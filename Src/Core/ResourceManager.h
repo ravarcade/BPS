@@ -75,13 +75,13 @@ public:
 };
 
 template <typename T, int ResTypeId, class Alloc = Allocators::Default>
-class ResoureImpl : public MemoryAllocatorImpl<Alloc>
+class ResoureImpl : public MemoryAllocatorGlobal<Alloc>
 {
 public:
 	// required methods to work as resource
 	static void *Create(ResourceBase *res) { return make_new<T>(); };
-	static void Destroy(void *ptr) { make_delete<T>(ptr); }
-	const U32 ResourceTypeId = ResTypeId;
+	static void Destroy(T *ptr) { make_delete<T>(ptr); }
+	static const U32 ResourceTypeId = ResTypeId;
 	static ResourceTypeRegistration<T> _AutomaticRegister;
 };
 
@@ -120,14 +120,14 @@ private:
 	T *_resourceImplementation;
 
 public:
-	Resource() { _resourceImplementation = T::Create(this); Type = T::ResourceTypeId; }
+	Resource() { _resourceImplementation = static_cast<T*>(T::Create(this)); Type = T::ResourceTypeId; }
 	virtual ~Resource() { if (_resourceImplementation) T::Destroy(_resourceImplementation); }
 	void Update() { _resourceImplementation->Update(this); }
 
 	
 };
 
-class BAMS_EXPORT ResourceManager : public MemoryAllocatorImpl<>
+class BAMS_EXPORT ResourceManager : public MemoryAllocatorGlobal<>
 {
 private:
 	struct InternalData;

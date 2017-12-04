@@ -119,7 +119,7 @@
     </Link>
     <PostBuildEvent>
       <Command>@echo "Copying $(ProjectName).lib"
-@copy /Y "$(SolutionDir)$(Configuration)\$(ProjectName).lib" "$(SolutionDir)Lib\$(ProjectName).lib"</Command>
+@copy /Y "$(SolutionDir)x64\$(Configuration)\$(ProjectName).lib" "$(SolutionDir)Lib\$(ProjectName).lib"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -167,7 +167,6 @@
     <ClInclude Include="..\Src\Core\Tools.h" />
     <ClInclude Include="..\Src\DllInterface\DllInterface.h" />
     <ClInclude Include="..\Src\DllInterface\IResourceManager.h" />
-    <ClInclude Include="..\Src\ResourcesManifest.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -176,7 +175,6 @@
     <ClCompile Include="..\Src\Core\ResourceManager.cpp" />
     <ClCompile Include="..\Src\Core\Tools.cpp" />
     <ClCompile Include="..\Src\DllInterface\IResourceManager.cpp" />
-    <ClCompile Include="..\Src\ResourcesManifest.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

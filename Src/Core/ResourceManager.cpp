@@ -48,7 +48,7 @@ ResourceBase::ResourceBase(CSTR path, CSTR name) :
 	}
 }
 
-struct ResourceManager::InternalData : public MemoryAllocatorImpl<>
+struct ResourceManager::InternalData : public MemoryAllocatorGlobal<>
 {
 	std::vector<ResourceBase *> _resources;
 

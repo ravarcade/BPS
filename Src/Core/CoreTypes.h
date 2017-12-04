@@ -29,7 +29,7 @@ class basic_string : public basic_string_base<T, U>
 private:
 	typedef basic_string<T, U, Alloc, minReservedSize> _T;
 	typedef basic_string_base<T, U> _B;
-	typedef MemoryAllocator<Alloc> _allocator;
+	typedef MemoryAllocatorGlobal<Alloc> _allocator;
 
 	void _Reserve(U newSize)
 	{
@@ -76,7 +76,12 @@ private:
 
 public:
 	basic_string() : _B(minReservedSize) { _Allocate(); }
-	basic_string(const T *src, const T *end = nullptr) { _used = end ? end - src : static_cast<U>(strlen(src)); _reserved = max(_used, static_cast<U>(minReservedSize)); _Allocate();  memcpy_s(_buf, _reserved, src, _used); }
+	basic_string(const T *src, const T *end = nullptr) { 
+		_used = end ? static_cast<U>(end - src) : static_cast<U>(strlen(src));
+		_reserved = max(_used, static_cast<U>(minReservedSize)); 
+		_Allocate();  
+		memcpy_s(_buf, _reserved, src, _used); 
+	}
 	template<typename V>
 	basic_string(const basic_string_base<T, V> &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used)) { _Allocate(); memcpy_s(_buf, _reserved, src._buf, _used); }
 
@@ -87,7 +92,7 @@ public:
 	~basic_string() { if (_buf) _allocator::deallocate(_buf); }
 
 
-	basic_string& operator=(const T* src) { _used = 0; U len = strlen(src);  _Append(len, src); return *this; }
+	basic_string& operator=(const T* src) { _used = 0; U len = static_cast<U>(strlen(src));  _Append(len, src); return *this; }
 	template<typename V>
 	basic_string& operator=(const basic_string_base<T, V>& src) { _used = 0; _Append(static_cast<U>(src._used), src._buf); return *this; }
 	//	basic_string& operator=(const basic_string_base_U16& src) { _used = 0; _Append(src._used, src._buf); return *this; }

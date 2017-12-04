@@ -9,9 +9,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="ResourceManager">
-      <UniqueIdentifier>{3b8239d9-b8c5-47bd-921b-cd170da706e7}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Core">
       <UniqueIdentifier>{e1e418ee-a8b7-4a24-8508-a81b32fa7815}</UniqueIdentifier>
     </Filter>
@@ -25,9 +22,6 @@
   <ItemGroup>
     <ClInclude Include="..\Src\BAMEngine.h">
       <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\ResourcesManifest.h">
-      <Filter>ResourceManager</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\Core\Core.h">
       <Filter>Core</Filter>
@@ -75,9 +69,6 @@
     </ClCompile>
     <ClCompile Include="..\Src\BAMEngine.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\ResourcesManifest.cpp">
-      <Filter>ResourceManager</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\Core\Tools.cpp">
       <Filter>Core</Filter>
