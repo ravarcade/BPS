@@ -28,6 +28,7 @@ public:
 
 	ResourceBase(CSTR path, CSTR name = nullptr);
 	ResourceBase() {};
+	virtual ~ResourceBase() {};
 
 
 	void ResourceLoad(void *data, SIZE_T size)
@@ -54,7 +55,7 @@ public:
 struct ResourceTypeListEntry
 {
 	typedef void *(*CreatePtr)(ResourceBase *);
-	typedef void(*DestroyPtr)(void *);
+	typedef void  (*DestroyPtr)(void *);
 
 	U32 TypeId;
 	CreatePtr Create;
@@ -149,20 +150,45 @@ public:
 	ResourceManager();
 	~ResourceManager();
 
-	//		void Import(ResourceManifest *pResourceManifest, int importType);
+	static ResourceManager *Create();
+	static void Destroy(ResourceManager *);
 
-	ResourceBase *Find(const STR &resName);
-	ResourceBase *Find(CSTR resName) { return Find(STR(resName)); };
+	ResourceBase *Find(const STR &resName, U32 typeId = ResourceBase::UNKNOWN);
+	ResourceBase *Find(CSTR resName, U32 typeId = ResourceBase::UNKNOWN) { return Find(STR(resName), typeId); };
 	ResourceBase *Find(const UUID &resUID);
 
 	void Add(CSTR path, CSTR name = nullptr);
 
 	template<class T>
-	Resource<T> *Get(const STR &resName) { auto res = Find(resName); return res != nullptr ? static_cast<Resource<T> *>(res) : _New<T>(resName, Tools::NOUID); }
+	Resource<T> *Get(const STR &resName) 
+	{ 
+		auto res = Find(resName, T::ResourceTypeId);
+		if (res == nullptr || res->Type != T::ResourceTypeId)
+			res = _New<T>(resName, Tools::NOUID);
+		return static_cast<Resource<T> *>(res);
+	}
 
 	template<class T>
-	Resource<T> *Get(CSTR resName) { auto res = Find(resName); return res != nullptr ? static_cast<Resource<T> *>(res) : _New<T>(resName, Tools::NOUID); }
+	Resource<T> *Get(CSTR resName) 
+	{ 
+		auto res = Find(resName, T::ResourceTypeId);
+		if (res == nullptr || res->Type != T::ResourceTypeId)
+		{
+			auto res2 = _New<T>(resName, Tools::NOUID);
+			res = res2;
+		}
+		return static_cast<Resource<T> *>(res);
+	}
 
 	template<class T>
-	Resource<T> *Get(const UUID &resUID) { auto res = Find(resUID); return res != nullptr ? static_cast<Resource<T> *>(res) : _New<T>("", resUID); }
+	Resource<T> *Get(const UUID &resUID) 
+	{ 
+		auto res = Find(resUID); 
+		if (res == nullptr || res->Type != T::ResourceTypeId)
+		{
+			auto res2 = _New<T>("", resUID);
+			res = res2;
+		}
+		return static_cast<Resource<T> *>(res);
+	}
 };

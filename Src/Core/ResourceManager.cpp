@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "..\..\BAMEngine\stdafx.h"
 
 NAMESPACE_CORE_BEGIN
 
@@ -89,11 +90,21 @@ ResourceManager::~ResourceManager()
 	make_delete(_data);
 }
 
-ResourceBase * ResourceManager::Find(const STR & resName)
+ResourceManager * ResourceManager::Create()
+{
+	return make_new<ResourceManager>();
+}
+
+void ResourceManager::Destroy(ResourceManager *rm)
+{
+	make_delete(rm);
+}
+
+ResourceBase * ResourceManager::Find(const STR & resName, U32 typeId)
 {
 	for (auto &res : _data->_resources)
 	{
-		if (res->Name == resName)
+		if (res->Name == resName && res->Type == typeId)
 			return res;
 	}
 

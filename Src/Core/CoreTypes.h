@@ -137,7 +137,7 @@ public:
 
 typedef basic_string<char> STR;
 typedef basic_string<char, U16> ShortSTR;
-typedef basic_string<char, U16, BAMS::CORE::Allocators::Default, 250> PathSTR;
+typedef basic_string<char, U16, Allocators::Default, 250> PathSTR;
 
 /**
 * === WASTE LAND ===

@@ -5,8 +5,31 @@
 #include "BAMEngine.h"
 
 
+class A
+{
+protected:
+	int x;
+public:
+	A() : x(2) {}
+	int GetX() { return x; }
+};
+
+class B : public A
+{
+protected:
+	int y;
+public:
+	B() : y(1) {}
+	~B() {}
+	int GetX() { return x; }
+	int GetY() { return y; }
+};
+
 int main()
 {
+	B *pB = new B();
+	A *pA = static_cast<A *>(pB);
+
 //	S1 st1;
 //	S1 st1;
 	/*
@@ -25,11 +48,16 @@ int main()
 	
 	BAMS::IResourceManager_AddResource("C:\\Work\\BAM Pinball Sim\\BPS\\BAMEngine\\ReadMe.txt");
 	BAMS::Resource res(BAMS::IResourceManager_FindByName("ReadMe"));
-	{
-		auto uid = res.GetUID();
-		auto path =res.GetPath();
-		auto name = res.GetName();
-	}
+	auto uid = res.GetUID();
+	auto path =res.GetPath();
+	auto name = res.GetName();
+
+	BAMS::Resource rr( BAMS::IResourceManager_GetByUID_RawData(uid));
+	uid = rr.GetUID();
+	path = rr.GetPath();
+	name = rr.GetName();
+
+
 
 //	SIZE_T s = ResourceBase::REQ_SIZE;
 //	ResourceManifest resman;

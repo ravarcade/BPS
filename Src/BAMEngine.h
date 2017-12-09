@@ -9,6 +9,7 @@
 #include "BAMEngineInternal.h"
 
 #else
+
 #pragma  comment(lib, "BAMEngine.lib")
 #define BAMS_EXPORT __declspec(dllimport)
 
