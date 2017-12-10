@@ -3,68 +3,73 @@
 
 #include "DllInterface.h"
 
-BAMS::CORE::ResourceManager rm;
-
 NAMESPACE_BAMS_BEGIN
 extern "C" {
 
-	BAMS_EXPORT IResourceManager *Create_ResourceManager()
-	{
-		return BAMS::CORE::ResourceManager::Create();
-	}
-
-	BAMS_EXPORT void Destroy_ResourceManager(IResourceManager *rm)
-	{
-		BAMS::CORE::ResourceManager::Destroy(reinterpret_cast<CORE::ResourceManager *>(rm));
-	}
-
-	BAMS_EXPORT void IResourceManager_AddResource(const char *path)
-	{
-		rm.Add(path);
-	}
-
-	BAMS_EXPORT IResource *IResourceManager_FindByName(const char *name)
-	{
-		return rm.Find(name);
-	}
-
-	BAMS_EXPORT IResource *IResourceManager_FindByUID(const UUID &uid)
-	{
-		return rm.Find(uid);
-	}
-
-	BAMS_EXPORT UUID IResourceManager_GetUID(IResource *res)
+	BAMS_EXPORT UUID IResource_GetUID(IResource *res)
 	{
 		CORE::ResourceBase *rb = reinterpret_cast<CORE::ResourceBase *>(res);
 		return rb->UID;
 	}
 
-	BAMS_EXPORT const char * IResourceManager_GetName(IResource *res)
+	BAMS_EXPORT const char * IResource_GetName(IResource *res)
 	{
 		CORE::ResourceBase *rb = reinterpret_cast<CORE::ResourceBase *>(res);
 		return rb->Name;
 	}
 
-	BAMS_EXPORT const char * IResourceManager_GetPath(IResource *res)
+	BAMS_EXPORT const char * IResource_GetPath(IResource *res)
 	{
 		CORE::ResourceBase *rb = reinterpret_cast<CORE::ResourceBase *>(res);
 		return rb->Path;
 	}
 
-	BAMS_EXPORT bool IResourceManager_IsLoaded(IResource *res)
+	BAMS_EXPORT bool IResource_IsLoaded(IResource *res)
 	{
 		CORE::ResourceBase *rb = reinterpret_cast<CORE::ResourceBase *>(res);
 		return rb->isLoaded();
 	}
 
-	BAMS_EXPORT IRawData *IResourceManager_GetByUID_RawData(const UUID & uid)
+	// ===========================================================================
+
+	BAMS_EXPORT IResourceManager *IResourceManager_Create()
 	{
-		return rm.Get<CORE::RawData>(uid);
+		return BAMS::CORE::ResourceManager::Create();
 	}
 
-	BAMS_EXPORT IRawData *IResourceManager_GetByName_RawData(const char * name)
+	BAMS_EXPORT void IResourceManager_Destroy(IResourceManager *rm)
 	{
-		return rm.Get<CORE::RawData>(name);
+		BAMS::CORE::ResourceManager::Destroy(reinterpret_cast<CORE::ResourceManager *>(rm));
+	}
+
+	BAMS_EXPORT void IResourceManager_AddResource(IResourceManager *rm, const char *path)
+	{
+		CORE::ResourceManager *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
+		resm->Add(path);
+	}
+
+	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name)
+	{
+		CORE::ResourceManager *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
+		return resm->Find(name);
+	}
+
+	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid)
+	{
+		CORE::ResourceManager *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
+		return resm->Find(uid);
+	}
+
+	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID & uid)
+	{
+		CORE::ResourceManager *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
+		return resm->Get<CORE::RawData>(uid);
+	}
+
+	BAMS_EXPORT IRawData *IResourceManager_GeRawDatatByName(IResourceManager *rm, const char * name)
+	{
+		CORE::ResourceManager *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
+		return resm->Get<CORE::RawData>(name);
 	}
 
 }

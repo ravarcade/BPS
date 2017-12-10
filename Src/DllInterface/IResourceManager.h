@@ -11,40 +11,66 @@ extern "C" {
 	typedef void IRawData;
 	typedef void IResourceManager;
 
-	BAMS_EXPORT IResourceManager *Create_ResourceManager();
-	BAMS_EXPORT void Destroy_ResourceManager(IResourceManager *);
+	// Resource
+	BAMS_EXPORT UUID IResource_GetUID(IResource *res);
+	BAMS_EXPORT const char * IResource_GetName(IResource *res);
+	BAMS_EXPORT const char * IResource_GetPath(IResource *res);
+	BAMS_EXPORT bool IResource_IsLoaded(IResource *res);
 
-	class ResourceManager {
-		IResourceManager *_rm;
+	// ResourceManager
+	BAMS_EXPORT IResourceManager *IResourceManager_Create();
+	BAMS_EXPORT void IResourceManager_Destroy(IResourceManager *);
+	BAMS_EXPORT void IResourceManager_AddResource(IResourceManager *rm, const char *path);
+	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name);
+	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid);
+	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID &uid);
+	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name);
 
-	public:
-		ResourceManager() { _rm = Create_ResourceManager(); }
-		ResourceManager(IResourceManager *rm) : _rm(rm) {};
-		~ResourceManager() { Destroy_ResourceManager(_rm); _rm = nullptr; }
-	};
 
-	//BAMS_EXPORT
 	
-	BAMS_EXPORT void IResourceManager_AddResource(const char *path);
-	BAMS_EXPORT IResource *IResourceManager_FindByName(const char *name);
-	BAMS_EXPORT IResource *IResourceManager_FindByUID(const UUID &uid);
-	BAMS_EXPORT UUID IResourceManager_GetUID(IResource *res);
-	BAMS_EXPORT const char * IResourceManager_GetName(IResource *res);
-	BAMS_EXPORT const char * IResourceManager_GetPath(IResource *res);
-	BAMS_EXPORT bool IResourceManager_IsLoaded(IResource *res);
 
-	class Resource {
+	class Resource 
+	{
 		IResource *_res;
+
 	public:
 		Resource(IResource *r) : _res(r) {}
 
-		UUID GetUID() { return IResourceManager_GetUID(_res); }
-		const char *GetName() { return IResourceManager_GetName(_res); }
-		const char *GetPath() { return IResourceManager_GetPath(_res); }
-		bool IsLoaded() { return IResourceManager_IsLoaded(_res); }
-
+		UUID GetUID() { return IResource_GetUID(_res); }
+		const char *GetName() { return IResource_GetName(_res); }
+		const char *GetPath() { return IResource_GetPath(_res); }
+		bool IsLoaded() { return IResource_IsLoaded(_res); }
 	};
 
-	BAMS_EXPORT IRawData IResourceManager_GetByUID_RawData(const UUID &uid);
-	BAMS_EXPORT IRawData IResourceManager_GetByName_RawData(const char *name);
+	class RawData
+	{
+		IRawData *_res;
+
+	public:
+		RawData(IRawData *r) : _res(r) {}
+
+		UUID GetUID() { return IResource_GetUID(static_cast<IResource*>(_res)); }
+		const char *GetName() { return IResource_GetName(static_cast<IResource*>(_res)); }
+		const char *GetPath() { return IResource_GetPath(static_cast<IResource*>(_res)); }
+		bool IsLoaded() { return IResource_IsLoaded(static_cast<IResource*>(_res)); }
+	};
+
+	class ResourceManager 
+	{
+		IResourceManager *_rm;
+
+	public:
+		ResourceManager() { _rm = IResourceManager_Create(); }
+		ResourceManager(IResourceManager *rm) : _rm(rm) {};
+		~ResourceManager() { IResourceManager_Destroy(_rm); _rm = nullptr; }
+
+		void AddResource(const char *path) { IResourceManager_AddResource(_rm, path); }
+
+		Resource FindByName(const char *name) { Resource res(IResourceManager_FindByName(_rm, name)); return res; }
+		Resource FindByUID(const UUID &uid) { Resource res(IResourceManager_FindByUID(_rm, uid)); return res; }
+
+		RawData GetRawDataByName(const char *name) { RawData res(IResourceManager_GetRawDataByName(_rm, name)); return res; }
+		RawData GetRawDataByUID(const UUID &uid) { RawData res(IResourceManager_GetRawDataByUID(_rm, uid)); return res; }
+
+	};
 }

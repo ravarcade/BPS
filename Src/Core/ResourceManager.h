@@ -159,6 +159,9 @@ public:
 
 	void Add(CSTR path, CSTR name = nullptr);
 
+	void LoadSync();
+	void LoadAsync();
+
 	template<class T>
 	Resource<T> *Get(const STR &resName) 
 	{ 

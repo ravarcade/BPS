@@ -73,6 +73,11 @@ struct ResourceManager::InternalData : public MemoryAllocatorGlobal<>
 	{
 		_resources.push_back(make_new<ResourceBase>(path, name));
 	}
+
+	void Load(ResourceBase *res)
+	{
+
+	}
 };
 
 void ResourceManager::_Add(ResourceBase * res)
@@ -126,6 +131,21 @@ ResourceBase * ResourceManager::Find(const UUID & resUID)
 void ResourceManager::Add(CSTR path, CSTR name)
 {
 	_data->AddResource(path, name);
+}
+
+void ResourceManager::LoadSync()
+{
+	for (auto &res : _data->_resources)
+	{
+		if (!res->isLoaded())
+		{
+			_data->Load(res);
+		}
+	}
+}
+
+void ResourceManager::LoadAsync()
+{
 }
 
 NAMESPACE_CORE_END
