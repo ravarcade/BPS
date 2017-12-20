@@ -7,8 +7,9 @@
 
 int main()
 {
-
-	BAMS::ResourceManager rm;
+	BAMS::Init();
+	BAMS::DoTests();
+	BAMS::CResourceManager rm;
 
 
 //	S1 st1;
@@ -27,7 +28,15 @@ int main()
 	st3 = st3 + st3 + st3;
 	*/
 	
-	rm.AddResource("C:\\Work\\BAM Pinball Sim\\BPS\\BAMEngine\\ReadMe.txt");
+	rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
+	auto r = rm.GetRawDataByName("ReadMe");
+	rm.LoadSync();
+	auto ruid = r.GetUID();
+	auto rpath = r.GetPath();
+	auto rname = r.GetName();
+	auto rdata = r.GetData();
+	auto rsize = r.GetSize();
+
 	auto res = rm.FindByName("ReadMe");
 	auto uid = res.GetUID();
 	auto path =res.GetPath();

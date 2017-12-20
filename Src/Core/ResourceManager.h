@@ -14,7 +14,6 @@
 class ResourceBase 
 {
 protected:
-
 	void *_resourceData;
 	SIZE_T _resourceSize;
 	bool _isLoaded;
@@ -24,19 +23,19 @@ public:
 	UUID UID;
 	U32  Type;
 	STR  Name;
-	PathSTR Path;
+	WSTR Path;
 
-	ResourceBase(CSTR path, CSTR name = nullptr);
+//	ResourceBase(CWSTR path, CSTR name = nullptr);
 	ResourceBase() {};
 	virtual ~ResourceBase() {};
 
+	void Init(CWSTR path);
 
 	void ResourceLoad(void *data, SIZE_T size)
 	{
 		_resourceData = data;
 		_resourceSize = size;
-		_isLoaded = false;
-		_refCounter = 0;
+		_isLoaded = data && size;
 	}
 
 	bool isLoaded() { return _isLoaded; }
@@ -49,6 +48,9 @@ public:
 		UNRECOGNIZED = -1,
 		UNKNOWN = 0,
 	};
+
+	virtual void Update() = 0;
+	virtual IMemoryAllocator *GetMemoryAllocator() = 0;
 };
 
 
@@ -89,31 +91,6 @@ public:
 template <typename T, int ResTypeId, class Alloc>
 ResourceTypeRegistration<T> ResoureImpl<T, ResTypeId, Alloc>::_AutomaticRegister;
 
-class RawData : public ResoureImpl<RawData, 0x00010001, Allocators::Default>
-{
-public:
-	U8 *Data;
-	SIZE_T Size;
-
-	RawData() : Data(nullptr), Size(0) {}
-	~RawData() { if (Data) deallocate(Data); }
-	void Update(ResourceBase *res) 
-	{
-		Size = res->GetSize();
-		if (Size)
-		{
-			Data = static_cast<U8 *>( allocate(Size) );
-			memcpy_s(Data, Size, res->GetData(), Size);
-		}
-	}
-};
-
-
-//#define REGRESOURCE(x)
-
-//REGRESOURCE(RawData);
-
-
 template<class T>
 class Resource : public ResourceBase
 {
@@ -124,8 +101,8 @@ public:
 	Resource() { _resourceImplementation = static_cast<T*>(T::Create(this)); Type = T::ResourceTypeId; }
 	virtual ~Resource() { if (_resourceImplementation) T::Destroy(_resourceImplementation); }
 	void Update() { _resourceImplementation->Update(this); }
-
-	
+	IMemoryAllocator *GetMemoryAllocator() { return _resourceImplementation->GetMemoryAllocator();  }
+	T *GetResource() { return _resourceImplementation; }
 };
 
 class BAMS_EXPORT ResourceManager : public MemoryAllocatorGlobal<>
@@ -157,7 +134,7 @@ public:
 	ResourceBase *Find(CSTR resName, U32 typeId = ResourceBase::UNKNOWN) { return Find(STR(resName), typeId); };
 	ResourceBase *Find(const UUID &resUID);
 
-	void Add(CSTR path, CSTR name = nullptr);
+	void Add(CWSTR path);
 
 	void LoadSync();
 	void LoadAsync();

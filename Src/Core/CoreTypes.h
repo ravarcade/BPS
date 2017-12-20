@@ -16,7 +16,13 @@ struct basic_string_base
 	basic_string_base() {}
 	basic_string_base(U reserved, U used = 0, T* buf = nullptr) : _reserved(reserved), _used(used), _buf(buf) {}
 	basic_string_base(const basic_string_base<T, U> &s) : _reserved(s._reserved), _used(s._used) {}
+	static SIZE_T length(const T *txt) { return strlen(txt); }
 };
+
+template<>
+SIZE_T basic_string_base<wchar_t, U16>::length(const wchar_t *txt) { return wcslen(txt); }
+template<>
+SIZE_T basic_string_base<wchar_t, U32>::length(const wchar_t *txt) { return wcslen(txt); }
 
 typedef basic_string_base<char, U16> basic_string_base_U16;
 typedef basic_string_base<char, U32> basic_string_base_U32;
@@ -30,39 +36,65 @@ private:
 	typedef basic_string<T, U, Alloc, minReservedSize> _T;
 	typedef basic_string_base<T, U> _B;
 	typedef MemoryAllocatorGlobal<Alloc> _allocator;
+	typedef basic_string_base<char, U> _BC;
+	typedef basic_string_base<wchar_t, U> _BW;
 
-	void _Reserve(U newSize)
+	void _CopyText(char *dst, const char *src, SIZE_T srcSize) { memcpy_s(dst, srcSize, src, srcSize); }
+	void _CopyText(wchar_t *dst, const wchar_t *src, SIZE_T srcSize) { memcpy_s(dst, srcSize * sizeof(wchar_t), src, srcSize * sizeof(wchar_t)); }
+	void _CopyText(wchar_t *dst, const char *src, SIZE_T srcSize)
 	{
-		T* old = _buf;
-		_reserved = max(newSize, minReservedSize);
-		_Allocate();
-
-		if (old)
+		size_t convertedChars;
+		mbstowcs_s(&convertedChars, dst, srcSize + 1, src, srcSize);
+		assert(convertedChars != srcSize);
+	}
+	void _CopyText(char *dst, const wchar_t *src, SIZE_T srcSize)
+	{
+		// we want to char "pure ascii" chars (0x20 - 0x7e)
+		while (srcSize)
 		{
-			if (_used)
-				memcpy_s(_buf, _reserved, old, _used);
-
-			_allocator::deallocate(old);
+			int c = *src;
+			++src;
+			if (c < 0x20 || c > 0x7e)
+				c = '_';
+			*dst = c;
+			++dst;
+			--srcSize;
 		}
+	}
+
+	//void _CopyText(T *dst, const ST *src, SIZE_T srcSize)
+	//{
+	//	while (srcSize)
+	//	{
+	//		*dst = static_cast<T>(*src);
+	//		++dst;
+	//		++src;
+	//		--srcSize;
+	//	}
+	//}
+
+	void _CopyText(void *dst, SIZE_T dstSize, const void *src, SIZE_T srcSize)
+	{
+		memcpy_s(dst, dstSize * sizeof(T), src, srcSize * sizeof(T));
 	}
 
 	void _Append(U len, const T *src)
 	{
 		T *oldBuf = nullptr;
 
-		if (_reserved <= _used + len) // yes.... we will have alway atleast 1 byte spared space.... for "\0" to make c-string
+		if (_reserved <= _used + len) // yes.... we will have alway atleast 1 char spared space.... for "\0" to make c-string
 		{
 			oldBuf = _buf;
 			_reserved = _used + len + minReservedSize;
 			_Allocate();
 
 			if (oldBuf && _used)
-				memcpy_s(_buf, _reserved, oldBuf, _used);
+				_CopyText(_buf, _reserved, oldBuf, _used);
 		}
 
 		if (len && src)
 		{
-			memcpy_s(_buf + _used, _reserved - _used, src, len);
+			_CopyText(_buf + _used, _reserved - _used, src, len);
 			_used += len;
 		}
 
@@ -72,47 +104,44 @@ private:
 
 	}
 
-	void _Allocate() { _buf = static_cast<T *>(_allocator::allocate(_reserved)); }
+	void _Allocate() { _buf = static_cast<T *>(_allocator::allocate(_reserved*sizeof(T))); }
 
 public:
 	basic_string() : _B(minReservedSize) { _Allocate(); }
-	basic_string(const T *src, const T *end = nullptr) { 
-		_used = end ? static_cast<U>(end - src) : static_cast<U>(strlen(src));
+	template<typename ST>
+	basic_string(const ST *src, const ST *end = nullptr) { 
+		_used = end ? static_cast<U>(end - src) : static_cast<U>(basic_string_base<ST,U>::length(src));
 		_reserved = max(_used, static_cast<U>(minReservedSize)); 
 		_Allocate();  
-		memcpy_s(_buf, _reserved, src, _used); 
+		_CopyText(_buf, src, _used);
 	}
-	template<typename V>
-	basic_string(const basic_string_base<T, V> &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used)) { _Allocate(); memcpy_s(_buf, _reserved, src._buf, _used); }
 
-	//	basic_string(const basic_string_base_U16 &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used)) { _Allocate(); memcpy_s(_buf, _reserved, src._buf, _used); }
-	//	basic_string(const basic_string_base_U32 &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used)) { _Allocate(); memcpy_s(_buf, _reserved, src._buf, _used); }
+	template<typename ST, typename SU>
+	basic_string(const basic_string_base<ST, SU> &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used))
+	{
+		_Allocate();
+		_CopyText(_buf, src._buf, _used);
+	}
 
+	basic_string(const _T &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used)) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); }
 	basic_string(_T &&src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used), src._buf) { src._used = 0; src._reserved = 0; src._buf = nullptr; }
 	~basic_string() { if (_buf) _allocator::deallocate(_buf); }
 
-
-	basic_string& operator=(const T* src) { _used = 0; U len = static_cast<U>(strlen(src));  _Append(len, src); return *this; }
 	template<typename V>
 	basic_string& operator=(const basic_string_base<T, V>& src) { _used = 0; _Append(static_cast<U>(src._used), src._buf); return *this; }
-	//	basic_string& operator=(const basic_string_base_U16& src) { _used = 0; _Append(src._used, src._buf); return *this; }
-	//	basic_string& operator=(const basic_string_base_U32& src) { _used = 0; _Append(src._used, src._buf); return *this; }
+	basic_string& operator=(const T* src) { _used = 0; U len = static_cast<U>(_B::length(src));  _Append(len, src); return *this; }
 	basic_string& operator=(const _T& src) { _used = 0; _Append(src._used, src._buf); return *this; }
 
 	T operator[](SIZE_T pos) const { return (pos < _used && pos >= 0) ? _buf[pos] : 0; };
 	T& operator[](SIZE_T pos) { return (pos < _used && pos >= 0) ? _buf[pos] : _buf[0]; };
 
-	basic_string & operator += (const T *src) { U len = static_cast<U>(strlen(src)); _Append(len, src); return *this; }
 	template<typename V>
 	basic_string & operator += (const basic_string_base<T, V>& src) { _Append(static_cast<U>(src._used), src._buf);  return *this; }
-	//	basic_string & operator += (const basic_string_base_U16 &src) { _Append(static_cast<U>(src._used), src._buf);  return *this; }
-	//	basic_string & operator += (const basic_string_base_U32 &src) { _Append(static_cast<U>(src._used), src._buf);  return *this; }
+	basic_string & operator += (const T *src) { U len = static_cast<U>(_B::length(src)); _Append(len, src); return *this; }
 
-	basic_string operator + (const T *src) const { basic_string tmp(*(static_cast<const _B *>(this))); tmp += src;	return tmp; }
 	template<typename V>
 	basic_string operator + (const basic_string_base<T, V>& src)  const { basic_string tmp(*(static_cast<const _B *>(this))); tmp += src;	return tmp; }
-	//	basic_string operator + (const basic_string_base_U16 &src)  const { basic_string tmp(*(static_cast<const _B *>(this))); tmp += src;	return tmp; }
-	//	basic_string operator + (const basic_string_base_U32 &src)  const { basic_string tmp(*(static_cast<const _B *>(this))); tmp += src;	return tmp; }
+	basic_string operator + (const T *src) const { basic_string tmp(*(static_cast<const _B *>(this))); tmp += src;	return tmp; }
 
 	bool operator == (const basic_string_base<T, U> &str) const {
 		if (str._buf == _buf)
@@ -126,18 +155,23 @@ public:
 
 	operator _B() { return *this; }
 
-	operator const T *() { 
+	const T * c_str() { 
 		if (_used == _reserved)
-			_Append(1, "");
+		{
+			static const char *zero = "\0";
+			_Append(1, reinterpret_cast<const T*>(zero));
+		}
 		_buf[_used] = 0;
 
 		return _buf; 
 	}
 };
 
+
 typedef basic_string<char> STR;
 typedef basic_string<char, U16> ShortSTR;
-typedef basic_string<char, U16, Allocators::Default, 250> PathSTR;
+typedef basic_string<wchar_t, U32, Allocators::Default, 250> PathSTR;
+typedef basic_string<wchar_t> WSTR;
 
 /**
 * === WASTE LAND ===

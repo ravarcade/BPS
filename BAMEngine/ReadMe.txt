@@ -12,7 +12,7 @@ https://social.msdn.microsoft.com/Forums/vstudio/en-US/a114380e-29f2-473f-9d26-b
 https://stackoverflow.com/questions/33599723/fatal-error-lnk1104-cannot-open-file-gdi32-lib
 
 
-Any way.... Do you e
+Any way.... how reads "readme.txt"?
 ========================================================================
     DYNAMIC LINK LIBRARY : BAMEngine Project Overview
 ========================================================================

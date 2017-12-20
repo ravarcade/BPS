@@ -140,7 +140,7 @@ public:
 		}
 	}
 
-	operator IMemoryAllocator*() { return _memoryAllocator; }
+	IMemoryAllocator* GetMemoryAllocator() { return _memoryAllocator; }
 };
 
 template<typename T>

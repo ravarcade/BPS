@@ -3,51 +3,90 @@
 
 NAMESPACE_CORE_BEGIN
 
-ResourceBase::ResourceBase(CSTR path, CSTR name) :
-	_resourceData(nullptr),
-	_resourceSize(0),
-	_isLoaded(false),
-	_refCounter(0)
+void ResourceBase::Init(CWSTR path)
 {
-	STR normalizedPath = path;
+	_resourceData = nullptr;
+	_resourceSize = 0;
+	_isLoaded = false;
+	_refCounter = 0;
+
+	WSTR normalizedPath = path;
 	Tools::NormalizePath(normalizedPath);
 
 	Tools::CreateUUID(UID);
-	Type = UNKNOWN;
 	Path = normalizedPath;
-	if (name)
+	CWSTR pPathEnd = Path._buf + Path._used;
+	CWSTR pPathBegin = Path._buf;
+	CWSTR pEnd = pPathEnd;
+	CWSTR pBegin = pPathBegin;
+	while (pPathEnd > pPathBegin)
 	{
-		Name = name;
+		--pPathEnd;
+		if (*pPathEnd == '.')
+		{
+			pEnd = pPathEnd;
+			break;
+		}
 	}
-	else
+
+	while (pPathEnd > pPathBegin)
 	{
-		CSTR pPathEnd = Path._buf + Path._used;
-		CSTR pPathBegin = Path._buf;
-		CSTR pEnd = pPathEnd;
-		CSTR pBegin = pPathBegin;
-		while (pPathEnd > pPathBegin)
+		--pPathEnd;
+		if (*pPathEnd == Tools::directorySeparatorChar)
 		{
-			--pPathEnd;
-			if (*pPathEnd == '.')
-			{
-				pEnd = pPathEnd;
-				break;
-			}
+			pBegin = pPathEnd + 1;
+			break;
 		}
-
-
-		while (pPathEnd > pPathBegin)
-		{
-			--pPathEnd;
-			if (*pPathEnd == Tools::directorySeparatorChar)
-			{
-				pBegin = pPathEnd + 1;
-				break;
-			}
-		}
-		Name = STR(pBegin, pEnd);
 	}
+	Name = STR(pBegin, pEnd);
 }
+
+//
+//ResourceBase::ResourceBase(CWSTR path, CSTR name) :
+//	_resourceData(nullptr),
+//	_resourceSize(0),
+//	_isLoaded(false),
+//	_refCounter(0)
+//{
+//	WSTR normalizedPath = path;
+//	Tools::NormalizePath(normalizedPath);
+//
+//	Tools::CreateUUID(UID);
+//	Type = UNKNOWN;
+//	Path = normalizedPath;
+//	if (name)
+//	{
+//		Name = name;
+//	}
+//	else
+//	{
+//		CWSTR pPathEnd = Path._buf + Path._used;
+//		CWSTR pPathBegin = Path._buf;
+//		CWSTR pEnd = pPathEnd;
+//		CWSTR pBegin = pPathBegin;
+//		while (pPathEnd > pPathBegin)
+//		{
+//			--pPathEnd;
+//			if (*pPathEnd == '.')
+//			{
+//				pEnd = pPathEnd;
+//				break;
+//			}
+//		}
+//
+//
+//		while (pPathEnd > pPathBegin)
+//		{
+//			--pPathEnd;
+//			if (*pPathEnd == Tools::directorySeparatorChar)
+//			{
+//				pBegin = pPathEnd + 1;
+//				break;
+//			}
+//		}
+//		Name = STR(pBegin, pEnd);
+//	}
+//}
 
 struct ResourceManager::InternalData : public MemoryAllocatorGlobal<>
 {
@@ -69,14 +108,19 @@ struct ResourceManager::InternalData : public MemoryAllocatorGlobal<>
 		_resources.push_back(res);
 	}
 
-	void AddResource(CSTR path, CSTR name)
+	void AddResource(CWSTR path)
 	{
-		_resources.push_back(make_new<ResourceBase>(path, name));
+		auto res = make_new<Resource<RawData> >();
+		res->Init(path);
+		_resources.push_back(res);
 	}
 
 	void Load(ResourceBase *res)
 	{
-
+		SIZE_T size = 0;
+		BYTE *data = nullptr;;
+		data = Tools::LoadFile(&size, res->Path, res->GetMemoryAllocator());
+		res->ResourceLoad(data, size);
 	}
 };
 
@@ -128,9 +172,9 @@ ResourceBase * ResourceManager::Find(const UUID & resUID)
 }
 
 
-void ResourceManager::Add(CSTR path, CSTR name)
+void ResourceManager::Add(CWSTR path)
 {
-	_data->AddResource(path, name);
+	_data->AddResource(path);
 }
 
 void ResourceManager::LoadSync()
@@ -140,6 +184,10 @@ void ResourceManager::LoadSync()
 		if (!res->isLoaded())
 		{
 			_data->Load(res);
+			if (res->isLoaded())
+			{
+				res->Update();
+			}
 		}
 	}
 }

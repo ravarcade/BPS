@@ -59,6 +59,9 @@
     <ClInclude Include="..\Src\DllInterface\IResourceManager.h">
       <Filter>DllInterface</Filter>
     </ClInclude>
+    <ClInclude Include="..\Src\Core\RawData.h">
+      <Filter>Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

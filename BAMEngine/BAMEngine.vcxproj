@@ -164,6 +164,7 @@
     <ClInclude Include="..\Src\Core\Core.h" />
     <ClInclude Include="..\Src\Core\CoreTypes.h" />
     <ClInclude Include="..\Src\Core\MemoryAllocator.h" />
+    <ClInclude Include="..\Src\Core\RawData.h" />
     <ClInclude Include="..\Src\Core\ResourceManager.h" />
     <ClInclude Include="..\Src\Core\Tools.h" />
     <ClInclude Include="..\Src\DllInterface\DllInterface.h" />

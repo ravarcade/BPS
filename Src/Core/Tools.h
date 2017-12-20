@@ -13,7 +13,9 @@ public:
 	enum {
 		directorySeparatorChar = '\\'
 	};
-	static void NormalizePath(STR & path);
+	static void NormalizePath(WSTR &path);
 	static void CreateUUID(UUID &uuid);
+	static BYTE *LoadFile(SIZE_T *pFileSize, WSTR &path, IMemoryAllocator *alloc);
+
 	static UUID NOUID;
 };
