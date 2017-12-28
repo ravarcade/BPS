@@ -17,7 +17,7 @@ public:
 
 	void Update(ResourceBase *res)
 	{
-		// memory is allocated with RawData MemoryAllocator, so we don't have tp copy it
+		// memory is allocated with RawData MemoryAllocator, so we don't have to copy it.
 		Data = static_cast<U8 *>(res->GetData());
 		Size = res->GetSize();
 	}

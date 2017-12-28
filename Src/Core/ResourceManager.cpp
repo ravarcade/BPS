@@ -149,11 +149,31 @@ void ResourceManager::Destroy(ResourceManager *rm)
 	make_delete(rm);
 }
 
+void ResourceManager::Filter(ResourceBase ** resList, I32 * resCount, CSTR & _pattern)
+{
+	STR pattern(_pattern);
+	I32 counter = 0;
+	I32 max = (resCount && resList) ? *resCount : 0;
+
+	for (auto &res : _data->_resources)
+	{
+		if (res->Name.wildcard(pattern))
+		{
+			if (counter < max)
+				resList[counter] = res;
+			++counter;
+		}
+	}
+
+	if (resCount)
+		*resCount = counter;
+}
+
 ResourceBase * ResourceManager::Find(const STR & resName, U32 typeId)
 {
 	for (auto &res : _data->_resources)
 	{
-		if (res->Name == resName && res->Type == typeId)
+		if (res->Name == resName && (res->Type == typeId || typeId == ResourceBase::UNKNOWN))
 			return res;
 	}
 

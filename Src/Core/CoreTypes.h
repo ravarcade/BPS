@@ -17,12 +17,19 @@ struct basic_string_base
 	basic_string_base(U reserved, U used = 0, T* buf = nullptr) : _reserved(reserved), _used(used), _buf(buf) {}
 	basic_string_base(const basic_string_base<T, U> &s) : _reserved(s._reserved), _used(s._used) {}
 	static SIZE_T length(const T *txt) { return strlen(txt); }
+	static T tolower(T c) { return ::tolower(c); }
 };
 
 template<>
 SIZE_T basic_string_base<wchar_t, U16>::length(const wchar_t *txt) { return wcslen(txt); }
 template<>
 SIZE_T basic_string_base<wchar_t, U32>::length(const wchar_t *txt) { return wcslen(txt); }
+
+template<>
+wchar_t basic_string_base<wchar_t, U16>::tolower(wchar_t c) { return towlower(c); }
+template<>
+wchar_t basic_string_base<wchar_t, U32>::tolower(wchar_t c) { return towlower(c); }
+
 
 typedef basic_string_base<char, U16> basic_string_base_U16;
 typedef basic_string_base<char, U32> basic_string_base_U32;
@@ -36,8 +43,6 @@ private:
 	typedef basic_string<T, U, Alloc, minReservedSize> _T;
 	typedef basic_string_base<T, U> _B;
 	typedef MemoryAllocatorGlobal<Alloc> _allocator;
-	typedef basic_string_base<char, U> _BC;
-	typedef basic_string_base<wchar_t, U> _BW;
 
 	void _CopyText(char *dst, const char *src, SIZE_T srcSize) { memcpy_s(dst, srcSize, src, srcSize); }
 	void _CopyText(wchar_t *dst, const wchar_t *src, SIZE_T srcSize) { memcpy_s(dst, srcSize * sizeof(wchar_t), src, srcSize * sizeof(wchar_t)); }
@@ -61,17 +66,6 @@ private:
 			--srcSize;
 		}
 	}
-
-	//void _CopyText(T *dst, const ST *src, SIZE_T srcSize)
-	//{
-	//	while (srcSize)
-	//	{
-	//		*dst = static_cast<T>(*src);
-	//		++dst;
-	//		++src;
-	//		--srcSize;
-	//	}
-	//}
 
 	void _CopyText(void *dst, SIZE_T dstSize, const void *src, SIZE_T srcSize)
 	{
@@ -164,6 +158,76 @@ public:
 		_buf[_used] = 0;
 
 		return _buf; 
+	}
+
+	template <typename V>
+	bool wildcard(const basic_string_base<T, V>& pat, U pos = 0, V patPos = 0)
+	{
+		for (V i=patPos; i<pat._used;)
+		{
+			T c = pat._buf[i];
+			++i;
+			switch (c) {
+			case '?':
+				if (pos <_used)
+					return false; // we have more chars in pattern than in haystack
+
+				++pos;
+				break;
+
+			case '*': {
+				if (i == pat._used)
+					return true; // last char in pattern is '*'
+
+				for (U j = pos + 1; j < _used; ++j)
+					if (wildcard(pat, j, i ))
+						return true;
+				return false;
+			}
+
+			default:
+				if (c != _buf[pos])
+					return false;
+				++pos;
+			}
+		}
+
+		return pos != _used;
+	}
+
+	template <typename V>
+	bool iwildcard(const basic_string_base<T, V>& pat, U pos = 0, V patPos = 0)
+	{
+		for (V i = patPos; i<pat._used;)
+		{
+			T c = pat._buf[i];
+			++i;
+			switch (c) {
+			case '?':
+				if (pos <_used)
+					return false; // we have more chars in pattern than in haystack
+
+				++pos;
+				break;
+
+			case '*': {
+				if (i == pat._used)
+					return true; // last char in pattern is '*'
+
+				for (U j = pos + 1; j < _used; ++j)
+					if (wildcard(pat, j, i))
+						return true;
+				return false;
+			}
+
+			default:
+				if (_B::tolower(c) != _B::tolower(_buf[pos]))
+					return false;
+				++pos;
+			}
+		}
+
+		return pos != _used;
 	}
 };
 

@@ -130,6 +130,7 @@ public:
 	static ResourceManager *Create();
 	static void Destroy(ResourceManager *);
 
+	void Filter(ResourceBase **resList, I32 *resCount, CSTR &patern);
 	ResourceBase *Find(const STR &resName, U32 typeId = ResourceBase::UNKNOWN);
 	ResourceBase *Find(CSTR resName, U32 typeId = ResourceBase::UNKNOWN) { return Find(STR(resName), typeId); };
 	ResourceBase *Find(const UUID &resUID);

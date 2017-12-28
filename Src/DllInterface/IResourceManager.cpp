@@ -11,6 +11,11 @@ extern "C" {
 		setlocale(LC_CTYPE, "");
 	}
 
+	BAMS_EXPORT void Release()
+	{
+		
+	}
+
 	// =========================================================================== Resource
 
 	BAMS_EXPORT UUID IResource_GetUID(IResource *res)
@@ -35,6 +40,12 @@ extern "C" {
 	{
 		auto *rb = reinterpret_cast<CORE::ResourceBase *>(res);
 		return rb ? rb->isLoaded() : false;
+	}
+
+	BAMS_EXPORT uint32_t IResource_GetType(IResource * res)
+	{
+		auto *rb = reinterpret_cast<CORE::ResourceBase *>(res);
+		return rb ? rb->Type : false;
 	}
 
 	// =========================================================================== RawData
@@ -75,6 +86,12 @@ extern "C" {
 		return resm->Find(name);
 	}
 
+	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource ** resList, int32_t * resCount, const char * pattern)
+	{
+		auto *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
+		resm->Filter(reinterpret_cast<CORE::ResourceBase **>(resList), resCount, pattern);
+	}
+
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid)
 	{
 		auto *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
@@ -103,6 +120,20 @@ extern "C" {
 	{
 		auto *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
 		resm->LoadAsync();
+	}
+
+	// ========================================================================
+
+	BAMS_EXPORT void GetMemoryAllocationStats(uint64_t *Max, uint64_t *Current, uint64_t *Counter)
+	{
+		if (Max)
+			*Max = CORE::Allocators::Default::MaxAllocatedMemory;
+
+		if (Current)
+			*Current = CORE::Allocators::Default::CurrentAllocatedMemory;
+
+		if (Counter)
+			*Counter = CORE::Allocators::Default::TotalAllocateCommands;
 	}
 
 	// ========================================================================

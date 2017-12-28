@@ -15,12 +15,14 @@
 inline void* _aligned_malloc(size_t size, size_t alignment)
 {
 	--alignment;
-	void* data = ::malloc(size + alignment + sizeof(void*));
+	size_t extraDataSize = sizeof(void *);
+	void* data = ::malloc(size + alignment + extraDataSize);
 	if (data == nullptr)
 		return nullptr;
 
-	uintptr_t alignedData = reinterpret_cast<uintptr_t>(data) + sizeof(void*) + alignment;
+	uintptr_t alignedData = reinterpret_cast<uintptr_t>(data) + extraDataSize + alignment;
 	alignedData &= (uintptr_t(-1) - alignment);;
+
 
 	reinterpret_cast<void **>(alignedData)[-1] = data;
 	return reinterpret_cast<void *>(alignedData);
@@ -35,6 +37,37 @@ inline void _aligned_free(void* ptr)
 	::free(reinterpret_cast<void **>(ptr)[-1]);
 }
 
+/// <summary>
+/// Allocate memory aligned to requested number of bytes (but number must be power of 2).
+/// </summary>
+/// <param name="size">The size in bytes.</param>
+/// <param name="alignment">The alignment in bytes (power of 2).</param>
+/// <param name="extraDataSize">Size of extrea spece before allocated memory. That space may be used to tag memory.</param>
+/// <returns>The pointer to new aligned memory.</returns>
+inline void* _aligned_malloc_plus(size_t size, size_t alignment, size_t extraDataSize)
+{
+	--alignment;
+	extraDataSize += sizeof(void *);
+	void* data = ::malloc(size + alignment + extraDataSize);
+	if (data == nullptr)
+		return nullptr;
+
+	uintptr_t alignedData = reinterpret_cast<uintptr_t>(data) + extraDataSize + alignment;
+	alignedData &= (uintptr_t(-1) - alignment);
+
+	reinterpret_cast<void **>(alignedData)[-1] = data;
+	return reinterpret_cast<void *>(alignedData);
+}
+
+/// <summary>
+/// Free allocated memory.
+/// </summary>
+/// <param name="ptr">The pointer to aligned memory.</param>
+inline void _aligned_free_plus(void* ptr)
+{
+	::free(reinterpret_cast<void **>(ptr)[-1]);
+}
+
 struct IMemoryAllocator
 {
 	virtual void *allocate(size_t bytes) = 0;
@@ -43,13 +76,44 @@ struct IMemoryAllocator
 
 namespace Allocators 
 {
+	struct Default : public IMemoryAllocator
+	{
+		static size_t MaxAllocatedMemory;
+		static size_t CurrentAllocatedMemory;
+		static size_t TotalAllocateCommands;
+		struct ExtraMemoryBlockInfo
+		{
+			size_t size;
+		};
+
+		void* allocate(size_t bytes) { 
+			++TotalAllocateCommands; 
+			CurrentAllocatedMemory += bytes; 
+			if (MaxAllocatedMemory < CurrentAllocatedMemory)
+			{
+				MaxAllocatedMemory = CurrentAllocatedMemory;
+			}
+			
+			void *ptr = _aligned_malloc_plus(bytes, 4, sizeof(ExtraMemoryBlockInfo));
+			ExtraMemoryBlockInfo *ext = reinterpret_cast<ExtraMemoryBlockInfo *>(reinterpret_cast<uintptr_t>(ptr) - sizeof(ExtraMemoryBlockInfo) - sizeof(void *));
+			ext->size = bytes;
+			return ptr;
+		}
+
+		void deallocate(void* ptr) { 
+			ExtraMemoryBlockInfo *ext = reinterpret_cast<ExtraMemoryBlockInfo *>(reinterpret_cast<uintptr_t>(ptr) - sizeof(ExtraMemoryBlockInfo) - sizeof(void *));
+			CurrentAllocatedMemory -= ext->size;
+			_aligned_free(ptr); 
+		}
+	};
+
 	struct Alligned16Bytes : public IMemoryAllocator
 	{
 		void* allocate(size_t bytes) { return _aligned_malloc(bytes, 16); }
 		void deallocate(void* ptr) { _aligned_free(ptr); }
 	};
 
-	typedef Alligned16Bytes Default;
+//	typedef Alligned16Bytes Default;
 	typedef Alligned16Bytes Stack;
 	typedef Alligned16Bytes Frame;
 	typedef Alligned16Bytes Blocks;
