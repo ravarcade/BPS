@@ -30,7 +30,7 @@ extern "C" {
 	BAMS_EXPORT void IResourceManager_Destroy(IResourceManager *);
 	BAMS_EXPORT void IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name);
-	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource **resList, int32_t *resCount, const char *pattern);
+	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource **resList, uint32_t *resCount, const char *pattern);
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name);
@@ -82,7 +82,7 @@ extern "C" {
 
 		void AddResource(const wchar_t *path) { IResourceManager_AddResource(_rm, path); }
 
-		void Filter(IResource **resList, int32_t *resCount, const char *pattern) { IResourceManager_Filter(_rm, resList, resCount, pattern); }
+		void Filter(IResource **resList, uint32_t *resCount, const char *pattern) { IResourceManager_Filter(_rm, resList, resCount, pattern); }
 		CResource FindByName(const char *name) { CResource res(IResourceManager_FindByName(_rm, name)); return res; }
 		CResource FindByUID(const UUID &uid) { CResource res(IResourceManager_FindByUID(_rm, uid)); return res; }
 

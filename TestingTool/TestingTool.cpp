@@ -51,7 +51,7 @@ int main()
 
 
 		BAMS::IResource *resList[10];
-		int32_t resCount = 10;
+		uint32_t resCount = 10;
 		rm.Filter(resList, &resCount, "*");
 
 		//	SIZE_T s = ResourceBase::REQ_SIZE;

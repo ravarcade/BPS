@@ -52,13 +52,13 @@ extern "C" {
 
 	BAMS_EXPORT unsigned char * IRawData_GetData(IRawData *res)
 	{
-		auto *rb = reinterpret_cast<CORE::Resource<CORE::RawData> *>(res)->GetResource();
+		auto *rb = reinterpret_cast<CORE::RawData *>( reinterpret_cast<CORE::ResourceBase *>(res)->GetImplementation() );
 		return static_cast<unsigned char *>(rb->GetData());
 	}
 
 	BAMS_EXPORT size_t IRawData_GetSize(IRawData *res)
 	{
-		auto *rb = reinterpret_cast<CORE::Resource<CORE::RawData> *>(res)->GetResource();
+		auto *rb = reinterpret_cast<CORE::RawData *>(reinterpret_cast<CORE::ResourceBase *>(res)->GetImplementation());
 		return rb->GetSize();
 	}
 
@@ -83,10 +83,10 @@ extern "C" {
 	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name)
 	{
 		auto *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
-		return resm->Find(name);
+		return resm->Get(name);
 	}
 
-	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource ** resList, int32_t * resCount, const char * pattern)
+	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource ** resList, uint32_t * resCount, const char * pattern)
 	{
 		auto *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
 		resm->Filter(reinterpret_cast<CORE::ResourceBase **>(resList), resCount, pattern);
@@ -95,13 +95,13 @@ extern "C" {
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid)
 	{
 		auto *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
-		return resm->Find(uid);
+		return resm->Get(uid);
 	}
 
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID & uid)
 	{
 		auto *resm = reinterpret_cast<CORE::ResourceManager *>(rm);
-		return resm->Get<CORE::RawData>(uid);
+		return resm->Get(uid);
 	}
 
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name)

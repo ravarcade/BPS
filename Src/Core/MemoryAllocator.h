@@ -76,7 +76,7 @@ struct IMemoryAllocator
 
 namespace Allocators 
 {
-	struct Default : public IMemoryAllocator
+	struct Standard : public IMemoryAllocator
 	{
 		static size_t MaxAllocatedMemory;
 		static size_t CurrentAllocatedMemory;
@@ -85,6 +85,44 @@ namespace Allocators
 		{
 			size_t size;
 		};
+
+		void* allocate(size_t bytes) {
+			++TotalAllocateCommands;
+			CurrentAllocatedMemory += bytes;
+			if (MaxAllocatedMemory < CurrentAllocatedMemory)
+			{
+				MaxAllocatedMemory = CurrentAllocatedMemory;
+			}
+
+			void *ptr = _aligned_malloc_plus(bytes, 4, sizeof(ExtraMemoryBlockInfo));
+			ExtraMemoryBlockInfo *ext = reinterpret_cast<ExtraMemoryBlockInfo *>(reinterpret_cast<uintptr_t>(ptr) - sizeof(ExtraMemoryBlockInfo) - sizeof(void *));
+			ext->size = bytes;
+			return ptr;
+		}
+
+		void deallocate(void* ptr) {
+			ExtraMemoryBlockInfo *ext = reinterpret_cast<ExtraMemoryBlockInfo *>(reinterpret_cast<uintptr_t>(ptr) - sizeof(ExtraMemoryBlockInfo) - sizeof(void *));
+			CurrentAllocatedMemory -= ext->size;
+			_aligned_free(ptr);
+		}
+	};
+
+	struct Debug : public IMemoryAllocator
+	{
+		static size_t MaxAllocatedMemory;
+		static size_t CurrentAllocatedMemory;
+		static size_t TotalAllocateCommands;
+		static U32 Counter;
+
+		struct ExtraMemoryBlockInfo
+		{
+			U32 counter;
+			size_t size;
+			ExtraMemoryBlockInfo *prev;
+			ExtraMemoryBlockInfo *next;
+		};
+
+		static ExtraMemoryBlockInfo *Last;
 
 		void* allocate(size_t bytes) { 
 			++TotalAllocateCommands; 
@@ -97,12 +135,26 @@ namespace Allocators
 			void *ptr = _aligned_malloc_plus(bytes, 4, sizeof(ExtraMemoryBlockInfo));
 			ExtraMemoryBlockInfo *ext = reinterpret_cast<ExtraMemoryBlockInfo *>(reinterpret_cast<uintptr_t>(ptr) - sizeof(ExtraMemoryBlockInfo) - sizeof(void *));
 			ext->size = bytes;
+			ext->counter = ++Counter;
+			ext->next = nullptr;
+			ext->prev = Last;
+			if (Last)
+				Last->next = ext;
+			Last = ext;
+
 			return ptr;
 		}
 
 		void deallocate(void* ptr) { 
 			ExtraMemoryBlockInfo *ext = reinterpret_cast<ExtraMemoryBlockInfo *>(reinterpret_cast<uintptr_t>(ptr) - sizeof(ExtraMemoryBlockInfo) - sizeof(void *));
 			CurrentAllocatedMemory -= ext->size;
+			if (ext->next)
+				ext->next->prev = ext->prev;
+			if (ext->prev)
+				ext->prev->next = ext->next;
+			if (Last == ext)
+				Last = ext->prev;
+
 			_aligned_free(ptr); 
 		}
 	};
@@ -112,6 +164,8 @@ namespace Allocators
 		void* allocate(size_t bytes) { return _aligned_malloc(bytes, 16); }
 		void deallocate(void* ptr) { _aligned_free(ptr); }
 	};
+
+	typedef Debug Default;
 
 //	typedef Alligned16Bytes Default;
 	typedef Alligned16Bytes Stack;
@@ -154,7 +208,7 @@ public:
 	{
 		if (p) 
 		{
-			p->~T();
+			reinterpret_cast<T*>(p)->~T();
 			deallocate(p);
 		}
 	}
@@ -195,11 +249,11 @@ public:
 
 
 	template <class T>
-	inline static void make_delete(T *p)
+	inline static void make_delete(void *p)
 	{
 		if (p)
 		{
-			p->~T();
+			reinterpret_cast<T*>(p)->~T();
 			deallocate(p);
 		}
 	}

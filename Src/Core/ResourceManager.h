@@ -6,6 +6,28 @@
 *
 */
 
+class ResourceBase;
+class ResourceInterface;
+class ResourceFactoryInterface;
+class ResourceManager;
+
+class ResourceInterface
+{
+public:
+	virtual ~ResourceInterface() {}
+	virtual void Update(ResourceBase *) = 0;
+	virtual ResourceFactoryInterface *GetFactory() = 0;
+};
+
+class ResourceFactoryInterface
+{
+public:
+	U32 TypeId;
+	virtual ~ResourceFactoryInterface() {}
+	virtual ResourceInterface *Create() = 0;
+	virtual void Destroy(void *ptr) = 0;
+	virtual IMemoryAllocator *GetMemoryAllocator() = 0;
+};
 
 /// <summary>
 /// Base Resource Class.
@@ -18,6 +40,7 @@ protected:
 	SIZE_T _resourceSize;
 	bool _isLoaded;
 	U32 _refCounter;
+	ResourceInterface *_resourceImplementation;
 
 public:
 	UUID UID;
@@ -25,9 +48,14 @@ public:
 	STR  Name;
 	WSTR Path;
 
-//	ResourceBase(CWSTR path, CSTR name = nullptr);
-	ResourceBase() {};
-	virtual ~ResourceBase() {};
+	ResourceBase() : _resourceImplementation(nullptr), _isLoaded(false), _refCounter(0), Type(UNKNOWN), UID(Tools::NOUID) {};
+	virtual ~ResourceBase() {
+
+		if (_resourceImplementation)
+		{
+			_resourceImplementation->GetFactory()->Destroy(_resourceImplementation);
+		}
+	};
 
 	void Init(CWSTR path);
 
@@ -41,6 +69,8 @@ public:
 	bool isLoaded() { return _isLoaded; }
 	void *GetData() { return _resourceData; }
 	SIZE_T GetSize() { return _resourceSize; }
+	ResourceInterface *GetImplementation() { return _resourceImplementation; }
+
 	void AddRef() { ++_refCounter; }
 	void Release() { --_refCounter; }
 
@@ -49,61 +79,50 @@ public:
 		UNKNOWN = 0,
 	};
 
-	virtual void Update() = 0;
-	virtual IMemoryAllocator *GetMemoryAllocator() = 0;
+	void Update() { if (_resourceImplementation) _resourceImplementation->Update(this); }
+	IMemoryAllocator *GetMemoryAllocator() { return !_resourceImplementation ? nullptr : _resourceImplementation->GetFactory()->GetMemoryAllocator(); }
+
+	friend class ResourceManager;
 };
 
-
-struct ResourceTypeListEntry
-{
-	typedef void *(*CreatePtr)(ResourceBase *);
-	typedef void  (*DestroyPtr)(void *);
-
-	U32 TypeId;
-	CreatePtr Create;
-	DestroyPtr Destroy;
-
-	ResourceTypeListEntry(U32 id, CreatePtr pCreate, DestroyPtr pDestroy) : TypeId(id), Create(pCreate), Destroy(pDestroy) {}
-};
-
-static std::vector<ResourceTypeListEntry> RegistrationList;
-
-template<typename T>
-class ResourceTypeRegistration
+class ResourceFactoryChain : public ResourceFactoryInterface
 {
 public:
-	ResourceTypeRegistration() { 
-		RegistrationList.push_back(ResourceTypeListEntry(T::ResTypeId, T::Create, T::Destroy)); 
+	static ResourceFactoryChain *First;
+	ResourceFactoryChain *Next;
+
+	ResourceFactoryChain()
+	{ 
+		Next = First; 
+		First = this; 
 	}
 };
 
-template <typename T, int ResTypeId, class Alloc = Allocators::Default>
-class ResoureImpl : public MemoryAllocatorGlobal<Alloc>
+template <typename T, U32 ResTypeId, class Alloc = Allocators::Default>
+class ResoureImpl : public ResourceInterface, public MemoryAllocatorGlobal<Alloc>
 {
 public:
-	// required methods to work as resource
-	static void *Create(ResourceBase *res) { return make_new<T>(); };
-	static void Destroy(T *ptr) { make_delete<T>(ptr); }
-	static const U32 ResourceTypeId = ResTypeId;
-	static ResourceTypeRegistration<T> _AutomaticRegister;
+	class ResFactory : public ResourceFactoryChain, public MemoryAllocatorGlobal<Alloc>
+	{
+	public:
+		ResourceInterface *Create() { return make_new<T>(); }
+		void Destroy(void *ptr) { make_delete<T>(ptr); }
+		IMemoryAllocator *GetMemoryAllocator() { return MemoryAllocatorGlobal<Alloc>::GetMemoryAllocator(); }
+		ResFactory() : ResourceFactoryChain() {
+			TypeId = ResTypeId; 
+		}
+	};
+	ResourceFactoryInterface *GetFactory() { return &_resourceFactory; }
+
+	static ResFactory _resourceFactory;
+	static U32 GetTypeId() { return _resourceFactory.TypeId; }
 };
 
-template <typename T, int ResTypeId, class Alloc>
-ResourceTypeRegistration<T> ResoureImpl<T, ResTypeId, Alloc>::_AutomaticRegister;
+template <typename T, U32 ResTypeId, class Alloc>
+typename ResoureImpl<T, ResTypeId, Alloc>::ResFactory ResoureImpl<T, ResTypeId, Alloc>::_resourceFactory;
 
-template<class T>
-class Resource : public ResourceBase
-{
-private:
-	T *_resourceImplementation;
 
-public:
-	Resource() { _resourceImplementation = static_cast<T*>(T::Create(this)); Type = T::ResourceTypeId; }
-	virtual ~Resource() { if (_resourceImplementation) T::Destroy(_resourceImplementation); }
-	void Update() { _resourceImplementation->Update(this); }
-	IMemoryAllocator *GetMemoryAllocator() { return _resourceImplementation->GetMemoryAllocator();  }
-	T *GetResource() { return _resourceImplementation; }
-};
+// ============================================================================
 
 class BAMS_EXPORT ResourceManager : public MemoryAllocatorGlobal<>
 {
@@ -113,15 +132,15 @@ private:
 
 	void _Add(ResourceBase *res);
 
-	template<class T>
-	Resource<T> *_New(const STR &resName, const UUID &resUID)
-	{
-		auto t = make_new<Resource<T> >();
-		t->Name = resName;
-		t->UID = resUID;
-		_Add(t);
-		return t;
-	}
+	//template<class T>
+	//Resource<T> *_New(const STR &resName, const UUID &resUID)
+	//{
+	//	auto t = make_new<Resource<T> >();
+	//	t->Name = resName;
+	//	t->UID = resUID;
+	//	_Add(t);
+	//	return t;
+	//}
 
 public:
 	ResourceManager();
@@ -130,46 +149,19 @@ public:
 	static ResourceManager *Create();
 	static void Destroy(ResourceManager *);
 
-	void Filter(ResourceBase **resList, I32 *resCount, CSTR &patern);
-	ResourceBase *Find(const STR &resName, U32 typeId = ResourceBase::UNKNOWN);
-	ResourceBase *Find(CSTR resName, U32 typeId = ResourceBase::UNKNOWN) { return Find(STR(resName), typeId); };
-	ResourceBase *Find(const UUID &resUID);
+	void Filter(ResourceBase **resList, U32 *resCount, CSTR &patern);
+	ResourceBase *Get(const STR &resName, U32 typeId = ResourceBase::UNKNOWN);
+	ResourceBase *Get(CSTR resName, U32 typeId = ResourceBase::UNKNOWN) { return Get(STR(resName), typeId); };
+	ResourceBase *Get(const UUID &resUID);
+
+	template<class T>
+	ResourceBase *Get(const STR &resName) { return Get(resName, T::GetTypeId()); }
+
+	template<class T>
+	ResourceBase *Get(CSTR resName) { return Get(resName, T::GetTypeId()); }
 
 	void Add(CWSTR path);
 
 	void LoadSync();
 	void LoadAsync();
-
-	template<class T>
-	Resource<T> *Get(const STR &resName) 
-	{ 
-		auto res = Find(resName, T::ResourceTypeId);
-		if (res == nullptr || res->Type != T::ResourceTypeId)
-			res = _New<T>(resName, Tools::NOUID);
-		return static_cast<Resource<T> *>(res);
-	}
-
-	template<class T>
-	Resource<T> *Get(CSTR resName) 
-	{ 
-		auto res = Find(resName, T::ResourceTypeId);
-		if (res == nullptr || res->Type != T::ResourceTypeId)
-		{
-			auto res2 = _New<T>(resName, Tools::NOUID);
-			res = res2;
-		}
-		return static_cast<Resource<T> *>(res);
-	}
-
-	template<class T>
-	Resource<T> *Get(const UUID &resUID) 
-	{ 
-		auto res = Find(resUID); 
-		if (res == nullptr || res->Type != T::ResourceTypeId)
-		{
-			auto res2 = _New<T>("", resUID);
-			res = res2;
-		}
-		return static_cast<Resource<T> *>(res);
-	}
 };
