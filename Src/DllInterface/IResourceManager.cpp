@@ -6,14 +6,15 @@
 NAMESPACE_BAMS_BEGIN
 extern "C" {
 
-	BAMS_EXPORT void Init()
+	BAMS_EXPORT void Initialize()
 	{
 		setlocale(LC_CTYPE, "");
+		CORE::RegisteredClasses::Initialize();
 	}
 
-	BAMS_EXPORT void Release()
+	BAMS_EXPORT void Finalize()
 	{
-		
+		CORE::RegisteredClasses::Finalize();
 	}
 
 	// =========================================================================== Resource
@@ -136,11 +137,33 @@ extern "C" {
 			*Counter = CORE::Allocators::Default::TotalAllocateCommands;
 	}
 
+	BAMS_EXPORT bool GetMemoryBlocks(void **current, size_t *size, size_t *counter, void **data)
+	{
+		return CORE::Allocators::Debug::list(current, size, counter, data);
+	}
+
 	// ========================================================================
 
 	BAMS_EXPORT void DoTests()
 	{
-		return;
+		{
+			CORE::shared_string<char> s1;
+			CORE::shared_string<char> s2("hello");
+			CORE::shared_string<char> s3(s2);
+		}
+//		return;
+		// basic_array tests
+		CORE::basic_array<U32> ba1;
+		CORE::basic_array<U32> ba2(10);
+		CORE::basic_array<U32> ba3({ 5,4,3,2,1 });
+		for each (auto v in ba3)
+		{
+			ba1.push_back(v);
+		}
+		ba2 = ba1;
+		ba2 += ba3;
+
+//		return;
 		using namespace CORE;
 		const char *txtTest = "[hello]";
 		STR t1;
@@ -152,9 +175,10 @@ extern "C" {
 		STR t7 = "[t7]";
 
 		ShortSTR st1 = "aaa";
-		STR t8(st1);
-		t1 = t7 + st1;
-		st1 += t1;
+//		STR t8(st1);
+		STR t8(st1.ToBasicString());
+		t1 = t7 + st1.ToBasicString();
+		st1 += t1.ToBasicString();
 		const char *t = st1.c_str();
 
 		const wchar_t *wtxtTest = L"[world]";
@@ -169,19 +193,19 @@ extern "C" {
 		CORE::basic_string<wchar_t, U16> sw1 = L"[sw1]";
 		WSTR w8(sw1);
 		w1 = w7 + sw1;
-		sw1 += w1;
+		sw1 += w1.ToBasicString();
 		const wchar_t *w = sw1.c_str();
 
-		WSTR w9(t1);
-		STR t9(w1);
+		WSTR w9(t1.ToBasicString());
+		STR t9(w1.ToBasicString());
 
 		WSTR w10 = L"¯ó³w ninja.";
-		STR t10 = w10;
+		STR t10 = w10.ToBasicString();
 		STR t12 = setlocale(LC_ALL, NULL);
 		setlocale(LC_CTYPE, "");
 		STR t13 = setlocale(LC_ALL, NULL);
 		STR t11 = "¯ó³w ninja.";
-		WSTR w11 = t11;
+		WSTR w11 = t11.ToBasicString();
 	}
 }
 NAMESPACE_BAMS_END

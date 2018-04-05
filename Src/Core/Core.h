@@ -11,13 +11,25 @@
 // standard c++ libs:
 #include <stdint.h> // for int64_t and few similiary types
 #include <stdlib.h> // for malloc, mfree
-#include <vector>
-//#include <list>
+#include <thread>
+#include <chrono>
 
 #ifdef NDEBUG
-#define assert(condition) ((void)0) 
+#define assert(condition) ((void)0)
+#define TRACE(x)
 #else
 #include <cassert>
+#  ifdef _MSC_VER
+#    include <windows.h>
+#    include <sstream>
+#    define TRACE(x)                           \
+     do {  std::ostringstream s;  s << x;      \
+           OutputDebugStringA(s.str().c_str()); \
+        } while(0)
+#  else
+#    include <iostream>
+#    define TRACE(x)  std::cerr << x << std::flush
+#  endif
 #endif
 
 NAMESPACE_CORE_BEGIN
@@ -25,6 +37,10 @@ NAMESPACE_CORE_BEGIN
 #include "BasicTypes.h"
 #include "MemoryAllocator.h"
 #include "CoreTypes.h"
+#include "SharedString.h"
+
+#include "Message.h"
+#include "Module.h"
 #include "Tools.h"
 #include "ResourceManager.h"
 #include "RawData.h"

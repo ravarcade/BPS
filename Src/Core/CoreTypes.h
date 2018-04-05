@@ -5,6 +5,13 @@
 * #include "Core\Core.h"
 *
 */
+struct RegisteredClasses
+{
+	static void Initialize();
+	static void Finalize();
+};
+
+// ============================================================================
 
 
 template <typename T, typename U>
@@ -15,9 +22,9 @@ struct basic_string_base
 	U _used;
 	basic_string_base() {}
 	basic_string_base(U reserved, U used = 0, T* buf = nullptr) : _reserved(reserved), _used(used), _buf(buf) {}
-	basic_string_base(const basic_string_base<T, U> &s) : _reserved(s._reserved), _used(s._used) {}
 	static SIZE_T length(const T *txt) { return strlen(txt); }
 	static T tolower(T c) { return ::tolower(c); }
+	static int ncmp(const T *string1, const T *string2, size_t count) { return strncmp(string1, string2, count); }
 };
 
 template<>
@@ -30,11 +37,11 @@ wchar_t basic_string_base<wchar_t, U16>::tolower(wchar_t c) { return towlower(c)
 template<>
 wchar_t basic_string_base<wchar_t, U32>::tolower(wchar_t c) { return towlower(c); }
 
+template<>
+int  basic_string_base<wchar_t, U16>::ncmp(const wchar_t *string1, const wchar_t *string2, size_t count) { return wcsncmp(string1, string2, count); }
 
-typedef basic_string_base<char, U16> basic_string_base_U16;
-typedef basic_string_base<char, U32> basic_string_base_U32;
-typedef basic_string_base<wchar_t, U16> basic_string_base_WU16;
-typedef basic_string_base<wchar_t, U32> basic_string_base_WU32;
+template<>
+int  basic_string_base<wchar_t, U32>::ncmp(const wchar_t *string1, const wchar_t *string2, size_t count) { return wcsncmp(string1, string2, count); }
 
 template <typename T, typename U = U32, class Alloc = Allocators::Default, SIZE_T minReservedSize = 48>
 class basic_string : public basic_string_base<T, U>
@@ -52,6 +59,7 @@ private:
 		mbstowcs_s(&convertedChars, dst, srcSize + 1, src, srcSize);
 		assert(convertedChars != srcSize);
 	}
+
 	void _CopyText(char *dst, const wchar_t *src, SIZE_T srcSize)
 	{
 		// we want to char "pure ascii" chars (0x20 - 0x7e)
@@ -59,7 +67,7 @@ private:
 		{
 			int c = *src;
 			++src;
-			if (c < 0x20 || c > 0x7e)
+			if (c > 0x7e)
 				c = '_';
 			*dst = c;
 			++dst;
@@ -95,13 +103,12 @@ private:
 		// oldBuf is released here, because there is chance, that we copy part from source buffer
 		if (oldBuf)
 			_allocator::deallocate(oldBuf);
-
 	}
 
 	void _Allocate() { _buf = static_cast<T *>(_allocator::allocate(_reserved*sizeof(T))); }
 
 public:
-	basic_string() : _B(minReservedSize) { _Allocate(); }
+	basic_string() : _B(0) {  }
 	template<typename ST>
 	basic_string(const ST *src, const ST *end = nullptr) { 
 		_used = end ? static_cast<U>(end - src) : static_cast<U>(basic_string_base<ST,U>::length(src));
@@ -119,12 +126,23 @@ public:
 
 	basic_string(const _T &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used)) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); }
 	basic_string(_T &&src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used), src._buf) { src._used = 0; src._reserved = 0; src._buf = nullptr; }
-	~basic_string() { if (_buf) _allocator::deallocate(_buf); }
+	~basic_string() { if (_buf) { _allocator::deallocate(_buf); _buf = 0; _reserved = 0; _used = 0; } }
 
 	template<typename V>
-	basic_string& operator=(const basic_string_base<T, V>& src) { _used = 0; _Append(static_cast<U>(src._used), src._buf); return *this; }
-	basic_string& operator=(const T* src) { _used = 0; U len = static_cast<U>(_B::length(src));  _Append(len, src); return *this; }
-	basic_string& operator=(const _T& src) { _used = 0; _Append(src._used, src._buf); return *this; }
+	basic_string& operator = (const basic_string_base<T, V>& src) { _used = 0; _Append(static_cast<U>(src._used), src._buf); return *this; }
+	basic_string& operator = (const T* src) { _used = 0; U len = static_cast<U>(_B::length(src));  _Append(len, src); return *this; }
+	basic_string& operator = (const _T& src) { _used = 0; _Append(src._used, src._buf); return *this; }
+	basic_string& operator = (_T&& src) {
+		if (_buf)
+			_allocator::deallocate(_buf);
+
+		_used = src._used;
+		_reserved = src._reserved;
+		_buf = src._buf;
+		src._used = 0; src._reserved = 0; src._buf = nullptr;
+
+		return *this;
+	}
 
 	T operator[](SIZE_T pos) const { return (pos < _used && pos >= 0) ? _buf[pos] : 0; };
 	T& operator[](SIZE_T pos) { return (pos < _used && pos >= 0) ? _buf[pos] : _buf[0]; };
@@ -142,7 +160,7 @@ public:
 			return true;
 		if (str._used != _used)
 			return false;
-		return strncmp(str._buf, _buf, _used) == 0;
+		return _B::ncmp(str._buf, _buf, _used) == 0;
 	}
 
 	SIZE_T size() const { return _used; }
@@ -229,13 +247,563 @@ public:
 
 		return pos != _used;
 	}
+
+};
+
+template <typename T>
+struct basic_array_base
+{
+	T *_buf;
+	SIZE_T _reserved;
+	SIZE_T _used;
+	basic_array_base() : _reserved(0), _used(0), _buf(nullptr) {}
+	basic_array_base(SIZE_T reserved, SIZE_T used = 0, T* buf = nullptr) : _reserved(reserved), _used(used), _buf(buf) {}
+};
+
+/***
+ * Use it for simple data type or simple struct (without own memory allocation). So, if in stuct you have String object, when it will crash.
+ */
+template <typename T, class Alloc = Allocators::Default, SIZE_T minReservedSize = 48>
+class basic_array : public basic_array_base<T>
+{
+	typedef basic_array<T, Alloc, minReservedSize> _T;
+	typedef basic_array_base<T> _B;
+	typedef MemoryAllocatorGlobal<Alloc> _allocator;
+
+	void _Realocate(SIZE_T newSize)
+	{
+		T *oldBuf = _buf;
+		SIZE_T oldReserved = _reserved;
+		_reserved = newSize;
+		_Allocate();
+
+		if (oldBuf && _used)
+			_Copy(_buf, oldBuf, _used);
+
+		if (oldBuf)
+			_allocator::deallocate(oldBuf);
+	}
+
+	void _Copy(T *dst, const T *src, SIZE_T len)
+	{
+		size_t s = len * sizeof(T);
+		memcpy_s(dst, s, src, s);
+	}
+
+	void _Append(SIZE_T len, const T *src)
+	{
+		if (_reserved < _used + len)
+			_Realocate(_used + len + minReservedSize);
+			
+		if (len && src)
+		{
+			_Copy(_buf + _used, src, len);
+			_used += len;
+		}
+	}
+
+	void _Allocate() { _buf = static_cast<T *>(_allocator::allocate(_reserved * sizeof(T))); }
+
+	void _InitializeEntry(T * begin, T * end)
+	{
+		while (begin < end)
+		{
+			new (begin) T();
+			++begin;
+		}
+	}
+
+public:
+	basic_array() {}
+	basic_array(SIZE_T s) : _B(minReservedSize, s) { if (_used > _reserved) _reserved = _used + minReservedSize; _Allocate(); _InitializeEntry(_buf, _buf + _used); }
+	basic_array(const _B &src) : _B(src._reserved, src._used) { _Allocate(); _Copy(_buf, src._buf, src._used); }
+	basic_array(std::initializer_list<T> list) : _B(list.size()) { _Allocate();	_Append(list.size(), list.begin());	}
+	basic_array(_T &&src) : _B(src._reserved, src._used, src._buf) { src._reserved = 0; src._used = 0; src._buf = nullptr; }
+
+	~basic_array() { if (_buf) _allocator::deallocate(_buf); }
+
+	T operator[](SIZE_T pos) const { return (pos < _used && pos >= 0) ? _buf[pos] : 0; };
+	T& operator[](SIZE_T pos) { return (pos < _used && pos >= 0) ? _buf[pos] : _buf[0]; };
+
+	SIZE_T size() const { return _used; }
+	SIZE_T capacity() const { return _reserved; }
+
+	T *begin() { return _buf; }
+	T *end() { return _buf + _used; }
+
+	void push_back(const T &v) {
+		if (size() == capacity())
+			_Realocate(_used + minReservedSize);
+
+		_buf[_used] = v;
+		++_used;
+	}
+
+	void push_back(T && v) { 
+		if (size() == capacity())
+			_Realocate(_used + minReservedSize);
+
+		_buf[_used] = std::move(v);
+		++_used;
+	}
+
+	T *add_empty()
+	{
+		if (size() == capacity())
+			_Realocate(_used + minReservedSize);
+		return _buf + _used++;
+	}
+
+
+	basic_array & operator += (const _T &src) { _Append(src._used, src._buf); return *this; }
+	basic_array & operator = (const _T& src) { _used = 0; _Append(src._used, src._buf); return *this; }
+
+	bool operator == (const _B &src) const {
+		if (src._buf == _buf)
+			return true;
+		if (src._used != _used)
+			return false;
+		return memcmp(src._buf, _buf, _used) == 0;
+	}
+
+	void clear() { _used = 0; }
+
+	void reset()
+	{
+		_used = 0;
+		_reserved = 0;
+		if (_buf)
+		{
+			_allocator::deallocate(_buf);
+			_buf = nullptr;
+		}
+	}
+};
+
+template <typename T, class Alloc = Allocators::Default, SIZE_T minReservedSize = 48>
+class object_array : public basic_array_base<T>
+{
+	typedef object_array<T, Alloc, minReservedSize> _T;
+	typedef basic_array_base<T> _B;
+	typedef MemoryAllocatorGlobal<Alloc> _allocator;
+
+	void _Realocate(SIZE_T newSize)
+	{
+		T *oldBuf = _buf;
+		SIZE_T oldReserved = _reserved;
+		_reserved = newSize;
+		_Allocate();
+
+		if (oldBuf && _used)
+			_Copy(_buf, oldBuf, _used);
+
+		if (oldBuf)
+			_allocator::deallocate(oldBuf);
+	}
+
+	void _Construct(T *dst, const T *src, SIZE_T len)
+	{
+		while (len)
+		{
+			new (*dst) T(*src);
+			++dst;
+			++src;
+			--len;
+		}
+	}
+
+	void _Copy(T *dst, const T *src, SIZE_T len)
+	{
+		size_t s = len * sizeof(T);
+		memcpy_s(dst, s, src, s);
+	}
+
+	void _Append(SIZE_T len, const T *src)
+	{
+		if (_reserved < _used + len)
+			_Realocate(_used + len + minReservedSize);
+
+		if (len && src)
+		{
+			_Construct(_buf + _used, src, len);
+			_used += len;
+		}
+	}
+
+	void _Allocate() { _buf = static_cast<T *>(_allocator::allocate(_reserved * sizeof(T))); }
+
+public:
+	object_array() { }
+	object_array(SIZE_T s) : _B(s,s) { _Allocate(); for (SIZE_T i = 0; i < _used; ++i) new (_buf + i) T(); }
+	object_array(const _B &src) : _B(src._reserved, src._used) { _Allocate(); _Construct(_buf, src._buf, src._used); }
+	object_array(std::initializer_list<T> list) : _B(list.size()) { _Allocate(); _Append(list.size(), list.begin()); }
+	object_array(_T &&src) : _B(src._reserved, src._used, src._buf) { src._reserved = 0; src._used = 0; src._buf = nullptr; }
+
+	~object_array() { if (_buf) _allocator::deallocate(_buf); }
+
+	T operator[](SIZE_T pos) const { return (pos < _used && pos >= 0) ? _buf[pos] : 0; };
+	T& operator[](SIZE_T pos) { return (pos < _used && pos >= 0) ? _buf[pos] : _buf[0]; };
+
+	SIZE_T size() const { return _used; }
+	SIZE_T capacity() const { return _reserved; }
+
+	T *begin() { return _buf; }
+	T *end() { return _buf + _used; }
+
+	void push_back(const T &v) {
+		if (size() == capacity())
+			_Realocate(_used + minReservedSize);
+
+		// we must call constructor for new object
+		new (_buf + _used) T(v);
+		++_used;
+	}
+
+	void push_back(T && v) {
+		if (size() == capacity())
+			_Realocate(_used + minReservedSize);
+
+		new (_buf + _used) T(std::move(v));
+		++_used;
+	}
+
+	object_array & operator += (const _T &src) { _Append(src._used, src._buf); return *this; }
+	object_array & operator = (const _T& src) { clear(); _Append(src._used, src._buf); return *this; }
+	object_array & operator = (_T&& src) {
+		clear();
+
+		if (_buf)
+			_allocator::deallocate(oldBuf);
+
+		_reserved = src._reserved;
+		_used = src._used;
+		_buf = src._buf;
+
+		src._reserved = 0; src._used = 0; src._buf = nullptr;
+
+		return *this; 
+	}
+
+	bool operator == (const _B &src) const {
+		if (src._buf == _buf)
+			return true;
+		if (src._used != _used)
+			return false;
+		for (SIZE_T i = 0; i < _used; ++i)
+			if (src._buf[i] != _buf[i])
+				return false;
+
+		return true;
+	}
+
+	void clear() { 
+		// call destructor on every object stored in array
+		for (auto *p : *this)
+			p->~T();
+
+		_used = 0; 
+	}
+};
+
+/// <summary>
+/// Extension class template for shared objects. Like shared_string.
+/// </summary>
+template <typename T, class A = Allocators::Default, SIZE_T S = 48>
+class shared_base 
+{
+private:
+	struct Entry
+	{
+		T value;
+		U32 refCounter;
+		U32 nextFree;
+	};
+
+	typedef basic_array<Entry, A, S> Pool;
+	static basic_array<Entry, A, S> _pool;
+	static U32 _firstFreeEntry;
+	static U32 _used;
+
+protected:
+	U32 _idx;
+
+	shared_base() : _idx(0) {}
+	shared_base(U32 idx) : _idx(idx) {}
+
+	inline void CheckIfInitialized()
+	{
+#ifdef _DEBUG
+		if (!_pool.size())
+		{
+			TRACE("Critical Error: shared_base not initialized befor first use.");
+			Entry *pEntry = _pool.add_empty();
+			pEntry->refCounter = 2;
+			new (&pEntry->value) T();
+		}
+#endif
+	}
+
+	template<class... Args>
+	void MakeNewEntry(Args &&... args)
+	{
+		U32 idx = _firstFreeEntry;
+		Entry *pEntry;
+		if (idx)
+		{
+			pEntry = &_pool[idx];
+			_firstFreeEntry = pEntry->nextFree;
+		}
+		else
+		{
+			CheckIfInitialized();
+			idx = static_cast<U32>(_pool.size());
+			pEntry = _pool.add_empty();
+		}
+		++_used;
+		pEntry->refCounter = 1;
+		new (&pEntry->value) T(std::forward<Args>(args)...);
+
+		_idx = idx;
+	}
+
+	inline void NeedUniq()
+	{
+		auto &src = _pool[_idx];
+		if (src.refCounter > 1)
+		{
+			--src.refCounter;
+			MakeNewEntry(src.value);
+		}
+	}
+
+	inline void AddRef() { if (_idx) ++_pool[_idx].refCounter; }
+	inline void Release() { 
+		if (_idx)
+		{
+			auto ref = --_pool[_idx].refCounter;
+
+			if (!ref)
+			{
+				auto &entry = _pool[_idx];
+
+				// We will release memory used by string, but entry stays in _pool. It is now empty.
+				reinterpret_cast<T*>(&entry.value)->~T();
+
+				// We will use refCounter as index to previous empty.
+				entry.nextFree = _firstFreeEntry;
+				_firstFreeEntry = _idx;
+				--_used;
+			}
+		}
+	}
+
+	inline T & GetValue() const { return _pool[_idx].value; }
+
+public:
+	static void Initialize()
+	{
+		Entry *pEntry = _pool.add_empty();
+		pEntry->refCounter = 2;
+		new (&pEntry->value) T();
+	}
+
+	static void Finalize()
+	{
+		if (_used == 0)
+		{
+			auto &entry = _pool[0];
+
+			// We will release memory of last used shared string (default empty string).
+			reinterpret_cast<T*>(&entry.value)->~T();
+
+			// We will release memory used to store entries;
+			_pool.reset();
+
+			// No free entries
+			_firstFreeEntry = 0;
+		}
+		else
+		{
+			TRACE("Critical Error: shared_base finalized, but not all shared entries are release.\n");
+		}
+	}
 };
 
 
-typedef basic_string<char> STR;
-typedef basic_string<char, U16> ShortSTR;
-typedef basic_string<wchar_t, U32, Allocators::Default, 250> PathSTR;
-typedef basic_string<wchar_t> WSTR;
+template <typename T, class A, SIZE_T S>
+typename shared_base<T, A, S>::Pool shared_base<T, A, S>::_pool;
+
+template <typename T, class A, SIZE_T S>
+U32 shared_base<T, A, S>::_firstFreeEntry = 0;
+
+template <typename T, class A, SIZE_T S>
+U32 shared_base<T, A, S>::_used = 0;
+
+template <typename T, typename U = U32, class A = Allocators::Default, SIZE_T S = 48, SIZE_T S2 = 16>
+class shared_string : public shared_base< basic_string<T, U, A, S>, A, S2>
+{
+public:
+	shared_string() : shared_base(0) { CheckIfInitialized();  AddRef(); }
+	shared_string(const shared_string &src) : shared_base(src._idx) { AddRef(); }
+	shared_string(shared_string &&src) : shared_base(src._idx) { src._idx = 0; }
+	template<typename ST>
+	shared_string(const ST *src, const ST *end = nullptr) { MakeNewEntry(src, end); }
+	template<typename ST, typename SU>
+	shared_string(const basic_string_base<ST, SU> &src) { MakeNewEntry(src); }
+	template<typename ST, typename SU>
+	shared_string(const basic_string_base<ST, SU> *src) { MakeNewEntry(src); }
+	~shared_string() { Release(); }
+
+	template<typename V>
+	shared_string& operator = (const basic_string_base<T, V>& src)       { NeedUniq(); GetValue() = src; return *this; }
+	shared_string& operator = (const T* src)                             { NeedUniq(); GetValue() = src; return *this; }
+	shared_string& operator = (const shared_string& src)                 { Release(); _idx = src._idx; AddRef(); return *this; }
+	shared_string& operator = (shared_string&& src)                      { Release(); _idx = src._idx; src._idx = 0; return *this; }
+
+	T operator[](SIZE_T pos) const                                       { return GetValue()[pos]; }
+	T& operator[](SIZE_T pos)                                            { NeedUniq(); return GetValue()[pos]; }
+
+	template<typename V>
+	shared_string & operator += (const basic_string_base<T, V>& src)     { NeedUniq(); GetValue() += src; return *this; }
+	shared_string & operator += (const T *src)                           { NeedUniq(); GetValue() += src; return *this; }
+	shared_string & operator += (const shared_string &src)               { NeedUniq(); GetValue() += src.GetValue(); return *this; }
+
+	template<typename V>
+	shared_string operator + (const basic_string_base<T, V>& src)  const { shared_string tmp(GetValue()); tmp += src; return tmp; }
+	shared_string operator + (const T *src) const                        { shared_string tmp(GetValue()); tmp += src; return tmp; }
+	shared_string operator + (const shared_string &src) const            { shared_string tmp(GetValue()); tmp += src; return tmp; }
+
+	bool operator == (const basic_string_base<T, U> &str) const          { return GetValue() == str; }
+	bool operator == (const shared_string &str) const                    { return GetValue() == str.GetValue(); }
+
+	SIZE_T size() const                                                  { return GetValue().size(); }
+
+//	operator const basic_string_base<T, U> ()                            { return GetValue(); } // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
+	const basic_string_base<T, U> ToBasicString() const                  { return GetValue(); } // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
+
+	const T * c_str()                                                    { return GetValue().c_str(); }
+
+	const T * begin()                                                    { return GetValue()._buf; }
+	const T * end()                                                      { auto &v = GetValue();  return v._buf + v._used; }
+
+	bool wildcard(const shared_string& pat, U pos = 0, U patPos = 0) const { return GetValue().wildcard(pat.ToBasicString(), pos, patPos); }
+
+	template <typename V>
+	bool wildcard(const basic_string_base<T, V>& pat, U pos = 0, V patPos = 0) const { return GetValue().wildcard(pat, pos, patPos); }
+
+	template <typename V>
+	bool iwildcard(const basic_string_base<T, V>& pat, U pos = 0, V patPos = 0) const { return GetValue().iwildcard(pat, pos, patPos); }
+};
+
+
+// ============================================================================
+
+
+typedef shared_string<char> STR;
+typedef shared_string<char, U16> ShortSTR;
+typedef shared_string<wchar_t> WSTR;
+typedef shared_string<wchar_t, U32, Allocators::Default, 250> PathSTR;
+
+/*
+template <typename T, typename U = U32, class Alloc = Allocators::Default, SIZE_T minReservedSize = 48>
+class shared_string
+{
+private:
+	typedef shared_string<T, U, Alloc, minReservedSize > _T;
+	typedef basic_string<T, U, Alloc, minReservedSize > _B;
+	struct Entry
+	{
+		_B value;
+		U32 refCounter;
+	};
+	typedef basic_array<Entry, Alloc> PoolOfStrings;
+
+	static PoolOfStrings _pool;	
+	static U32 _freeEntry;
+
+	/// <summary>
+	/// Get empty entry in <see cref="_pool"/>.
+	/// </summary>
+	/// <remarks>
+	/// <para>If we have empty, unused item in <see cref="_pool"/>, it will return that item.</para>
+	/// <para>Otherwise, it will create new entry in <see cref="_pool"/>.</para>
+	/// </remarks>
+	/// <param name="args">Arguments passed to value constructor.</param>
+	/// <returns>Index in <see cref="_pool"/>.</returns>
+	template<class... Args>
+	static U32 make_new_entry(Args &&... args)
+	{
+		U32 idx = _freeEntry;
+		Entry *pEntry;
+		if (_freeEntry)
+		{
+			pEntry = &_pool[idx];
+			_freeEntry = pEntry->refCounter;
+		}
+		else
+		{
+			idx = static_cast<U32>(_pool.size());
+			pEntry = _pool.add_empty();
+		}
+		pEntry->refCounter = 1;
+		new (&pEntry->value) _B(std::forward<Args>(args)...);
+
+		return idx;
+	}
+
+	/// only real data is _idx
+	U32 _idx;
+	inline void AddRef() { ++_pool[_idx].refCounter; }
+	inline U32 Release() { return --_pool[_idx].refCounter; }
+	
+	/// <summary>Called, when member function need unique value (not shared with others).</summary>
+	inline void NeedUniq()
+	{ 
+		auto &src = _pool[_idx];
+		if (src.refCounter > 1)
+		{
+			--src.refCounter;
+			_idx = make_new_entry(src.value);
+		}
+	}
+public:
+	shared_string() : _idx(0) { AddRef(); }
+
+	template<typename ST>
+	shared_string(const ST *src, const ST *end = nullptr) { _idx = make_new_entry(src, end); }
+
+	template<typename ST, typename SU>
+	shared_string(const basic_string_base<ST, SU> &src) { _idx = make_new_entry(src); }
+
+	shared_string(const _T &src) : _idx(src._idx) { AddRef(); } 
+	shared_string(_T &&src) : _idx(src._idx) { }
+	~shared_string() {
+		if (!Release())
+		{
+			auto entry = _pool[_idx];
+			// We will release memory used by string, but entry stays in _pool. It is now empty.
+			reinterpret_cast<_B*>(&entry.value)->~_B();
+
+			// We will use refCounter as index to previous empty.
+			entry.refCounter = _freeEntry;
+			_freeEntry = _idx;
+		}
+	}
+};
+
+/// <summary>
+/// The pool used to store all entries (data).
+/// </summary>
+template <typename T, typename U, class Alloc, SIZE_T minReservedSize>
+typename shared_string<T, U, Alloc, minReservedSize>::PoolOfStrings shared_string<T, U, Alloc, minReservedSize>::_pool;
+
+/// <summary>
+/// Index of first free entry in <see cref="_pool">.
+/// </summary>
+template <typename T, typename U, class Alloc, SIZE_T minReservedSize>
+U32 shared_string<T, U, Alloc, minReservedSize>::_freeEntry = 0;
+
+*/
 
 /**
 * === WASTE LAND ===

@@ -130,18 +130,6 @@ private:
 	struct InternalData;
 	InternalData *_data;
 
-	void _Add(ResourceBase *res);
-
-	//template<class T>
-	//Resource<T> *_New(const STR &resName, const UUID &resUID)
-	//{
-	//	auto t = make_new<Resource<T> >();
-	//	t->Name = resName;
-	//	t->UID = resUID;
-	//	_Add(t);
-	//	return t;
-	//}
-
 public:
 	ResourceManager();
 	~ResourceManager();
@@ -165,3 +153,19 @@ public:
 	void LoadSync();
 	void LoadAsync();
 };
+
+
+// ============================================================================
+
+class ResourceManagerModule : IModule
+{
+public:
+	void Update(float dt);
+	void Initialize();
+	void Finalize();
+	void SendMessage(Message *msg);
+	~ResourceManagerModule();
+};
+
+
+#define RESOURCEMANAGER_ADD_FILE 0x10001

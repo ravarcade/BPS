@@ -142,6 +142,7 @@ namespace Allocators
 				Last->next = ext;
 			Last = ext;
 
+			TRACE ("++ [" << ext->counter <<  "]: allocate(" << ext->size << ")\n");
 			return ptr;
 		}
 
@@ -155,7 +156,39 @@ namespace Allocators
 			if (Last == ext)
 				Last = ext->prev;
 
-			_aligned_free(ptr); 
+			TRACE("-- [" << ext->counter << "]: deallocate(" << ext->size << ")\n");
+			_aligned_free(ptr);
+		}
+
+		static bool list(void **current, size_t *size, size_t *counter, void **data)
+		{
+			if (current == nullptr)
+				return false;
+			
+			ExtraMemoryBlockInfo * f;
+			if (*current == nullptr)
+			{
+				f = Last;
+			}
+			else
+			{
+				f = reinterpret_cast<ExtraMemoryBlockInfo *>(*current);
+				if (f)
+					f = f->prev;
+			}
+
+			if (f == nullptr)
+				return false;
+
+			if (size)
+				*size = f->size;
+			if (counter)
+				*counter = f->counter;
+			if (data)
+				*data = f + 1;
+			*current = f;
+
+			return true;
 		}
 	};
 

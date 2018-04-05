@@ -12,11 +12,12 @@ extern "C" {
 	typedef void IResourceManager;
 
 	//
-	BAMS_EXPORT void Init();
-	BAMS_EXPORT void Release();
+	BAMS_EXPORT void Initialize();
+	BAMS_EXPORT void Finalize();
 
 	// MemoryAllocators
 	BAMS_EXPORT void GetMemoryAllocationStats(uint64_t *Max, uint64_t *Current, uint64_t *Counter);
+	BAMS_EXPORT bool GetMemoryBlocks(void **current, size_t *size, size_t *counter, void **data);
 
 	// Resource
 	BAMS_EXPORT UUID IResource_GetUID(IResource *res);
