@@ -50,65 +50,114 @@ void DumpRAM()
 	printf("\n=========================================================\nMax = %d, Current = %d, Count = %d\n", (int)Max, (int)Current, (int)Counter);
 }
 
+#include <vector>
+using std::vector;
+
+SHORT AllKeyboardStates[256] = { 0 };
+DWORD AllKeyboardRepeatTime[256];
+bool currentKeyState[256];
+#pragma comment(lib, "Winmm.lib")
+
+void updateAllKeysScan()
+{
+	const DWORD rep_first = 300;
+	const DWORD rep_next = 50;
+
+	DWORD ct = timeGetTime();
+	for (int i = 0; i < 256; ++i)
+	{
+		auto r = GetAsyncKeyState(i);
+		auto o = AllKeyboardStates[i];
+		if (i <= 0x20) {
+			r = r & 0x8000 ? 0x8001 : 0;
+		}
+
+		r = r << 8;
+		if (r != 0 && o == 0)
+		{
+			currentKeyState[i] = true;
+			AllKeyboardRepeatTime[i] = ct + rep_first;
+		}
+		else if (r != 0 && AllKeyboardRepeatTime[i] < ct)
+		{
+			currentKeyState[i] = true;
+			AllKeyboardRepeatTime[i] = ct + rep_next;
+		}
+		else {
+			currentKeyState[i] = false;
+		}
+		AllKeyboardStates[i] = r;
+	}
+}
+
+bool GetKeyPressed(DWORD key)
+{
+	return currentKeyState[key];
+}
+
+void wait_for_esc()
+{
+	for (;;)
+	{
+//		Sleep(100);
+		SleepEx(100, TRUE);
+		updateAllKeysScan();
+		if (GetKeyPressed(VK_ESCAPE))
+			break;
+
+	}
+}
+
 int main()
 {
+	{
+		vector<int> x(3);
+	}
 
 	uint64_t Max, Current, Counter;
 
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
+	BAMS::Initialize();
+
 	{
-		BAMS::Initialize();
 		BAMS::DoTests();
-		{
-			BAMS::CResourceManager rm;
+		BAMS::CResourceManager rm;
+		rm.StartDirectoryMonitor();
+		rm.AddDir(L"C:\\Work\\test");
+//		rm.AddDir(_tgetenv(_T("USERPROFILE")));
+//		rm.AddDir(L"C:\\");
+
+		rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
+		auto r = rm.GetRawDataByName("ReadMe");
+		rm.LoadSync();
+		auto ruid = r.GetUID();
+		auto rpath = r.GetPath();
+		auto rname = r.GetName();
+		auto rdata = r.GetData();
+		auto rsize = r.GetSize();
+
+		auto res = rm.FindByName("ReadMe");
+		auto uid = res.GetUID();
+		auto path = res.GetPath();
+		auto name = res.GetName();
+
+		auto rr = rm.GetRawDataByUID(uid);
+		uid = rr.GetUID();
+		path = rr.GetPath();
+		name = rr.GetName();
 
 
-
-			//	S1 st1;
-			//	S1 st1;
-				/*
-				S2 st2("hello world");
-				S3 st3(st2);
-				foo(std::move(st3));
-			//	S2 sst1;
-			//	sst1 = st2;
-
-				st1 += " and you";
-				st2 += S3("!tada!");
-				st1 = (st2 + "haha" + st1);
-				st3 += st3;
-				st3 = st3 + st3 + st3;
-				*/
-
-			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
-			auto r = rm.GetRawDataByName("ReadMe");
-			rm.LoadSync();
-			auto ruid = r.GetUID();
-			auto rpath = r.GetPath();
-			auto rname = r.GetName();
-			auto rdata = r.GetData();
-			auto rsize = r.GetSize();
-
-			auto res = rm.FindByName("ReadMe");
-			auto uid = res.GetUID();
-			auto path = res.GetPath();
-			auto name = res.GetName();
-
-			auto rr = rm.GetRawDataByUID(uid);
-			uid = rr.GetUID();
-			path = rr.GetPath();
-			name = rr.GetName();
-
-
-			BAMS::IResource *resList[10];
-			uint32_t resCount = 10;
-			rm.Filter(resList, &resCount, "*");
-		}
-		BAMS::Finalize();
+		BAMS::IResource *resList[10];
+		uint32_t resCount = 10;
+		rm.Filter(resList, &resCount, "*");
+		wait_for_esc();
 	}
+
+	BAMS::Finalize();
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
 
 	DumpRAM();
+	wait_for_esc();
 	return 0;
 }
 

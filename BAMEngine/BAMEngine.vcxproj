@@ -131,6 +131,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;BAMENGINE_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir) </AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -163,6 +164,7 @@
     <ClInclude Include="..\Src\Core\BasicTypes.h" />
     <ClInclude Include="..\Src\Core\Core.h" />
     <ClInclude Include="..\Src\Core\CoreTypes.h" />
+    <ClInclude Include="..\Src\Core\DirectoryChangeNotifier.h" />
     <ClInclude Include="..\Src\Core\MemoryAllocator.h" />
     <ClInclude Include="..\Src\Core\RawData.h" />
     <ClInclude Include="..\Src\Core\ResourceManager.h" />
@@ -175,6 +177,7 @@
   <ItemGroup>
     <ClCompile Include="..\Src\BAMEngine.cpp" />
     <ClCompile Include="..\Src\Core\CoreTypes.cpp" />
+    <ClCompile Include="..\Src\Core\DirectoryChangeNotifier.cpp" />
     <ClCompile Include="..\Src\Core\MemoryAllocator.cpp" />
     <ClCompile Include="..\Src\Core\ResourceManager.cpp" />
     <ClCompile Include="..\Src\Core\Tools.cpp" />

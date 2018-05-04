@@ -30,6 +30,7 @@ extern "C" {
 	BAMS_EXPORT IResourceManager *IResourceManager_Create();
 	BAMS_EXPORT void IResourceManager_Destroy(IResourceManager *);
 	BAMS_EXPORT void IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path);
+	BAMS_EXPORT void IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name);
 	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource **resList, uint32_t *resCount, const char *pattern);
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid);
@@ -37,6 +38,8 @@ extern "C" {
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name);
 	BAMS_EXPORT void IResourceManager_LoadSync(IResourceManager *rm);
 	BAMS_EXPORT void IResourceManager_LoadAsync(IResourceManager *rm);
+	BAMS_EXPORT void IResourceManager_StartDirectoryMonitor(IResourceManager *rm);
+	BAMS_EXPORT void IResourceManager_StopDirectoryMonitor(IResourceManager *rm);
 
 	// RawData
 	BAMS_EXPORT unsigned char *IRawData_GetData(IRawData *res);
@@ -82,6 +85,7 @@ extern "C" {
 		~CResourceManager() { IResourceManager_Destroy(_rm); _rm = nullptr; }
 
 		void AddResource(const wchar_t *path) { IResourceManager_AddResource(_rm, path); }
+		void AddDir(const wchar_t *path) { IResourceManager_AddDir(_rm, path); }
 
 		void Filter(IResource **resList, uint32_t *resCount, const char *pattern) { IResourceManager_Filter(_rm, resList, resCount, pattern); }
 		CResource FindByName(const char *name) { CResource res(IResourceManager_FindByName(_rm, name)); return res; }
@@ -92,6 +96,10 @@ extern "C" {
 
 		void LoadSync() { IResourceManager_LoadSync(_rm); }
 		void LoadAsync() { IResourceManager_LoadAsync(_rm); }
+
+		void StartDirectoryMonitor() { IResourceManager_StartDirectoryMonitor(_rm); }
+		void StopDirectoryMonitor() { IResourceManager_StopDirectoryMonitor(_rm); }
+
 	};
 
 

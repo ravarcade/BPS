@@ -13,6 +13,7 @@
 #include <stdlib.h> // for malloc, mfree
 #include <thread>
 #include <chrono>
+#include <mutex>
 
 #ifdef NDEBUG
 #define assert(condition) ((void)0)
@@ -42,6 +43,7 @@ NAMESPACE_CORE_BEGIN
 #include "Message.h"
 #include "Module.h"
 #include "Tools.h"
+#include "DirectoryChangeNotifier.h"
 #include "ResourceManager.h"
 #include "RawData.h"
 

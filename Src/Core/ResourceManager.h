@@ -149,9 +149,13 @@ public:
 	ResourceBase *Get(CSTR resName) { return Get(resName, T::GetTypeId()); }
 
 	void Add(CWSTR path);
+	void AddDir(CWSTR path);
 
 	void LoadSync();
 	void LoadAsync();
+
+	void StartDirectoryMonitor();
+	void StopDirectoryMonitor();
 };
 
 

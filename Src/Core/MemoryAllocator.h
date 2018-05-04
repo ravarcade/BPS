@@ -21,7 +21,7 @@ inline void* _aligned_malloc(size_t size, size_t alignment)
 		return nullptr;
 
 	uintptr_t alignedData = reinterpret_cast<uintptr_t>(data) + extraDataSize + alignment;
-	alignedData &= (uintptr_t(-1) - alignment);;
+	alignedData &= (uintptr_t(-1) - alignment);
 
 
 	reinterpret_cast<void **>(alignedData)[-1] = data;
@@ -198,6 +198,159 @@ namespace Allocators
 		void deallocate(void* ptr) { _aligned_free(ptr); }
 	};
 
+	/**
+	 * Buffer size is limited to 2GB
+	 */
+	struct RingBuffer : public IMemoryAllocator
+	{
+		RingBuffer(IMemoryAllocator *alloc, SIZE_T size = 8192) : _alloc(alloc)
+		{
+			assert(size <= 0x7ffffffL); // 2 GB
+			_buf_begin = reinterpret_cast<pointer>(_alloc->allocate(size));
+			_buf_end = _buf_begin + size; _head = _tail = _buf_begin; 
+			_last_assigned = nullptr; 
+			_allocated_memory = 0;
+			_memory_waiting_for_tail = 0;
+			_counter = 0;
+		};
+
+		~RingBuffer() { _alloc->deallocate(_buf_begin); }
+
+		void* allocate(size_t bytes) 
+		{ 
+			bytes = (bytes + _alignment_add) & _alignment_mask;
+
+			// try to find space after _head before _buf_end
+			pointer e = _tail > _head ? _tail : _buf_end;
+
+			SIZE_T max = e - _head;
+			if (_tail == _head && _allocated_memory > 0)
+				max = 0;
+
+			if (bytes > max && _tail < _head) // not enought space.... try at begin of buffer
+			{
+				// calc free space at begin of buffer
+				max = _tail - _buf_begin;
+				if (bytes <= max)
+				{
+					// now we have to move _head to begin of buffer and extend last allocated region
+					if (_last_assigned)
+					{
+						if (*_last_assigned > 0)
+						{
+							_allocated_memory -= *_last_assigned;
+							*_last_assigned = static_cast<size_type>(_buf_end - reinterpret_cast<pointer>(_last_assigned));
+							_allocated_memory += *_last_assigned;
+						}
+						else
+						{
+							_memory_waiting_for_tail += *_last_assigned;
+							*_last_assigned = -static_cast<size_type>(_buf_end - reinterpret_cast<pointer>(_last_assigned));
+							_memory_waiting_for_tail -= *_last_assigned;
+						}
+					}
+
+					_head = _buf_begin;
+				}
+			}
+
+			// do we have needed free space?
+			if (bytes > max)
+				throw std::bad_alloc(); // no free space. PANIC!
+			
+
+			// we have needed free space after _head
+			_last_assigned = reinterpret_cast<size_type *>(_head);
+			*_last_assigned = static_cast<size_type>(bytes);
+			auto ret = _head + sizeof(size_type);
+			_head += bytes;
+			if (_head == _buf_end)
+				_head = _buf_begin;
+
+			++_counter;
+			_allocated_memory += static_cast<size_type>(bytes);
+			return ret;
+		}
+
+		void deallocate(void* ptr) 
+		{
+			pointer p = reinterpret_cast<pointer>(ptr) - sizeof(size_type);
+			size_type s = *reinterpret_cast<size_type *>(p);
+			if (p != _tail) // no problem... we mark this block as "free" by setting negative size
+			{
+				_memory_waiting_for_tail += s;
+				_allocated_memory -= s;
+				*reinterpret_cast<size_type *>(p) = -s;
+				return;
+			}
+
+			_allocated_memory -= s;
+			p += s;
+			for (;;)
+			{
+				if (p == _buf_end)
+					p = _buf_begin;
+
+				size_type s = *reinterpret_cast<size_type *>(p);
+				if (s > 0)
+					break;
+				_memory_waiting_for_tail += s;
+				if (p == _head)
+				{
+					_tail = _head = _buf_begin;
+					_last_assigned = nullptr;
+					return;
+				}
+
+				p -= s;
+			}
+
+			_tail = p;
+		}
+
+		void clear()
+		{
+			if (_tail == _head)
+				_tail = _head = _buf_begin;
+		}
+
+		bool empty() { return _last_assigned == nullptr; }
+
+		void *getTail() { return _tail + sizeof(size_type); }
+		void *getHead() { return _head + sizeof(size_type); } // next possible allocated block
+		SIZE_T getCapacity() { return _buf_end - _buf_begin; }
+
+		SIZE_T getFree()
+		{
+			pointer e = _tail > _head ? _tail : _buf_end;
+
+			SIZE_T max = e - _head;
+			if (_tail < _head)
+			{
+				// calc free space at begin of buffer
+				SIZE_T max2 = _tail - _buf_begin;
+				if (max2 > max)
+					max = max2;
+			}
+
+			return max;
+		}
+	private:
+		typedef U8 * pointer;
+		typedef I32 size_type;  // signed, because we use negative size to mark block "free"
+		pointer _buf_begin, _buf_end, _head, _tail;
+		size_type *_last_assigned;
+		const uintptr_t alignment = 4;
+		const uintptr_t _alignment_add = sizeof(size_type) + alignment - 1;
+		const uintptr_t _alignment_mask = uintptr_t(0) - alignment ;
+		size_type _allocated_memory;
+		size_type _memory_waiting_for_tail;
+		U32 _counter;
+		IMemoryAllocator *_alloc;
+	};
+
+	
+
 	typedef Debug Default;
 
 //	typedef Alligned16Bytes Default;
@@ -258,6 +411,8 @@ private:
 	static MemoryAllocator<T> _memoryAllocator;
 
 public:
+	typedef T Allocator;
+
 	inline static void* allocate(size_t bytes)
 	{
 		return _memoryAllocator.allocate(bytes);
@@ -291,7 +446,7 @@ public:
 		}
 	}
 
-	IMemoryAllocator* GetMemoryAllocator() { return _memoryAllocator; }
+	inline static IMemoryAllocator* GetMemoryAllocator() { return _memoryAllocator; }
 };
 
 template<typename T>
