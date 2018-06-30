@@ -164,6 +164,13 @@
     <ClInclude Include="..\Src\Core\BasicTypes.h" />
     <ClInclude Include="..\Src\Core\Core.h" />
     <ClInclude Include="..\Src\Core\CoreTypes.h" />
+    <ClInclude Include="..\Src\Core\CoreType_array.h" />
+    <ClInclude Include="..\Src\Core\CoreType_hash.h" />
+    <ClInclude Include="..\Src\Core\CoreType_hashtable.h" />
+    <ClInclude Include="..\Src\Core\CoreType_helpers.h" />
+    <ClInclude Include="..\Src\Core\CoreType_list.h" />
+    <ClInclude Include="..\Src\Core\CoreType_queue.h" />
+    <ClInclude Include="..\Src\Core\CoreType_strings.h" />
     <ClInclude Include="..\Src\Core\DirectoryChangeNotifier.h" />
     <ClInclude Include="..\Src\Core\MemoryAllocator.h" />
     <ClInclude Include="..\Src\Core\RawData.h" />

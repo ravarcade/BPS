@@ -56,7 +56,7 @@ ResourceFactoryChain * ResourceFactoryChain::First = nullptr;
 // ============================================================================ ResourceManager::InternalData ===
 
 
-struct ResourceManager::InternalData : public MemoryAllocatorGlobal<>
+struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 {
 	basic_array<ResourceBase *, Allocator> _resources;
 	DirectoryChangeNotifier _monitoredDirs;

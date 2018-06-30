@@ -99,15 +99,15 @@ public:
 };
 
 template <typename T, U32 ResTypeId, class Alloc = Allocators::Default>
-class ResoureImpl : public ResourceInterface, public MemoryAllocatorGlobal<Alloc>
+class ResoureImpl : public ResourceInterface, public MemoryAllocatorStatic<Alloc>
 {
 public:
-	class ResFactory : public ResourceFactoryChain, public MemoryAllocatorGlobal<Alloc>
+	class ResFactory : public ResourceFactoryChain, public MemoryAllocatorStatic<Alloc>
 	{
 	public:
 		ResourceInterface *Create() { return make_new<T>(); }
 		void Destroy(void *ptr) { make_delete<T>(ptr); }
-		IMemoryAllocator *GetMemoryAllocator() { return MemoryAllocatorGlobal<Alloc>::GetMemoryAllocator(); }
+		IMemoryAllocator *GetMemoryAllocator() { return MemoryAllocatorStatic<Alloc>::GetMemoryAllocator(); }
 		ResFactory() : ResourceFactoryChain() {
 			TypeId = ResTypeId; 
 		}
@@ -124,7 +124,7 @@ typename ResoureImpl<T, ResTypeId, Alloc>::ResFactory ResoureImpl<T, ResTypeId, 
 
 // ============================================================================
 
-class BAMS_EXPORT ResourceManager : public MemoryAllocatorGlobal<>
+class BAMS_EXPORT ResourceManager : public MemoryAllocatorStatic<>
 {
 private:
 	struct InternalData;

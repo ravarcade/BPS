@@ -1,5 +1,5 @@
 
-class DirectoryChangeNotifier : public MemoryAllocatorGlobal<>
+class DirectoryChangeNotifier : public MemoryAllocatorStatic<>
 {
 	struct InternalData;
 	InternalData *_data;
