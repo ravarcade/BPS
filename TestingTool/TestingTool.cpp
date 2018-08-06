@@ -18,7 +18,7 @@ void DumpHex(BYTE *data, size_t s)
 		if ((i % 4) == 3)
 			printf(" ");		
 	}
-	printf("|");
+	printf("| ");
 	for (size_t i = 0; i < s; ++i)
 	{
 		static char txt[2] = { 0, 0};
@@ -117,7 +117,7 @@ int main()
 	uint64_t Max, Current, Counter;
 
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
-	BAMS::Initialize();
+	BAMS::Initialize(); // Starts Game Engine Thread
 
 	{
 		BAMS::DoTests();

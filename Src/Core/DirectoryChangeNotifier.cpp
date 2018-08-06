@@ -36,7 +36,7 @@ struct DiskFileName
 		hash = JSHash(_fileName, hash);
 	}
 
-	bool operator == (const DiskFileName &b)
+	bool operator == (const DiskFileName &b) const
 	{
 		if (hash == b.hash)
 		{
@@ -102,13 +102,18 @@ struct DiskFileName
 	PathSTR path;
 	U32 hash;
 	WSimpleString fileName;
+
+	// required to use DiskFileName in hash table and as hash table key
+	typedef const DiskFileName key_t;
+	inline U32 getHash() const { return hash; }
+	inline key_t * getKey() const { return this; }
 };
 
 
 /// <summary>
 /// Disk file change event.
 /// Note 1: First arg of constructor is always allocator. It is used to create strings with desired memory allocator.
-/// Note 2: It is "plain" struct. Destructor will delete all strings too. They have pointer to memory allocator.
+/// Note 2: It is "plain" struct. Destructor will delete all strings too. Strings have pointer to own memory allocator.
 /// Note 3: This class will be used with queue and hashtable. Both may not call destructor. 
 ///         All is stored in Blocks, so whole memory block may be "destroyed" at once.
 /// </summary>
@@ -168,11 +173,6 @@ struct MonitoredDir
 		bufferSize(0) 
 	{ 
 		memset(&pollingOverlap, 0, sizeof(pollingOverlap)); 
-	}
-
-	static void CALLBACK OnStartMonitoredDir(__in  ULONG_PTR arg)
-	{
-		MonitoredDir *_self = reinterpret_cast<MonitoredDir *>(arg);
 	}
 
 	void Start()
@@ -296,54 +296,19 @@ struct DirectoryChangeNotifier::InternalData : public MemoryAllocatorStatic<>
 {
 
 private:
-	std::thread *_worker;
-	bool _killWorkerFlag;
 	std::mutex _monitoredDirsAccessMutex;
-	basic_array<MonitoredDir *, Allocator>_monitoredDirs;
-	MonitoredDir::EventQueue _eventsFromOs;
-
-	struct DelayedEvent : MonitoredDirEvent
-	{
-		DelayedEvent(IMemoryAllocator *alloc, MonitoredDirEvent &src) :
-			MonitoredDirEvent(alloc, src),
-			_waitTo(clock::now()),
-			_nextOnList(nullptr),
-			_prevOnList(nullptr)
-		{}
-
-		DelayedEvent(time waitTo, IMemoryAllocator *alloc, MonitoredDirEvent &src) :
-			MonitoredDirEvent(alloc, src),
-			_waitTo(waitTo),
-			_nextOnList(nullptr),
-			_prevOnList(nullptr)
-		{}
-
-		DelayedEvent(clock::duration delay, IMemoryAllocator *alloc, MonitoredDirEvent &src) :
-			MonitoredDirEvent(alloc, src),
-			_waitTo(clock::now() + delay),
-			_nextOnList(nullptr),
-			_prevOnList(nullptr)
-		{}
-
-		time _waitTo;
-		DelayedEvent * _nextOnList;
-		DelayedEvent * _prevOnList;
-	};
-
-	typedef list<DelayedEvent> ListOfDelayedEvents;
-	typedef hashtable<DiskFileName *, DelayedEvent*> UniqEvenTable;
-	ListOfDelayedEvents _eventsToProcess;
-	UniqEvenTable _uniqEvenTable;
-
-
+	basic_array<MonitoredDir *, Allocator> _monitoredDirs;
+	MonitoredDir::EventQueue _eventsQueue;
+	WSTR _fileName;
+	WSTR _fileNameRenameTo;
 
 public:
-	typedef queue<MonitoredDirEvent> EventQueue;
+//	typedef queue<MonitoredDirEvent> EventQueue;
 
 	InternalData() :
-		_worker(nullptr),
-		_killWorkerFlag(false),
-		_eventsFromOs(8192) // 8kB in event ring buffer
+		_fileName(1000),
+		_fileNameRenameTo(224),
+		_eventsQueue(8192) // 8kB in for first memory block for events. More block can be added later.
 	{}
 
 	virtual ~InternalData()
@@ -354,24 +319,6 @@ public:
 		std::lock_guard<std::mutex> lck(_monitoredDirsAccessMutex);
 		for (auto md : _monitoredDirs)
 			make_delete<MonitoredDir>(md);
-	}
-
-	void AddDir(PathSTR &&sPath, U32 type)
-	{
-		for (auto &md : _monitoredDirs)
-		{
-			if (md && md->path == sPath)
-			{
-				md->type |= type;
-				return;
-			}
-		}
-
-		auto newMonitoredDir = make_new<MonitoredDir>(std::move(sPath), type, &_eventsFromOs);
-		std::lock_guard<std::mutex> lck(_monitoredDirsAccessMutex);
-		_monitoredDirs.push_back(newMonitoredDir);
-
-		newMonitoredDir->Start();
 	}
 
 	void RemoveDir(PathSTR &&sPath)
@@ -389,86 +336,28 @@ public:
 		}
 	}
 
-	static void Worker(InternalData *rm)
+	// ==================================================================== inherited DirectoryChangeNotifier ===
+
+	void AddDir(PathSTR &&sPath, U32 type)
 	{
-		// reset statistics
-		rm->addcount = 0;
-		rm->remcount = 0;
-		rm->modcount = 0;
-		rm->rencount = 0;
-		auto &events = rm->_eventsFromOs;
-		while (!rm->_killWorkerFlag)
+		for (auto &md : _monitoredDirs)
 		{
-			SleepEx(1000, TRUE); // we do nothing... everything is done in os
-			while (auto ev = events.pop_front())
+			if (md && md->path == sPath)
 			{
-				rm->ProcessEvent(ev);           // .... process ....
-				events.release(ev);				// importan part: here is relesed memory used to store event.
+				md->type |= type;
+				return;
 			}
-
-			wprintf(L"Add: [%d], Del: [%d], Mod: [%d], Ren: [%d]\n", rm->addcount, rm->remcount, rm->modcount, rm->rencount);
 		}
 
-	}
+		auto newMonitoredDir = make_new<MonitoredDir>(std::move(sPath), type, &_eventsQueue);
+		std::lock_guard<std::mutex> lck(_monitoredDirsAccessMutex);
+		_monitoredDirs.push_back(newMonitoredDir);
 
-	int addcount, remcount, modcount, rencount;
-
-	/// <summary>
-	/// Processes the event.
-	/// </summary>
-	/// <param name="ev">The event.</param>
-	void ProcessEvent(MonitoredDirEvent *ev)
-	{
-		clock::duration delays[] = {
-			0s,    // 0
-			250ms, // FILE_ACTION_ADDED
-			0s,    // FILE_ACTION_REMOVED
-			250ms, // FILE_ACTION_MODIFIED
-			0s,    // FILE_ACTION_RENAMED_OLD_NAME
-			0s,    // FILE_ACTION_RENAMED_NEW_NAME
-		};
-
-		DiskFileName *key = ev;
-
-//		auto de = _uniqEvenTable.find(key);
-//		if (!de) // insert
-		{
-//			auto etp = _eventsToProcess.push_back(*ev);
-//			MonitoredDirEvent::Key key(etp);
-//			_uniqEvenTable.insert(key, etp);
-
-		}
-	
-		switch (ev->action)
-		{
-		case FILE_ACTION_ADDED:
-			wprintf(L"Add: [%s] \n", ev->fileName.c_str());
-			++addcount;
-			break;
-		case FILE_ACTION_REMOVED:
-			wprintf(L"Delete: [%s] \n", ev->fileName.c_str());
-			++remcount;
-			break;
-		case FILE_ACTION_MODIFIED:
-			wprintf(L"Modify: [%s]\n", ev->fileName.c_str());
-			++modcount;
-			break;
-		case FILE_ACTION_RENAMED_NEW_NAME:
-			wprintf(L"Rename: [%s] -> [%s]\n", ev->fileNameRenameTo.c_str(), ev->fileName.c_str());
-			++rencount;
-			break;
-		case FILE_ACTION_RENAMED_OLD_NAME:
-		default:
-			wprintf(L"!!! Default error.\n");
-			break;
-		}
+		newMonitoredDir->Start();
 	}
 
 	void StartWorker()
 	{
-		if (!_worker)
-			_worker = make_new<std::thread>(Worker, this);
-
 		for (auto &md : _monitoredDirs)
 		{
 			if (md)
@@ -478,27 +367,37 @@ public:
 
 	void StopWorker()
 	{
-		if (_worker)
+		for (auto &md : _monitoredDirs)
 		{
-			_killWorkerFlag = true;
-
-			for (auto &md : _monitoredDirs)
-			{
-				if (md)
-					md->Stop();
-			}
-
-			_worker->join();
-			make_delete<std::thread>(_worker);
-			_worker = nullptr;
+			if (md)
+				md->Stop();
 		}
 	}
 
-	void StartMonitoredDir(MonitoredDir *md)
+	DiskEvent *GetDiskEvent()
 	{
-		QueueUserAPC(MonitoredDir::OnStartMonitoredDir, _worker->native_handle(), reinterpret_cast<ULONG_PTR>(md));
-	}
+		DiskEvent *ret = nullptr;
+		static DiskEvent de;
 
+		if (auto ev = _eventsQueue.pop_front()) // get event from queue
+		{
+			// .... process ....
+			// Copy and combine path and filename to _fileName ... and fileNameRenameTo to _fileNameRenameTo.
+			// Both variable will hold data after we destroy orginal event container.
+			// Here string will be copied. There is no reason to optimise this.
+			_fileName = ev->path + Tools::wDirectorySeparator + ev->fileName;
+			_fileNameRenameTo = ev->fileNameRenameTo;
+
+			// fill container "DiskEvent" with data about event
+			de.action = ev->action;
+			de.fileName = _fileName;
+			de.fileNameRenameTo = _fileNameRenameTo;
+
+			ret = &de;
+			_eventsQueue.release(ev);				// importan part: here memory used by event is relesed.
+		}
+		return ret;
+	}
 };
 
 // ============================================================================ DirectoryChangeNotifier ===
@@ -509,5 +408,6 @@ DirectoryChangeNotifier::~DirectoryChangeNotifier() { make_delete<InternalData>(
 void DirectoryChangeNotifier::AddDir(PathSTR &&sPath, U32 type) { _data->AddDir(std::move(sPath), type); }
 void DirectoryChangeNotifier::Start() { _data->StartWorker(); }
 void DirectoryChangeNotifier::Stop() { _data->StopWorker(); }
+DiskEvent *DirectoryChangeNotifier::GetDiskEvent() { return _data->GetDiskEvent(); }
 
 NAMESPACE_CORE_END

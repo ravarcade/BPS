@@ -36,12 +36,19 @@ public:
 	queue(SIZE_T defaultBlockSize = 16*1024) :
 		alloc(MemoryAllocatorStatic<>::GetMemoryAllocator(), defaultBlockSize),
 		first(nullptr),
-		last(nullptr)
+		last(nullptr),
+		used(0)
 	{}
 
+	/// <summary>
+	/// Add new entry to queue. It call object constructor with given params (and allocatora as first param).
+	/// </summary>
+	/// <param name="...args">The ...args.</param>
+	/// <returns>Pointer to entry</returns>
 	template<class... Args>
-	void push_back(Args &&... args)
+	Entry * push_back(Args &&... args)
 	{
+		++used;
 		std::lock_guard<std::mutex> lck(mutex);
 		void *p = alloc.allocate(sizeof(Entry));
 		new (p) Entry(&alloc, std::forward<Args>(args)...);
@@ -52,10 +59,18 @@ public:
 		last = e;
 		if (!first)
 			first = e;
+
+		return (Entry *)p;
 	}
 
+	/// <summary>
+	/// Pops entry from front of queue.
+	/// Waning: It will not removes it from memory. Rembember to call <see cref="release">release after</see> you end using it.
+	/// </summary>
+	/// <returns>Pointer to entry or nullptr if queue is empty.</returns>
 	Entry *pop_front()
-	{ 
+	{
+		--used;
 		std::lock_guard<std::mutex> lck(mutex);
 		Entry *ret = first;
 		if (first)
@@ -66,15 +81,23 @@ public:
 		return ret;
 	}
 
-	void release(Entry *en)
+	U32 size() { return used; }
+
+	/// <summary>
+	/// Releases entry. Removes it from queue memory.
+	/// Rembember to call it after you end using it.
+	/// </summary>
+	/// <param name="en">The entry.</param>
+	void release(Entry *entry)
 	{
-		en->~Entry();
-		alloc.deallocate(en);
+		entry->~Entry();
+		alloc.deallocate(entry);
 	}
 
 private:
 	Alloc alloc;
 	Entry *first;
 	Entry *last;
+	U32 used;
 	std::mutex mutex;
 };

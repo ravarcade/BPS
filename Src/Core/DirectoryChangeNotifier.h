@@ -1,4 +1,11 @@
 
+struct DiskEvent
+{
+	U32 action;
+	WString fileName;
+	WString fileNameRenameTo;
+};
+
 class DirectoryChangeNotifier : public MemoryAllocatorStatic<>
 {
 	struct InternalData;
@@ -11,6 +18,8 @@ public:
 	void AddDir(PathSTR &&sPath, U32 type);
 	void Start();
 	void Stop();
+	DiskEvent *GetDiskEvent();
+	
 };
 
 

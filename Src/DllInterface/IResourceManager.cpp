@@ -38,7 +38,7 @@ struct DiskFileName
 		hash = JSHash(_fileName, hash);
 	}
 
-	bool operator == (const DiskFileName &b)
+	bool operator == (const DiskFileName &b) const
 	{
 		if (hash == b.hash)
 		{
@@ -104,6 +104,10 @@ struct DiskFileName
 	PathSTR path;
 	U32 hash;
 	WSimpleString fileName;
+
+	typedef const DiskFileName key_t;
+	inline U32 getHash() const { return hash; }
+	inline key_t * getKey() const { return this; }
 };
 
 
@@ -312,9 +316,45 @@ resm->LoadSync();
 
 	void TestRingBuffer()
 	{
+		PathSTR path = L"c:\\cos\\cs";
+		U32 pathHash = hash<PathSTR>()(path);		
+		WSTR fn = L"nazwaplik.txt";
+		WSTR fn2 = L"nazwaplik2.txt";
+		WSTR fn3 = L"nazwaplik3.txt";
+		WSTR fn4 = L"nazwaplik4.txt";
+		WSTR fn5 = L"nazwaplik4.txt";
+		WSTR fn6 = L"nazwaplik4.txt";
+
+		queue<MonitoredDirEvent> events(8192);
+		hashtable<MonitoredDirEvent> ht;
+
+		// fill events and ht
+		MonitoredDirEvent *ev;
+		ev = events.push_back(100, path, pathHash, fn);
+		ht.append(ev);
+		ev = events.push_back(101, path, pathHash, fn2);
+		ht.append(ev);
+		ev = events.push_back(102, path, pathHash, fn3);
+		ht.append(ev);
+		ev = events.push_back(200, path, pathHash, fn4);
+		ht.append(ev);
+		ev = events.push_back(201, path, pathHash, fn5);
+		ht.append(ev);
+		ev = events.push_back(202, path, pathHash, fn6);
+		ht.append(ev);
+
+
+		// remove all MonitoredDirEvent from events list
+		while (auto ev = events.pop_front())
+		{
+			TRACE("ev: " << ev->action << "\n");
+			ht.remove(ev);
+			events.release(ev); // release will delete MonitoredDirEvent from memory.
+		}
+
+
 //		hashtable<const MonitoredDirEvent*, const MonitoredDirEvent *>ht2;
 
-		hashtable<DiskFileName *, MonitoredDirEvent *> ht;
 /**
 		hashtable<PathSTR, WSimpleString> ht;
 		ht.insert(L"hi", L"tada");
@@ -344,41 +384,21 @@ resm->LoadSync();
 		_alloc.deallocate(a4);
 		auto a8 = _alloc.allocate(2000);
 
-		queue<MonitoredDirEvent> events(8192);
 
-		wchar_t test[] = L"abcdefghijklmnopq";
-		PathSTR path = L"c:\\cos\\cs";
-		U32 pathHash = hash<PathSTR>()(path);
-		WSTR fn = L"nazwaplik.txt";
-
-		events.push_back(100, path, pathHash, fn);
-		events.push_back(101, path, pathHash, fn);
-		events.push_back(102, path, pathHash, fn);
-		//		events.resize(16384);
-		events.push_back(200, path, pathHash, fn);
-		events.push_back(201, path, pathHash, fn);
-		events.push_back(202, path, pathHash, fn);
-		//		events.resize(32768);
-
-		while (auto ev = events.pop_front())
-		{
-			TRACE("ev: " << ev->action << "\n");
-			events.release(ev);
-		}
 
 		list<MonitoredDirEvent> lt;
 		lt.push_back(200, path, pathHash, fn);
-		for (auto it = lt.begin(); it != lt.end(); ++it)
+		for (auto it = lt.begin(); it != lt.end();) // li.erase(it) will "move" it to next object
 		{
 			TRACE("ev: " << it->action << "\n");
 			it = lt.erase(it);
-//			events.release(ev);
 		}
 
 	}
 
 	BAMS_EXPORT void DoTests()
 	{
+		return;
 		TestRingBuffer();
 		{
 			shared_string<char> s1;

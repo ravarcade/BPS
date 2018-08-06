@@ -672,6 +672,12 @@ public:
 		_memoryAllocator.deallocate(ptr);
 	}
 
+	template <typename U>
+	inline static U allocate(size_t bytes)
+	{
+		return static_cast<U>(_memoryAllocator.allocate(bytes));
+	}
+
 	template <class U>
 	inline static void allocArray(size_t arraySize, U*& result)
 	{

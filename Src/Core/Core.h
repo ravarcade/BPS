@@ -33,9 +33,10 @@
 #  endif
 #endif
 
+#include "BasicTypes.h"
+
 NAMESPACE_CORE_BEGIN
 
-#include "BasicTypes.h"
 #include "MemoryAllocator.h"
 #include "CoreTypes.h"
 #include "SharedString.h"

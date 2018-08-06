@@ -6,6 +6,9 @@
 *
 */
 
+/// <summary>
+/// Basic string. It has only info about where in memory is string, length, 
+/// </summary>
 template <typename T, typename U>
 struct basic_string_base
 {
@@ -14,7 +17,10 @@ struct basic_string_base
 	U _used;
 	basic_string_base() {}
 	basic_string_base(U reserved, U used = 0, T* buf = nullptr) : _reserved(reserved), _used(used), _buf(buf) {}
+
 	inline const basic_string_base &ToBasicString() const { return *this; }
+
+	SIZE_T size() const { return _used; }
 
 	static SIZE_T length(const T *txt) { return strlen(txt); }
 	static T tolower(T c) { return ::tolower(c); }
@@ -60,7 +66,6 @@ struct simple_string : basic_string_base<T, U>
 		return _used ? _B::ncmp(str._buf, _buf, _used) == 0 : true;
 	}
 
-	SIZE_T size() const { return _used; }
 	operator _B() { return *this; }
 
 	const T * c_str()
@@ -220,7 +225,12 @@ private:
 	void _Allocate() { _buf = static_cast<T *>(_allocator::allocate(_reserved * sizeof(T))); }
 
 public:
+	// constructors
+
+	// 1. Default for empty string. No memory allocation
 	basic_string() : _B(0) {  }
+
+	// 2. With c-string as param
 	template<typename ST>
 	basic_string(const ST *src, const ST *end = nullptr) {
 		_used = end ? static_cast<U>(end - src) : static_cast<U>(basic_string_base<ST, U>::length(src));
@@ -229,6 +239,7 @@ public:
 		_CopyText(_buf, src, _used);
 	}
 
+	// 3. From basic_string_base
 	template<typename ST, typename SU>
 	basic_string(const basic_string_base<ST, SU> &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used))
 	{
@@ -236,8 +247,15 @@ public:
 		_CopyText(_buf, src._buf, _used);
 	}
 
+	// 4. Copy constructor
 	basic_string(const _T &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used)) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); }
+
+	// 5. Move constructor
 	basic_string(_T &&src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used), src._buf) { src._used = 0; src._reserved = 0; src._buf = nullptr; }
+
+	// 6. Reserve space constructor
+	basic_string(U reserve) : _B(reserve) { _Allocate(); }
+
 	~basic_string() { if (_buf) { _allocator::deallocate(_buf); _buf = 0; _reserved = 0; _used = 0; } }
 
 	template<typename V>
@@ -281,9 +299,7 @@ public:
 		return _B::ncmp(str._buf, _buf, _used) == 0;
 	}
 
-	SIZE_T size() const { return _used; }
-
-	operator _B() { return *this; }
+	operator _B&() { return *this; }
 
 	const T * c_str() {
 		if (_used == _reserved)
@@ -376,7 +392,7 @@ class shared_string : public shared_base< basic_string<T, U, A, S>, A, S2>
 public:
 	typedef basic_string_base<T, U> _B;
 
-	// constructorw
+	// constructors
 	// 1. Default (empty string)
 	shared_string() : shared_base(0) { CheckIfInitialized();  AddRef(); }
 
@@ -395,7 +411,8 @@ public:
 	>
 	shared_string(const V &src) { MakeNewEntry(src.ToBasicString()); }
 
-//	template<typename ST, typename SU> shared_string(const basic_string_base<ST, SU> &src) { MakeNewEntry(src); }
+	// 6. reserve memory for string
+	shared_string(U reserve) { MakeNewEntry(reserve); }
 
 	~shared_string() { Release(); }
 
@@ -432,8 +449,8 @@ public:
 
 	SIZE_T size() const { return GetValue().size(); }
 
-	operator const basic_string_base<T, U>() { return GetValue(); } // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
-	const basic_string_base<T, U> ToBasicString() const { return GetValue(); } // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
+	operator basic_string_base<T, U>&() { return GetValue(); }            // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
+	basic_string_base<T, U> &ToBasicString() const { return GetValue(); } // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
 
 	const T * c_str() const { return GetValue().c_str(); }
 
@@ -460,6 +477,8 @@ typedef shared_string<wchar_t, U32, Allocators::Default, 250> PathSTR;
 typedef simple_string<wchar_t, U32> WSimpleString;
 typedef simple_string<char, U32> SimpleString;
 
+typedef basic_string_base<wchar_t, U32> WString;
+typedef basic_string_base<char, U32> String;
 
 /**
  * STR & WSTR should be used as standard strings. It store: 1x pointer, 2x 32-bit for length of string and length of buffer.

@@ -60,11 +60,18 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 {
 	basic_array<ResourceBase *, Allocator> _resources;
 	DirectoryChangeNotifier _monitoredDirs;
+	std::thread *_worker;
+	bool _killWorkerFlag;
 
-	InternalData() {};
+	InternalData() :
+		_worker(nullptr),
+		_killWorkerFlag(false)
+	{};
 
 	virtual ~InternalData()
 	{
+		StopMonitoring();
+
 		for (auto *pRes : _resources)
 		{
 			make_delete<ResourceBase>(pRes);
@@ -95,7 +102,6 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 	{ 
 		_monitoredDirs.AddDir(std::move(sPath), type); 
 	}
-
 	
 	void Load(ResourceBase *res)
 	{
@@ -105,13 +111,82 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 		res->ResourceLoad(data, size);
 	}	
 
+	WSTR fileName, fileNameRenameTo;
+	int addcount, remcount, modcount, rencount;
+	static void Worker(InternalData *rm)
+	{
+		// reset statistics
+		rm->addcount = 0;
+		rm->remcount = 0;
+		rm->modcount = 0;
+		rm->rencount = 0;
+//		auto &events = rm->_eventsFromOs;
+		while (!rm->_killWorkerFlag)
+		{
+			// this will wait 1 second for new events to process
+			SleepEx(1000, TRUE); // we do nothing... everything is done in os
+			while (auto ev = rm->_monitoredDirs.GetDiskEvent()) // we read all events
+			{
+				auto &fn = rm->fileName;
+				auto &frn = rm->fileNameRenameTo;
+				fn = ev->fileName;
+				frn = ev->fileNameRenameTo;
+
+				switch (ev->action)
+				{
+				case FILE_ACTION_ADDED:
+					rm->AddResource(rm->fileName.c_str());
+					wprintf(L"Add: [%s] \n", fn.c_str());
+					++rm->addcount;
+					break;
+				case FILE_ACTION_REMOVED:
+					wprintf(L"Delete: [%s] \n", fn.c_str());
+					++rm->remcount;
+					break;
+				case FILE_ACTION_MODIFIED:
+					wprintf(L"Modify: [%s]\n", fn.c_str());
+					++rm->modcount;
+					break;
+				case FILE_ACTION_RENAMED_NEW_NAME:
+					wprintf(L"Rename: [%s] -> [%s]\n", fn.c_str(), frn.c_str());
+					++rm->rencount;
+					break;
+				case FILE_ACTION_RENAMED_OLD_NAME:
+				default:
+					wprintf(L"!!! Default error.\n");
+					break;
+				}
+			}
+			wprintf(L"Add: [%d], Del: [%d], Mod: [%d], Ren: [%d]\n", rm->addcount, rm->remcount, rm->modcount, rm->rencount);
+//			while (auto ev = events.pop_front())
+//			{
+//				rm->ProcessEvent(ev);           // .... process ....
+//				events.release(ev);				// importan part: here is relesed memory used to store event.
+//			}
+
+			wprintf(L"still alive...\n");
+//			wprintf(L"Add: [%d], Del: [%d], Mod: [%d], Ren: [%d]\n", rm->addcount, rm->remcount, rm->modcount, rm->rencount);
+		}
+	}
+
 	void StartMonitoring()
 	{
 		_monitoredDirs.Start();
+
+		if (!_worker)
+			_worker = make_new<std::thread>(Worker, this);
 	}
 
 	void StopMonitoring()
 	{
+		if (_worker)
+		{
+			_killWorkerFlag = true;
+			_worker->join();
+			make_delete<std::thread>(_worker);
+			_worker = nullptr;
+		}
+
 		_monitoredDirs.Stop();
 	}
 };
