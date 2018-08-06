@@ -2,7 +2,7 @@
 * DO NOT INCLUDE THIS FILE DIRECTLY.
 * USE:
 *
-* #include "Core\Core.h"
+* #include "Core.h"
 *
 */
 
@@ -154,13 +154,13 @@ template <typename T>                                                           
 struct has_method_##x                                                                              \
 {                                                                                                  \
 	template <class, class> class checker;                                                         \
-                                                                                                   \
+																								   \
 	template <typename C>                                                                          \
 	static std::true_type test(checker<C, decltype(&C::x)> *);                                     \
-                                                                                                   \
+																								   \
 	template <typename C>                                                                          \
 	static std::false_type test(...);                                                              \
-                                                                                                   \
+																								   \
 	typedef decltype(test<T>(nullptr)) type;                                                       \
 	enum { value = std::is_same<std::true_type, decltype(test<T>(nullptr))>::value };              \
 };

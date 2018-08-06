@@ -2,7 +2,7 @@
 * DO NOT INCLUDE THIS FILE DIRECTLY.
 * USE:
 *
-* #include "Core\Core.h"
+* #include "Core.h"
 *
 */
 
@@ -22,10 +22,10 @@ using namespace std::chrono_literals; // we want to use literals, like 50ms or 1
 typedef std::chrono::steady_clock clock;
 typedef std::chrono::steady_clock::time_point time;
 
-#include "CoreType_array.h"
-#include "CoreType_helpers.h"
-#include "CoreType_strings.h"
-#include "CoreType_hash.h"
-#include "CoreType_queue.h"
-#include "CoreType_hashtable.h"
-#include "CoreType_list.h"
+#include "Core_Array.h"
+#include "Core_Helpers.h"
+#include "Core_Strings.h"
+#include "Core_Hash.h"
+#include "Core_Queue.h"
+#include "Core_Hashtable.h"
+#include "Core_List.h"

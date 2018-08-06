@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "..\..\BAMEngine\\stdafx.h"
 #include <stdio.h>
 
 NAMESPACE_CORE_BEGIN

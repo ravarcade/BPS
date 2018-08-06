@@ -1,6 +1,4 @@
 #include "stdafx.h"
-#include "..\..\BAMEngine\stdafx.h"
-
 #include "DllInterface.h"
 
 NAMESPACE_BAMS_BEGIN

@@ -33,19 +33,17 @@
 #  endif
 #endif
 
-#include "BasicTypes.h"
+#include "Core_BasicTypes.h"
 
 NAMESPACE_CORE_BEGIN
 
-#include "MemoryAllocator.h"
-#include "CoreTypes.h"
-#include "SharedString.h"
-
-#include "Message.h"
-#include "Module.h"
-#include "Tools.h"
-#include "DirectoryChangeNotifier.h"
-#include "ResourceManager.h"
-#include "RawData.h"
+#include "Core_MemoryAllocator.h"
+#include "Core_Types.h"
+#include "Core_Message.h"
+#include "Core_Module.h"
+#include "Core_Tools.h"
+#include "Core_DirectoryChangeNotifier.h"
+#include "Core_ResourceManager.h"
+#include "Core_RawData.h"
 
 NAMESPACE_CORE_END

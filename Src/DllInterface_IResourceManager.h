@@ -2,7 +2,7 @@
 * DO NOT INCLUDE THIS FILE DIRECTLY.
 * USE:
 *
-* #include "DllInterface\DllInterface.h"
+* #include "DllInterface.h"
 *
 */
 

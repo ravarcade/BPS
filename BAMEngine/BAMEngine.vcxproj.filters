@@ -23,20 +23,8 @@
     <ClInclude Include="..\Src\BAMEngine.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\Core.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\BAMEngineInternal.h">
       <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\Core\MemoryAllocator.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\Core\Tools.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\Core\ResourceManager.h">
-      <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="stdafx.h">
       <Filter>Source Files</Filter>
@@ -44,46 +32,64 @@
     <ClInclude Include="targetver.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\CoreTypes.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\BAMEngineImport.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\BasicTypes.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\DllInterface\DllInterface.h">
+    <ClInclude Include="..\Src\DllInterface.h">
       <Filter>DllInterface</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\DllInterface\IResourceManager.h">
+    <ClInclude Include="..\Src\DllInterface_IResourceManager.h">
       <Filter>DllInterface</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\RawData.h">
+    <ClInclude Include="..\Src\Core.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\DirectoryChangeNotifier.h">
+    <ClInclude Include="..\Src\Core_Array.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\CoreType_strings.h">
+    <ClInclude Include="..\Src\Core_BasicTypes.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\CoreType_array.h">
+    <ClInclude Include="..\Src\Core_DirectoryChangeNotifier.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\CoreType_helpers.h">
+    <ClInclude Include="..\Src\Core_Hash.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\CoreType_queue.h">
+    <ClInclude Include="..\Src\Core_Hashtable.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\CoreType_hashtable.h">
+    <ClInclude Include="..\Src\Core_Helpers.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\CoreType_hash.h">
+    <ClInclude Include="..\Src\Core_List.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core\CoreType_list.h">
+    <ClInclude Include="..\Src\Core_MemoryAllocator.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\Core_Message.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\Core_Module.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\Core_Queue.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\Core_RawData.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\Core_ResourceManager.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\Core_Strings.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\Core_Tools.h">
+      <Filter>Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\Core_Types.h">
       <Filter>Core</Filter>
     </ClInclude>
   </ItemGroup>
@@ -97,22 +103,22 @@
     <ClCompile Include="..\Src\BAMEngine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core\Tools.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\Core\ResourceManager.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\DllInterface\IResourceManager.cpp">
+    <ClCompile Include="..\Src\DllInterface_IResourceManager.cpp">
       <Filter>DllInterface</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core\MemoryAllocator.cpp">
+    <ClCompile Include="..\Src\Core_DirectoryChangeNotifier.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core\CoreTypes.cpp">
+    <ClCompile Include="..\Src\Core_MemoryAllocator.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core\DirectoryChangeNotifier.cpp">
+    <ClCompile Include="..\Src\Core_ResourceManager.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\Core_Tools.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\Core_Types.cpp">
       <Filter>Core</Filter>
     </ClCompile>
   </ItemGroup>

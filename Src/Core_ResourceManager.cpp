@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "..\..\BAMEngine\stdafx.h"
 
 /**
  * Usefull links:
