@@ -10,12 +10,16 @@ extern "C" {
 	typedef void IResource;
 	typedef void IRawData;
 	typedef void IResourceManager;
+	typedef void IModule;
 
 	// Call Initialize befor do anything with resources, game engine, etc. Only some memory allocations.
 	BAMS_EXPORT void Initialize();
 
 	// Call Finalize as last thing to release all resources and memory
 	BAMS_EXPORT void Finalize();
+
+	BAMS_EXPORT IModule *GetModule(uint32_t moduleId);
+//	BAMS_EXPORT void SendMessage();
 
 	// MemoryAllocators
 	BAMS_EXPORT void GetMemoryAllocationStats(uint64_t *Max, uint64_t *Current, uint64_t *Counter);

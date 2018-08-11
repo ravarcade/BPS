@@ -161,7 +161,7 @@ public:
 
 // ============================================================================
 
-class ResourceManagerModule : IModule
+class ResourceManagerModule : public IModule
 {
 public:
 	void Update(float dt);
@@ -169,6 +169,11 @@ public:
 	void Finalize();
 	void SendMessage(Message *msg);
 	~ResourceManagerModule();
+
+	U32 GetModuleId() { return IModule::ResourceManagerModule; }
+
+	ResourceManager *GetResourceManager();
+
 };
 
 

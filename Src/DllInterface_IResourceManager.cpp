@@ -4,154 +4,6 @@
 NAMESPACE_BAMS_BEGIN
 using namespace CORE;
 
-struct DiskFileName
-{
-	DiskFileName() = delete;
-	DiskFileName(const DiskFileName &) = delete;
-	DiskFileName(const DiskFileName &&) = delete;
-
-	DiskFileName(IMemoryAllocator *alloc, const DiskFileName &src) :
-		path(src.path),
-		hash(src.hash),
-		fileName(alloc, src.fileName)
-	{} // we still have to allocate fileName string
-
-	DiskFileName(IMemoryAllocator *alloc, const PathSTR &_path, U32 _pathHash, FILE_NOTIFY_INFORMATION* pNotify) :
-		path(_path),
-		hash(_pathHash),
-		fileName(alloc, pNotify->FileName, reinterpret_cast<WCHAR *>(reinterpret_cast<U8 *>(pNotify->FileName) + pNotify->FileNameLength))
-	{
-		// We calc hash from: path + "\" + filename.
-		// So: "c:\dir\subdir" + "\" + "filename.ext" will have same hash as "c:\dir" + "\" + "subdir\filename.ext"
-		hash = JSHash(reinterpret_cast<const U8 *>(Tools::directorySeparator), 1, hash);
-		hash = JSHash(pNotify, hash);
-	}
-
-	DiskFileName(IMemoryAllocator *alloc, const PathSTR &_path, U32 _pathHash, const WSimpleString::_B &_fileName) :
-		path(_path),
-		hash(_pathHash),
-		fileName(alloc, _fileName)
-	{
-		hash = JSHash(reinterpret_cast<const U8 *>(Tools::directorySeparator), 1, hash);
-		hash = JSHash(_fileName, hash);
-	}
-
-	bool operator == (const DiskFileName &b) const
-	{
-		if (hash == b.hash)
-		{
-			// almost always it will be true.... but we still have to check
-			if (path.size() == b.path.size()) // check when path length i same... simplest case
-			{
-				return path == b.path && fileName == b.fileName;
-			}
-			else if ((path.size() + fileName.size()) == (b.path.size() + b.fileName.size())) // total lenght must be same
-			{
-				// check when path length is different but total leng is still same
-				auto aPath = path.begin();
-				auto bPath = b.path.begin();
-				auto aFN = fileName.begin();
-				auto bFN = b.fileName.begin();
-				auto aPathSize = path.size();
-				auto bPathSize = path.size();
-				auto aFNSize = fileName.size();
-				auto bFNSize = b.fileName.size();
-				I32 dif = static_cast<I32>(aPathSize - bPathSize);
-
-				/* example:
-				a : path = c:\AA fileName = BB\stuffs.txt
-				b : path = c:\AA\BB fileName = stuffs.txt
-				aPathSize = 5
-				bPathSize = 8
-				dif = -3
-				wcsncmp("c:\AA", "c:\AA\BB", 5) = true
-				wcsncmp("BB\stuffs.txt"+3, "stuffs.txt", 10) == true // wcsncmp("stuffs.txt"+3, "stuffs.txt", 10)
-				we must compare: aFN: "BB\" with bPath: "\BB"
-				*/
-				// looks complicate... but we check if: path + "\\" + fileName == b.path + "\\" + b.fileName
-				if (dif < 0)
-				{
-					dif = -dif; // dif is alway positive
-					if (wcsncmp(aPath, bPath, aPathSize) == 0 &&
-						wcsncmp(aFN + dif, bFN, bFNSize) == 0 &&
-						wcsncmp(aFN, bPath + bPathSize - (dif - 1), dif - 1) == 0 &&
-						aFN[dif - 1] == Tools::directorySeparatorChar &&
-						bPath[bPathSize - dif] == Tools::directorySeparatorChar)
-					{
-						return true;
-					}
-				}
-				else
-				{
-					if (wcsncmp(aPath, bPath, bPathSize) == 0 &&
-						wcsncmp(aFN, bFN + dif, aFNSize) == 0 &&
-						wcsncmp(aPath + aPathSize - (dif - 1), bFN, dif - 1) == 0 &&
-						bFN[dif - 1] == Tools::directorySeparatorChar &&
-						aPath[aPathSize - dif] == Tools::directorySeparatorChar)
-					{
-						return true;
-					}
-
-				}
-			}
-		}
-
-		return false;
-	}
-
-	PathSTR path;
-	U32 hash;
-	WSimpleString fileName;
-
-	typedef const DiskFileName key_t;
-	inline U32 getHash() const { return hash; }
-	inline key_t * getKey() const { return this; }
-};
-
-
-/// <summary>
-/// Disk file change event.
-/// Note 1: First arg of constructor is always allocator. It is used to create strings with desired memory allocator.
-/// Note 2: It is "plain" struct. Destructor will delete all strings too. They have pointer to memory allocator.
-/// Note 3: This class will be used with queue and hashtable. Both may not call destructor. 
-///         All is stored in Blocks, so whole memory block may be "destroyed" at once.
-/// </summary>
-struct MonitoredDirEvent : DiskFileName
-{
-	// They are derived from DiskFileName
-	//	PathSTR path;
-	//	U32 pathHash;
-	//	WSimpleString fileName;
-	U32 action;
-	WSimpleString fileNameRenameTo;
-
-	MonitoredDirEvent(IMemoryAllocator *alloc, MonitoredDirEvent &src) :
-		DiskFileName(alloc, src),
-		action(src.action),
-		fileNameRenameTo(alloc, src.fileNameRenameTo)
-	{}
-
-	template<typename T>
-	MonitoredDirEvent(IMemoryAllocator *alloc, U32 _action, const PathSTR &_path, U32 _pathHash, FILE_NOTIFY_INFORMATION* pNotify, T &_fileNameRenameOld) :
-		DiskFileName(alloc, _path, _pathHash, _fileNameRenameOld),
-		action(_action),
-		fileNameRenameTo(alloc, pNotify->FileName, reinterpret_cast<WCHAR *>(reinterpret_cast<U8 *>(pNotify->FileName) + pNotify->FileNameLength)),
-		{}
-
-	MonitoredDirEvent(IMemoryAllocator *alloc, U32 _action, const PathSTR &_path, U32 _pathHash, FILE_NOTIFY_INFORMATION* pNotify) :
-		DiskFileName(alloc, _path, _pathHash, pNotify),
-		action(_action),
-		fileNameRenameTo()
-	{}
-
-	template<typename T>
-	MonitoredDirEvent(IMemoryAllocator *alloc, U32 _action, const PathSTR &_path, U32 _pathHash, T &_fileName) :
-		DiskFileName(alloc, _path, _pathHash, _fileName),
-		action(_action),
-		fileNameRenameTo()
-	{}
-};
-
 extern "C" {
 
 
@@ -159,13 +11,19 @@ extern "C" {
 	{
 		setlocale(LC_CTYPE, "");
 		RegisteredClasses::Initialize();
+		IEngine::Initialize();
 	}
 
 	BAMS_EXPORT void Finalize()
 	{
+		IEngine::Finalize();
 		RegisteredClasses::Finalize();
 	}
 
+	BAMS_EXPORT BAMS::IModule *GetModule(uint32_t moduleId)
+	{
+		return IEngine::GetModule(moduleId);
+	}
 	// =========================================================================== Resource
 
 	BAMS_EXPORT UUID IResource_GetUID(IResource *res)
@@ -216,12 +74,15 @@ extern "C" {
 
 	BAMS_EXPORT IResourceManager *IResourceManager_Create()
 	{
-		return BAMS::ResourceManager::Create();
+		auto rm = reinterpret_cast<ResourceManagerModule*>(GetModule(IModule::ResourceManagerModule));
+		return rm->GetResourceManager();
+//		return BAMS::ResourceManager::Create();
 	}
 
 	BAMS_EXPORT void IResourceManager_Destroy(IResourceManager *rm)
 	{
-		BAMS::ResourceManager::Destroy(reinterpret_cast<ResourceManager *>(rm));
+		// do nothing.... ResourceManage is global object.
+//		BAMS::ResourceManager::Destroy(reinterpret_cast<ResourceManager *>(rm));
 	}
 
 	BAMS_EXPORT void IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path)
@@ -310,62 +171,12 @@ resm->LoadSync();
 		return MemmoryAllocatorsPrivate::DebugStats.list(current, size, counter, data);
 	}
 
+	
 	// ========================================================================
 
 	void TestRingBuffer()
 	{
-		PathSTR path = L"c:\\cos\\cs";
-		U32 pathHash = hash<PathSTR>()(path);		
-		WSTR fn = L"nazwaplik.txt";
-		WSTR fn2 = L"nazwaplik2.txt";
-		WSTR fn3 = L"nazwaplik3.txt";
-		WSTR fn4 = L"nazwaplik4.txt";
-		WSTR fn5 = L"nazwaplik4.txt";
-		WSTR fn6 = L"nazwaplik4.txt";
-
-		queue<MonitoredDirEvent> events(8192);
-		hashtable<MonitoredDirEvent> ht;
-
-		// fill events and ht
-		MonitoredDirEvent *ev;
-		ev = events.push_back(100, path, pathHash, fn);
-		ht.append(ev);
-		ev = events.push_back(101, path, pathHash, fn2);
-		ht.append(ev);
-		ev = events.push_back(102, path, pathHash, fn3);
-		ht.append(ev);
-		ev = events.push_back(200, path, pathHash, fn4);
-		ht.append(ev);
-		ev = events.push_back(201, path, pathHash, fn5);
-		ht.append(ev);
-		ev = events.push_back(202, path, pathHash, fn6);
-		ht.append(ev);
-
-
-		// remove all MonitoredDirEvent from events list
-		while (auto ev = events.pop_front())
-		{
-			TRACE("ev: " << ev->action << "\n");
-			ht.remove(ev);
-			events.release(ev); // release will delete MonitoredDirEvent from memory.
-		}
-
-
-//		hashtable<const MonitoredDirEvent*, const MonitoredDirEvent *>ht2;
-
-/**
-		hashtable<PathSTR, WSimpleString> ht;
-		ht.insert(L"hi", L"tada");
-		ht.insert(L"ha", L"tada 2");
-		ht.insert(L"hi ha ho", L"tada 3");
-		ht.insert(L"hey ho", L"tada 4");
-		
-		auto ha = ht.find(L"ha");
-		auto hmm = ht.find(L"hmm");
-		*/
 		Allocators::Blocks _alloc(MemoryAllocatorStatic<>::GetMemoryAllocator(), 8192);
-
-		//		Allocators::RingBuffer _alloc(MemoryAllocatorStatic<>::GetMemoryAllocator(), 8192);
 
 		auto a1 = _alloc.allocate(2000);
 		auto a2 = _alloc.allocate(2000);
@@ -381,16 +192,6 @@ resm->LoadSync();
 		_alloc.deallocate(a5);
 		_alloc.deallocate(a4);
 		auto a8 = _alloc.allocate(2000);
-
-
-
-		list<MonitoredDirEvent> lt;
-		lt.push_back(200, path, pathHash, fn);
-		for (auto it = lt.begin(); it != lt.end();) // li.erase(it) will "move" it to next object
-		{
-			TRACE("ev: " << it->action << "\n");
-			it = lt.erase(it);
-		}
 
 	}
 

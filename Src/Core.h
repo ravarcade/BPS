@@ -45,5 +45,6 @@ NAMESPACE_CORE_BEGIN
 #include "Core_DirectoryChangeNotifier.h"
 #include "Core_ResourceManager.h"
 #include "Core_RawData.h"
+#include "Core_Engine.h"
 
 NAMESPACE_CORE_END

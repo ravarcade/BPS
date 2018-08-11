@@ -5,6 +5,18 @@
 #include "BAMEngine.h"
 
 
+const char * UUID2String(GUID &g)
+{
+	static char tmp[256];
+	//[Guid("5FE64E68-7A75-4D58-B0B0-89A29C5D80E1")]
+	sprintf_s(tmp, "[%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x]", g.Data1, g.Data2, g.Data3,
+		g.Data4[0], g.Data4[1], g.Data4[2], g.Data4[3],
+		g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7]);
+
+	return tmp;
+};
+
+
 void DumpHex(BYTE *data, size_t s)
 {
 	const char *hex = "0123456789abcdef";
@@ -117,15 +129,13 @@ int main()
 	uint64_t Max, Current, Counter;
 
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
-	BAMS::Initialize(); // Starts Game Engine Thread
+	
+	BAMS::Initialize(); // Starts Game Engine Thread, it will create all needed threads ...
 
 	{
 		BAMS::DoTests();
 		BAMS::CResourceManager rm;
-		rm.StartDirectoryMonitor();
 		rm.AddDir(L"C:\\Work\\test");
-//		rm.AddDir(_tgetenv(_T("USERPROFILE")));
-//		rm.AddDir(L"C:\\");
 
 		rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 		auto r = rm.GetRawDataByName("ReadMe");
@@ -147,10 +157,16 @@ int main()
 		name = rr.GetName();
 
 
+		wait_for_esc();
 		BAMS::IResource *resList[10];
 		uint32_t resCount = 10;
 		rm.Filter(resList, &resCount, "*");
-		wait_for_esc();
+		for (uint32_t i = 0; i < resCount; ++i)
+		{
+			BAMS::CResource r(resList[i]);
+			printf("%d: \"%s\", %#010x, %s", i, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
+			wprintf(L", \"%s\"\n", r.GetPath());
+		}
 	}
 
 	BAMS::Finalize();

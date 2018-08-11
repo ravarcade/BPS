@@ -165,6 +165,7 @@
     <ClInclude Include="..\Src\Core_Array.h" />
     <ClInclude Include="..\Src\Core_BasicTypes.h" />
     <ClInclude Include="..\Src\Core_DirectoryChangeNotifier.h" />
+    <ClInclude Include="..\Src\Core_Engine.h" />
     <ClInclude Include="..\Src\Core_Hash.h" />
     <ClInclude Include="..\Src\Core_Hashtable.h" />
     <ClInclude Include="..\Src\Core_Helpers.h" />
@@ -186,7 +187,9 @@
   <ItemGroup>
     <ClCompile Include="..\Src\BAMEngine.cpp" />
     <ClCompile Include="..\Src\Core_DirectoryChangeNotifier.cpp" />
+    <ClCompile Include="..\Src\Core_Engine.cpp" />
     <ClCompile Include="..\Src\Core_MemoryAllocator.cpp" />
+    <ClCompile Include="..\Src\Core_Module.cpp" />
     <ClCompile Include="..\Src\Core_ResourceManager.cpp" />
     <ClCompile Include="..\Src\Core_Tools.cpp" />
     <ClCompile Include="..\Src\Core_Types.cpp" />

@@ -351,10 +351,12 @@ void ResourceManagerModule::Update(float dt)
 void ResourceManagerModule::Initialize()
 {
 	globalResourceManager = ResourceManager::Create();
+	globalResourceManager->StartDirectoryMonitor();
 }
 
 void ResourceManagerModule::Finalize()
 {
+	globalResourceManager->StopDirectoryMonitor();
 	ResourceManager::Destroy(globalResourceManager);
 	globalResourceManager = nullptr;
 }
@@ -376,5 +378,9 @@ ResourceManagerModule::~ResourceManagerModule()
 	}
 }
 
+ResourceManager *ResourceManagerModule::GetResourceManager()
+{
+	return globalResourceManager;
+}
 
 NAMESPACE_CORE_END

@@ -35,7 +35,6 @@ struct ModuleRegistration : ClassRegistrationBase
 ClassRegistrationBase *ClassRegistrationBase::first = nullptr;
 
 #define REGISTER(x) ClassRegistration< x > x##_registered
-#define MODULE(x) ModuleRegistration< x > x##_registered
 
 // ============================================================================
 
@@ -43,8 +42,6 @@ REGISTER(STR);
 REGISTER(WSTR);
 REGISTER(PathSTR);
 REGISTER(ShortSTR);
-
-MODULE(ResourceManagerModule);
 
 // ============================================================================
 

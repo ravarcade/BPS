@@ -92,6 +92,9 @@
     <ClInclude Include="..\Src\Core_Types.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="..\Src\Core_Engine.h">
+      <Filter>Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -119,6 +122,12 @@
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\Core_Types.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\Core_Engine.cpp">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\Core_Module.cpp">
       <Filter>Core</Filter>
     </ClCompile>
   </ItemGroup>
