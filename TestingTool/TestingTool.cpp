@@ -122,9 +122,6 @@ void wait_for_esc()
 
 int main()
 {
-	{
-		vector<int> x(3);
-	}
 
 	uint64_t Max, Current, Counter;
 
@@ -138,8 +135,11 @@ int main()
 		rm.AddDir(L"C:\\Work\\test");
 
 		rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
+//		rm.LoadSync();
 		auto r = rm.GetRawDataByName("ReadMe");
+		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
 		rm.LoadSync();
+		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
 		auto ruid = r.GetUID();
 		auto rpath = r.GetPath();
 		auto rname = r.GetName();
@@ -158,14 +158,26 @@ int main()
 
 
 		wait_for_esc();
+
+		rm.LoadSync();
+
 		BAMS::IResource *resList[10];
 		uint32_t resCount = 10;
 		rm.Filter(resList, &resCount, "*");
 		for (uint32_t i = 0; i < resCount; ++i)
 		{
 			BAMS::CResource r(resList[i]);
-			printf("%d: \"%s\", %#010x, %s", i, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
+			printf("%3d: \"%s\", %#010x, %s", i, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
 			wprintf(L", \"%s\"\n", r.GetPath());
+			auto rd = rm.GetRawDataByName(r.GetName());
+			auto rdata = rd.GetData();
+			auto rsize = rd.GetSize();
+			if (rsize > 32) 
+				rsize = 32;
+			printf("     ");
+			DumpHex(rdata, rsize);
+			printf("\n");
+
 		}
 	}
 

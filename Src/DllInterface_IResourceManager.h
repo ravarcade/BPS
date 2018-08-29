@@ -31,11 +31,12 @@ extern "C" {
 	BAMS_EXPORT const wchar_t * IResource_GetPath(IResource *res);
 	BAMS_EXPORT bool IResource_IsLoaded(IResource *res);
 	BAMS_EXPORT uint32_t IResource_GetType(IResource *res);
+	BAMS_EXPORT void IResource_Release(IResource *res);
 
 	// ResourceManager
 	BAMS_EXPORT IResourceManager *IResourceManager_Create();
 	BAMS_EXPORT void IResourceManager_Destroy(IResourceManager *);
-	BAMS_EXPORT void IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path);
+	BAMS_EXPORT IResource *IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT void IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name);
 	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource **resList, uint32_t *resCount, const char *pattern);
@@ -57,6 +58,7 @@ extern "C" {
 
 	public:
 		CResource(IResource *r) : _res(r) {}
+		~CResource() { IResource_Release(_res); }
 
 		UUID GetUID() { return IResource_GetUID(_res); }
 		const char *GetName() { return IResource_GetName(_res); }
@@ -71,6 +73,7 @@ extern "C" {
 
 	public:
 		CRawData(IRawData *r) : _res(r) {}
+		~CRawData() { IResource_Release(static_cast<IResource*>(_res)); }
 
 		UUID GetUID() { return IResource_GetUID(static_cast<IResource*>(_res)); }
 		const char *GetName() { return IResource_GetName(static_cast<IResource*>(_res)); }
@@ -90,7 +93,10 @@ extern "C" {
 		CResourceManager(IResourceManager *rm) : _rm(rm) {};
 		~CResourceManager() { IResourceManager_Destroy(_rm); _rm = nullptr; }
 
-		void AddResource(const wchar_t *path) { IResourceManager_AddResource(_rm, path); }
+		CResource AddResource(const wchar_t *path) 
+		{ 
+			CResource res(IResourceManager_AddResource(_rm, path)); 
+			return res; }
 		void AddDir(const wchar_t *path) { IResourceManager_AddDir(_rm, path); }
 
 		void Filter(IResource **resList, uint32_t *resCount, const char *pattern) { IResourceManager_Filter(_rm, resList, resCount, pattern); }

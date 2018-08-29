@@ -50,10 +50,17 @@ extern "C" {
 		return rb ? rb->isLoaded() : false;
 	}
 
-	BAMS_EXPORT uint32_t IResource_GetType(IResource * res)
+	BAMS_EXPORT uint32_t IResource_GetType(IResource *res)
 	{
 		auto *rb = reinterpret_cast<ResourceBase *>(res);
 		return rb ? rb->Type : false;
+	}
+
+	BAMS_EXPORT void IResource_Release(IResource *res)
+	{
+		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		rb->Release();
+
 	}
 
 	// =========================================================================== RawData
@@ -85,10 +92,10 @@ extern "C" {
 //		BAMS::ResourceManager::Destroy(reinterpret_cast<ResourceManager *>(rm));
 	}
 
-	BAMS_EXPORT void IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path)
+	BAMS_EXPORT IResource *IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->Add(path);
+		return resm->Add(path);
 	}
 
 	BAMS_EXPORT void IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path)
@@ -129,8 +136,8 @@ extern "C" {
 
 	BAMS_EXPORT void IResourceManager_LoadSync(IResourceManager *rm)
 	{
-auto *resm = reinterpret_cast<ResourceManager *>(rm);
-resm->LoadSync();
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		resm->LoadSync();
 	}
 
 	BAMS_EXPORT void IResourceManager_LoadAsync(IResourceManager *rm)

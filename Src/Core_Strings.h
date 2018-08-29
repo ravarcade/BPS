@@ -17,6 +17,7 @@ struct basic_string_base
 	U _used;
 	basic_string_base() {}
 	basic_string_base(U reserved, U used = 0, T* buf = nullptr) : _reserved(reserved), _used(used), _buf(buf) {}
+	basic_string_base(U used, T *buf) : _buf(buf), _used(used), _reserved(used) {}
 
 	inline const basic_string_base &ToBasicString() const { return *this; }
 
