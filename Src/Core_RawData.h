@@ -22,6 +22,14 @@ public:
 		Size = res->GetSize();
 	}
 
+	void Release(ResourceBase *res)
+	{
+		res->ResourceLoad(nullptr, 0);
+		res->GetMemoryAllocator()->deallocate(Data);
+		Data = nullptr;
+		Size = 0;
+	}
+
 	U8 *GetData() { return Data; }
 	SIZE_T GetSize() { return Size; }
 };

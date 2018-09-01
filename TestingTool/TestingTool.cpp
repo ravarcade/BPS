@@ -135,11 +135,11 @@ int main()
 		rm.AddDir(L"C:\\Work\\test");
 
 		rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
-//		rm.LoadSync();
+		rm.LoadSync();
 		auto r = rm.GetRawDataByName("ReadMe");
 		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
 		rm.LoadSync();
-		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
+		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no"); 
 		auto ruid = r.GetUID();
 		auto rpath = r.GetPath();
 		auto rname = r.GetName();
@@ -167,6 +167,8 @@ int main()
 		for (uint32_t i = 0; i < resCount; ++i)
 		{
 			BAMS::CResource r(resList[i]);
+			if (!r.IsLoaded())
+				rm.LoadSync();
 			printf("%3d: \"%s\", %#010x, %s", i, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
 			wprintf(L", \"%s\"\n", r.GetPath());
 			auto rd = rm.GetRawDataByName(r.GetName());

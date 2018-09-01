@@ -8,6 +8,7 @@
 // windows libs:
 #include <Rpc.h> // for UUID
 #include <stdint.h> // for int64_t and few similiary types
+#include <utility>
 
 NAMESPACE_BAMS_BEGIN
 

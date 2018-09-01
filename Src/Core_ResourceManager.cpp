@@ -116,6 +116,7 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 	DirectoryChangeNotifier _monitoredDirs;
 	std::thread *_worker;
 	bool _killWorkerFlag;
+	std::mutex _fileLoadingMutex;
 
 	InternalData() :
 		_worker(nullptr),
@@ -217,7 +218,6 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 			{
 				res->_waitWithUpdate = clock::now() + ResourceBase::defaultDelay;
 				res->_isModified = true;
-				res->_isLoaded = false;
 			}
 		}
 	}
@@ -228,10 +228,7 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 		{
 			if (!res->_isDeleted)
 			{
-				res->_waitWithUpdate = clock::now() + ResourceBase::defaultDelay;
-				res->_isModified = true;
 				res->_isDeleted = true;
-				res->_isLoaded = false;
 			}
 		}
 	}
@@ -346,15 +343,48 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 					break;
 				}
 			}
-			wprintf(L"Add: [%d], Del: [%d], Mod: [%d], Ren: [%d]\n", rm->addcount, rm->remcount, rm->modcount, rm->rencount);
-//			while (auto ev = events.pop_front())
-//			{
-//				rm->ProcessEvent(ev);           // .... process ....
-//				events.release(ev);				// importan part: here is relesed memory used to store event.
-//			}
+			rm->ProcessResources();
+			wprintf(L"Still alive... Add: [%d], Del: [%d], Mod: [%d], Ren: [%d]\n", rm->addcount, rm->remcount, rm->modcount, rm->rencount);
+		}
+	}
 
-			wprintf(L"still alive...\n");
-//			wprintf(L"Add: [%d], Del: [%d], Mod: [%d], Ren: [%d]\n", rm->addcount, rm->remcount, rm->modcount, rm->rencount);
+
+	bool ProcessResources()
+	{
+		bool allLoaded = true;
+		std::lock_guard<std::mutex> lck(_fileLoadingMutex);
+		auto now = clock::now();
+		for (auto &res : _resources)
+		{
+			if (res->_isLoaded && (res->_isDeleted || (res->_isModified && res->_waitWithUpdate > now)))
+			{
+				res->GetImplementation()->Release(res);
+			}
+
+			if (!res->_isLoaded && res->_refCounter && !res->_isDeleted && (!res->_isModified || res->_waitWithUpdate < now))
+			{
+				wprintf(L"Loading: %s\n", res->Path.c_str());
+				Load(res);
+				if (res->_isLoaded)
+				{
+					res->Update();
+				}
+			}
+			if (res->_refCounter && !res->_isLoaded)
+			{
+				allLoaded = false;
+			}
+		}
+		return allLoaded;
+	}
+
+	void LoadEverything()
+	{
+		bool allLoaded = ProcessResources();
+		while (!_killWorkerFlag && !allLoaded)
+		{
+			SleepEx(100, TRUE);
+			allLoaded = ProcessResources();
 		}
 	}
 
@@ -450,7 +480,7 @@ ResourceBase * ResourceManager::Get(const STR & resName, U32 typeId)
 	for (auto &res : _data->_resources)
 	{
 		// if we have correct name and typeid, then we have found
-		if (res->Name == resName && res->Type == typeId && typeId == ResourceBase::UNKNOWN)
+		if (res->Name == resName && res->Type == typeId && typeId != ResourceBase::UNKNOWN)
 		{
 			ret = res;
 			break;
@@ -485,7 +515,6 @@ ResourceBase * ResourceManager::Get(const STR & resName, U32 typeId)
 
 	CreateResourceImplementation(ret);
 
-	ret->AddRef();
 	return ret;
 }
 
@@ -505,29 +534,18 @@ ResourceBase * ResourceManager::Get(const UUID & resUID)
 	if (!ret)
 	{
 		auto res = make_new<ResourceBase>();
+		res->UID = resUID;
 		_data->AddResource(res);
 		ret = res;
 	}
 
-	// increase ref counter;
-	ret->AddRef();
 	return ret;
 }
 
 
 void ResourceManager::LoadSync()
 {
-	for (auto &res : _data->_resources)
-	{
-		if (!res->isLoaded() && res->_refCounter)
-		{
-			_data->Load(res);
-			if (res->isLoaded())
-			{
-				res->Update();
-			}
-		}
-	}
+	_data->LoadEverything();
 }
 
 void ResourceManager::LoadAsync()

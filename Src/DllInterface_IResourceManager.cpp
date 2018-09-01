@@ -26,6 +26,24 @@ extern "C" {
 	}
 	// =========================================================================== Resource
 
+	BAMS_EXPORT void IResource_AddRef(IResource *res)
+	{
+		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		rb->AddRef();
+	}
+
+	BAMS_EXPORT void IResource_Release(IResource *res)
+	{
+		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		rb->Release();
+	}
+
+	BAMS_EXPORT uint32_t IResource_GetRefCounter(IResource *res)
+	{
+		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		return rb->GetRefCounter();
+	}
+
 	BAMS_EXPORT UUID IResource_GetUID(IResource *res)
 	{
 		auto *rb = reinterpret_cast<ResourceBase *>(res);
@@ -54,13 +72,6 @@ extern "C" {
 	{
 		auto *rb = reinterpret_cast<ResourceBase *>(res);
 		return rb ? rb->Type : false;
-	}
-
-	BAMS_EXPORT void IResource_Release(IResource *res)
-	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
-		rb->Release();
-
 	}
 
 	// =========================================================================== RawData

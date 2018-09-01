@@ -19,6 +19,7 @@ class ResourceImplementationInterface
 public:
 	virtual ~ResourceImplementationInterface() {}
 	virtual void Update(ResourceBase *) = 0;
+	virtual void Release(ResourceBase *) = 0;
 	virtual ResourceFactoryInterface *GetFactory() = 0;
 };
 
@@ -116,6 +117,8 @@ public:
 			_resourceImplementation = nullptr;
 		}
 	}
+
+	U32 GetRefCounter() { return _refCounter; }
 
 	enum {
 		UNKNOWN = 0,
