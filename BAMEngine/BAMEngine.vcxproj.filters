@@ -15,6 +15,12 @@
     <Filter Include="DllInterface">
       <UniqueIdentifier>{00b217d3-9ca4-4fd5-b7dd-17357f9f7547}</UniqueIdentifier>
     </Filter>
+    <Filter Include="3rdParty">
+      <UniqueIdentifier>{cc465bd2-3b50-493d-9f67-5571f30ce1d2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="3rdParty\TinyXML2">
+      <UniqueIdentifier>{ef3d5c09-2237-4d4e-bbe6-2e53bf21e077}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -95,6 +101,9 @@
     <ClInclude Include="..\Src\Core_Engine.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="..\3rdParty\tinyxml2\tinyxml2.h">
+      <Filter>3rdParty\TinyXML2</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -129,6 +138,9 @@
     </ClCompile>
     <ClCompile Include="..\Src\Core_Module.cpp">
       <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rdParty\tinyxml2\tinyxml2.cpp">
+      <Filter>3rdParty\TinyXML2</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

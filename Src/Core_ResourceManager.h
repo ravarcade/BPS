@@ -56,6 +56,7 @@ protected:
 	bool _isModified;
 	time _waitWithUpdate;
 	U32 _refCounter;
+	time_t _fileTimeStamp;
 
 	ResourceImplementationInterface *_resourceImplementation;
 	const static time::duration defaultDelay;
@@ -202,12 +203,15 @@ public:
 
 	ResourceBase *Add(CWSTR path);
 	void AddDir(CWSTR path);
+	void RootDir(CWSTR path);
 
 	void LoadSync();
-	void LoadAsync();
 
 	void StartDirectoryMonitor();
 	void StopDirectoryMonitor();
+
+	void LoadManifest();
+	void SaveManifest();
 };
 
 

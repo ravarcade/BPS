@@ -74,9 +74,10 @@ protected:
 	inline void NeedUniq()
 	{
 		auto &src = _pool[_idx];
-		if (src.refCounter > 1)
+		if (src.refCounter > 1 || _idx == 0)
 		{
-			--src.refCounter;
+			if (_idx)
+				--src.refCounter;
 			MakeNewEntry(src.value);
 		}
 	}

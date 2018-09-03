@@ -115,6 +115,12 @@ extern "C" {
 		resm->AddDir(path);
 	}
 
+	BAMS_EXPORT void IResourceManager_RootDir(IResourceManager *rm, const wchar_t *path)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		resm->RootDir(path);
+	}
+
 	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
@@ -149,12 +155,6 @@ extern "C" {
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
 		resm->LoadSync();
-	}
-
-	BAMS_EXPORT void IResourceManager_LoadAsync(IResourceManager *rm)
-	{
-		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->LoadAsync();
 	}
 
 	BAMS_EXPORT void IResourceManager_StartDirectoryMonitor(IResourceManager *rm)

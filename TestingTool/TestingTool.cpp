@@ -132,7 +132,7 @@ int main()
 	{
 		BAMS::DoTests();
 		BAMS::CResourceManager rm;
-		rm.AddDir(L"C:\\Work\\test");
+		rm.RootDir(L"C:\\Work\\test");
 
 		rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 		rm.LoadSync();

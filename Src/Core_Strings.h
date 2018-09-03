@@ -26,6 +26,7 @@ struct basic_string_base
 	static SIZE_T length(const T *txt) { return strlen(txt); }
 	static T tolower(T c) { return ::tolower(c); }
 	static int ncmp(const T *string1, const T *string2, size_t count) { return strncmp(string1, string2, count); }
+	static int nicmp(const T *string1, const T *string2, size_t count) { return strnicmp(string1, string2, count); }
 };
 
 DEFINE_HAS_METHOD(ToBasicString);
@@ -49,6 +50,23 @@ struct simple_string : basic_string_base<T, U>
 	~simple_string() { if (_buf && _alloc) { _alloc->deallocate(_buf); _buf = 0; _reserved = 0; _used = 0; } }
 
 	void set_allocator(IMemoryAllocator *alloc) { if (!_alloc) _alloc = alloc; }
+	void resize(U32 s) 
+	{ 
+		if (s >= _reserved)
+		{
+			T *oldBuf = _buf;
+			_reserved = s + 1;
+			_Allocate();
+
+			if (oldBuf && _used)
+				_CopyText(_buf, _reserved, oldBuf, _used);
+
+			// oldBuf is released here, because there is chance, that we copy part from source buffer
+			if (oldBuf)
+				_alloc->deallocate(oldBuf);
+		}
+		_used = s;
+	}
 
 	template<typename V>
 	simple_string& operator = (const basic_string_base<T, V>& src) { _used = 0; _Append(static_cast<U>(src._used), src._buf); return *this; }
@@ -157,7 +175,16 @@ template<>
 int  basic_string_base<wchar_t, U16>::ncmp(const wchar_t *string1, const wchar_t *string2, size_t count) { return wcsncmp(string1, string2, count); }
 
 template<>
-int  basic_string_base<wchar_t, U32>::ncmp(const wchar_t *string1, const wchar_t *string2, size_t count) { return wcsncmp(string1, string2, count); }
+int  basic_string_base<wchar_t, U32>::ncmp(const wchar_t *string1, const wchar_t *string2, size_t count) { 
+	TRACEW(L"s1: " << std::wstring(string1, string1 + count).c_str() << L"\ns2: " << std::wstring(string2, string2 + count).c_str() << L"\n");
+	return wcsncmp(string1, string2, count); 
+}
+
+template<>
+int  basic_string_base<wchar_t, U16>::nicmp(const wchar_t *string1, const wchar_t *string2, size_t count) { return _wcsnicmp(string1, string2, count); }
+
+template<>
+int  basic_string_base<wchar_t, U32>::nicmp(const wchar_t *string1, const wchar_t *string2, size_t count) { return _wcsnicmp(string1, string2, count); }
 
 // ============================================================================
 
@@ -259,6 +286,24 @@ public:
 
 	~basic_string() { if (_buf) { _allocator::deallocate(_buf); _buf = 0; _reserved = 0; _used = 0; } }
 
+	void resize(U32 s)
+	{
+		if (s >= _reserved)
+		{
+			T *oldBuf = _buf;
+			_reserved = s + 1;
+			_Allocate();
+
+			if (oldBuf && _used)
+				_CopyText(_buf, _reserved, oldBuf, _used);
+
+			// oldBuf is released here, because there is chance, that we copy part from source buffer
+			if (oldBuf)
+				_allocator::deallocate(oldBuf);
+		}
+		_used = s;
+	}
+
 	template<typename V>
 	basic_string& operator = (const basic_string_base<T, V>& src) { _used = 0; _Append(static_cast<U>(src._used), src._buf); return *this; }
 	basic_string& operator = (const T* src) { _used = 0; U len = static_cast<U>(_B::length(src));  _Append(len, src); return *this; }
@@ -297,7 +342,34 @@ public:
 			return true;
 		if (str._used != _used)
 			return false;
+
 		return _B::ncmp(str._buf, _buf, _used) == 0;
+	}
+
+	bool startWith(const basic_string_base<T, U> &str, bool caseInsesitive = false) const {
+		if (str._used >= _used)
+			return false;
+		return caseInsesitive ? _B::nicmp(str._buf, _buf, str._used) == 0 : _B::ncmp(str._buf, _buf, str._used) == 0;
+	}
+
+	basic_string_base<T, U> substr(I32 start, I32 len = 0x7fffffff)
+	{
+		I64 s = start >= 0 ? start : I64(_used) + I64(start);
+		I64 l = _used;
+		if (s < 0)
+			s = 0;
+		if (s > l)
+			s = l;
+
+
+		I64 e = (len < 0 ? l : s) + I64(len);
+		if (e < s)
+			e = s;
+		if (e > l)
+			e = l;
+
+		basic_string_base<T, U> ret(U32(e-s), _buf+U32(s));
+		return std::move(ret);
 	}
 
 	operator _B&() { return *this; }
@@ -312,6 +384,51 @@ public:
 
 		return _buf;
 	}
+
+
+	void UTF8(const basic_string_base<char, U> &s)
+	{
+		if (!s.size() || std::is_same_v<T, char>)
+		{ 
+			_used = 0; 
+		}
+		else
+		{
+			int size_needed = MultiByteToWideChar(CP_UTF8, 0, s._buf, (int)s.size(), NULL, 0);
+			_used = size_needed / siezof(wchar_t);
+			if (_used >= _reserved)
+			{
+				if (_buf)
+					_allocator::deallocate(_buf);
+				_reserved = size_needed + minReservedSize;
+				_Allocate();					
+			}
+
+			MultiByteToWideChar(CP_UTF8, 0, s._buf, (int)s.size(), _buf, size_needed);
+		}
+	}
+
+	void UTF8(const basic_string_base<wchar_t, U> &s)
+	{
+		if (!s.size() || std::is_same_v<T, wchar_t>)
+		{
+			_used = 0;
+		}
+		else
+		{
+			_used = WideCharToMultiByte(CP_UTF8, 0, s._buf, (int) s.size(), NULL, 0, NULL, NULL);
+			if (_used >= _reserved)
+			{
+				if (_buf)
+					_allocator::deallocate(_buf);
+				_reserved = _used + minReservedSize;
+				_Allocate();
+			}
+
+			WideCharToMultiByte(CP_UTF8, 0, s._buf, (int)s.size(), _buf, _used, NULL, NULL);
+		}
+	}
+
 
 	template <typename V>
 	bool wildcard(const basic_string_base<T, V>& pat, U pos = 0, V patPos = 0)
@@ -447,8 +564,11 @@ public:
 	// === compare
 	bool operator == (const basic_string_base<T, U> &str) const { return GetValue() == str; }
 	bool operator == (const shared_string &str) const { return _idx == str._idx ? true : GetValue() == str.GetValue(); } // no need to compare same strings
+	bool startWith(const basic_string_base<T, U> &str, bool caseInsesitive = false) const { return GetValue().startWidt(str); }
+	bool startWith(const shared_string &str, bool caseInsesitive = false) const { return GetValue().startWith(str.GetValue()); }
 
 	SIZE_T size() const { return GetValue().size(); }
+	void resize(U32 s) { GetValue().resize(s); }
 
 	operator basic_string_base<T, U>&() { return GetValue(); }            // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
 	basic_string_base<T, U> &ToBasicString() const { return GetValue(); } // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
@@ -457,6 +577,7 @@ public:
 
 	const T * begin() const { return GetValue()._buf; }
 	const T * end() { auto &v = GetValue();  return v._buf + v._used; }
+	basic_string_base<T, U> substr(I32 start, I32 len = 0x7fffffff) const { return GetValue().substr(start, len); }
 
 	bool wildcard(const shared_string& pat, U pos = 0, U patPos = 0) const { return GetValue().wildcard(pat.ToBasicString(), pos, patPos); }
 
@@ -465,6 +586,9 @@ public:
 
 	template <typename V>
 	bool iwildcard(const basic_string_base<T, V>& pat, U pos = 0, V patPos = 0) const { return GetValue().iwildcard(pat, pos, patPos); }
+
+	void UTF8(const basic_string_base<wchar_t, U> &s) { GetValue().UTF8(s); }
+	void UTF8(const basic_string_base<char, U> &s)    { GetValue().UTF8(s); }
 };
 
 

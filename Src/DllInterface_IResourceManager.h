@@ -40,13 +40,13 @@ extern "C" {
 	BAMS_EXPORT void IResourceManager_Destroy(IResourceManager *);
 	BAMS_EXPORT IResource *IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT void IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path);
+	BAMS_EXPORT void IResourceManager_RootDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name);
 	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource **resList, uint32_t *resCount, const char *pattern);
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name);
 	BAMS_EXPORT void IResourceManager_LoadSync(IResourceManager *rm);
-	BAMS_EXPORT void IResourceManager_LoadAsync(IResourceManager *rm);
 	BAMS_EXPORT void IResourceManager_StartDirectoryMonitor(IResourceManager *rm);
 	BAMS_EXPORT void IResourceManager_StopDirectoryMonitor(IResourceManager *rm);
 
@@ -142,6 +142,7 @@ extern "C" {
 			IResourceManager_AddResource(_rm, path); 
 		}
 		void AddDir(const wchar_t *path) { IResourceManager_AddDir(_rm, path); }
+		void RootDir(const wchar_t *path) { IResourceManager_RootDir(_rm, path); }
 
 		void Filter(IResource **resList, uint32_t *resCount, const char *pattern) { IResourceManager_Filter(_rm, resList, resCount, pattern); }
 		CResource FindByName(const char *name) { CResource res(IResourceManager_FindByName(_rm, name)); return std::move(res); }
@@ -151,7 +152,6 @@ extern "C" {
 		CRawData GetRawDataByUID(const UUID &uid) { CRawData res(IResourceManager_GetRawDataByUID(_rm, uid)); return std::move(res); }
 
 		void LoadSync() { IResourceManager_LoadSync(_rm); }
-		void LoadAsync() { IResourceManager_LoadAsync(_rm); }
 
 		void StartDirectoryMonitor() { IResourceManager_StartDirectoryMonitor(_rm); }
 		void StopDirectoryMonitor() { IResourceManager_StopDirectoryMonitor(_rm); }

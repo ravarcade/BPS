@@ -56,6 +56,9 @@
  */
 NAMESPACE_CORE_BEGIN
 
+using tinyxml2::XMLPrinter;
+using tinyxml2::XMLDocument;
+const wchar_t *MANIFESTFILENAME = L"resource_manifest.xml";
 
 // ============================================================================ ResourceBase ===
 const time::duration ResourceBase::defaultDelay = 500ms;
@@ -117,6 +120,7 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 	std::thread *_worker;
 	bool _killWorkerFlag;
 	std::mutex _fileLoadingMutex;
+	WSTR _rootDir;
 
 	InternalData() :
 		_worker(nullptr),
@@ -254,6 +258,13 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 	{ 
 		_monitoredDirs.AddDir(std::move(sPath), type); 
 	}
+
+	void RootDir(CWSTR path)
+	{
+		AddDirToMonitor(path, 0);
+		_rootDir = path;
+		Tools::NormalizePath(_rootDir);
+	}
 	
 	void SetResourceType(ResourceBase *res, U32 resTypeId)
 	{
@@ -289,7 +300,7 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 		if (res->Type == ResourceBase::UNKNOWN)
 			SetResourceType(res, RawData::GetTypeId());
 
-		data = Tools::LoadFile(&size, res->Path, res->GetMemoryAllocator());
+		data = Tools::LoadFile(&size, &res->_fileTimeStamp, res->Path, res->GetMemoryAllocator());
 		res->ResourceLoad(data, size);
 		res->_isModified = false;
 	}	
@@ -419,6 +430,8 @@ ResourceManager::ResourceManager()
 
 ResourceManager::~ResourceManager()
 {
+	_data->StopMonitoring();
+	SaveManifest();
 	make_delete<InternalData>(_data);
 }
 
@@ -543,22 +556,52 @@ ResourceBase * ResourceManager::Get(const UUID & resUID)
 }
 
 
-void ResourceManager::LoadSync()
-{
-	_data->LoadEverything();
-}
-
-void ResourceManager::LoadAsync()
-{
-}
-
-
 // few "one liners"
+void ResourceManager::LoadSync() { _data->LoadEverything(); }
+
 ResourceBase *ResourceManager::Add(CWSTR path) { return _data->AddResource(path); }
 void ResourceManager::AddDir(CWSTR path) { _data->AddDirToMonitor(path, 0); }
-
+void ResourceManager::RootDir(CWSTR path) { _data->RootDir(path); }
 void ResourceManager::StartDirectoryMonitor() { _data->StartMonitoring(); }
 void ResourceManager::StopDirectoryMonitor() { _data->StopMonitoring(); }
+
+void ResourceManager::LoadManifest()
+{
+}
+
+void ResourceManager::SaveManifest()
+{
+	XMLDocument out;
+	auto *rm = out.NewElement("ResourcesManifest");
+	rm->SetAttribute("qty", (int)_data->_resources.size());
+	STR cvt;
+	char uidbuf[40];
+	WSTR rpath = _data->_rootDir + Tools::wDirectorySeparator;
+	U32 rplen = static_cast<U32>(rpath.size());
+
+	for (auto *res : _data->_resources)
+	{
+		cvt.UTF8(res->Path.startWith(rpath) ? res->Path.substr(rplen) : res->Path);
+		Tools::UUID2String(res->UID, uidbuf);
+		auto *entry = out.NewElement("Resource");
+		entry->SetAttribute("Name", res->Name.c_str());
+		entry->SetAttribute("Type", res->Type);
+		entry->SetAttribute("Update", res->_fileTimeStamp);
+		entry->SetAttribute("UID", uidbuf);
+		entry->SetAttribute("Size", (I64)res->_resourceSize);
+		entry->SetText(cvt.c_str());
+		rm->InsertEndChild(entry);
+	}
+
+	out.InsertFirstChild(rm);
+	XMLPrinter prn;
+	out.Print(&prn);
+	
+	WSTR manifestFileName = rpath + MANIFESTFILENAME;
+
+	Tools::SaveFile(prn.CStrSize() - 1, prn.CStr(), manifestFileName);
+	printf("-------------- xml ------------------\n%s\n-------------------------------\n",prn.CStr());
+}
 
 // ============================================================================ ResourceManagerModule ===
 

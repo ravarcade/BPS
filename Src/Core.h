@@ -27,12 +27,17 @@
      do {  std::ostringstream s;  s << x;      \
            OutputDebugStringA(s.str().c_str()); \
         } while(0)
+#    define TRACEW(x)                           \
+     do {  std::wstringstream s;  s << x;      \
+           OutputDebugStringW(s.str().c_str()); \
+        } while(0)
 #  else
 #    include <iostream>
 #    define TRACE(x)  std::cerr << x << std::flush
 #  endif
 #endif
 
+#include "..\3rdParty\tinyxml2\tinyxml2.h"
 #include "Core_BasicTypes.h"
 
 NAMESPACE_CORE_BEGIN
