@@ -209,9 +209,6 @@ public:
 
 	void StartDirectoryMonitor();
 	void StopDirectoryMonitor();
-
-	void LoadManifest();
-	void SaveManifest();
 };
 
 
@@ -223,13 +220,12 @@ public:
 	void Update(float dt);
 	void Initialize();
 	void Finalize();
-	void SendMessage(Message *msg);
+	void SendMsg(Message *msg);
 	~ResourceManagerModule();
 
 	U32 GetModuleId() { return IModule::ResourceManagerModule; }
 
 	ResourceManager *GetResourceManager();
-
 };
 
 

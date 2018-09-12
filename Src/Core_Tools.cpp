@@ -27,11 +27,41 @@ void Tools::CreateUUID(UUID &uuid)
 	UuidCreate(&uuid);
 }
 
-void Tools::UUID2String(UUID &g, char *buf)
+void Tools::UUID2String(const UUID &g, char *buf)
 {
 	sprintf_s(buf, 39, "[%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x]", g.Data1, g.Data2, g.Data3,
 		g.Data4[0], g.Data4[1], g.Data4[2], g.Data4[3],
 		g.Data4[4], g.Data4[5], g.Data4[6], g.Data4[7]);
+}
+
+inline U8 xdigit(int c)
+{
+	return c >= '0' && c <= '9' ? U8(c - '0') :
+		c >= 'a' ? U8(c - ('a' - 10)) : U8(c - ('A' - 10));
+}
+
+void hexstring2value(BYTE *out, const char *&src, int len, bool bigEndian = false)
+{
+	int base = len-1;
+	while (len && *src)
+	{
+		if (isxdigit(*src))
+		{
+			U8 b = xdigit(src[0]) << 4 | xdigit(src[1]);
+			--len;
+			out[bigEndian ? base - len : len] = b;
+			++src;
+		}
+		++src;
+	}
+}
+
+void Tools::String2UUID(UUID &uuid, const char *buf)
+{	
+	hexstring2value((BYTE *)&uuid.Data1, buf, sizeof(uuid.Data1));
+	hexstring2value((BYTE *)&uuid.Data2, buf, sizeof(uuid.Data2));
+	hexstring2value((BYTE *)&uuid.Data3, buf, sizeof(uuid.Data3));
+	hexstring2value((BYTE *)&uuid.Data4, buf, sizeof(uuid.Data4), true); // it is set of 8 bytes, we can read it at once if we read it as 128 bit big endian value
 }
 
 BYTE * Tools::LoadFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path, IMemoryAllocator * alloc)
@@ -101,7 +131,7 @@ BYTE * Tools::LoadFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path, IMemor
 	return binBuf;
 }
 
-void Tools::InfoFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path)
+bool Tools::InfoFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path)
 {
 	HANDLE hFile;
 	OVERLAPPED ol = { 0 };
@@ -116,14 +146,14 @@ void Tools::InfoFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path)
 	DWORD err = GetLastError();
 
 	if (hFile == INVALID_HANDLE_VALUE)
-		return;
+		return false;
 
 	LARGE_INTEGER size;
 	if (!GetFileSizeEx(hFile, &size))
 	{
 		DWORD err = GetLastError();
 		CloseHandle(hFile);
-		return; // error condition, could call GetLastError to find out more
+		return false; // error condition, could call GetLastError to find out more
 	}
 
 	if (pTimestamp)
@@ -138,6 +168,8 @@ void Tools::InfoFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path)
 	
 	if (pFileSize)
 		*pFileSize = size.QuadPart;
+
+	return true;
 }
 
 bool Tools::SaveFile(SIZE_T size, const void *data, WSTR &path)
@@ -165,6 +197,57 @@ bool Tools::SaveFile(SIZE_T size, const void *data, WSTR &path)
 
 	CloseHandle(hFile);
 	return true;
+}
+
+bool Tools::IsDirectory(WSTR &path)
+{
+	DWORD attr = GetFileAttributesW(path.c_str());
+	return (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
+}
+
+bool Tools::Exist(WSTR &path)
+{
+	DWORD dwAttrib = GetFileAttributes(path.c_str());
+
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+		!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+void Tools::SearchForFiles(const WSTR &path, TSearchForFilesCallback SearchForFilesCallback, void *ctrl)
+{
+	HANDLE hFind;
+	WIN32_FIND_DATA data;
+	WSTR fpath = path;
+	if (fpath[fpath.size() - 1] != directorySeparatorChar)
+		fpath += wDirectorySeparator;
+	WSTR mask = fpath + L"*.*";
+
+	hFind = FindFirstFileW(mask.c_str(), &data);
+	if (hFind == INVALID_HANDLE_VALUE)
+		return;
+
+	WSTR filename;
+	do {
+
+		if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+		{
+			if (wcscmp(data.cFileName, L".") != 0 && wcscmp(data.cFileName, L"..") != 0)
+			{
+				// check subdir
+				filename = fpath + data.cFileName;
+				SearchForFiles(filename, SearchForFilesCallback, ctrl);
+			}
+		}
+		else {
+			filename = fpath + data.cFileName;
+			U64 size = U64(data.nFileSizeHigh) << 32 | data.nFileSizeLow;
+			U64 ft   = U64(data.ftLastWriteTime.dwHighDateTime) << 32 | data.ftLastWriteTime.dwLowDateTime;
+			time_t timestamp = ft / TICKS_PER_SECOND - EPOCH_DIFFERENCE;
+			SearchForFilesCallback(filename, size, timestamp, ctrl);
+		}
+	} while (FindNextFile(hFind, &data));
+
+	FindClose(hFind);
 }
 
 UUID Tools::NOUID = { 0 };

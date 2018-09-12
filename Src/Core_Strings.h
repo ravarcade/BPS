@@ -176,7 +176,6 @@ int  basic_string_base<wchar_t, U16>::ncmp(const wchar_t *string1, const wchar_t
 
 template<>
 int  basic_string_base<wchar_t, U32>::ncmp(const wchar_t *string1, const wchar_t *string2, size_t count) { 
-	TRACEW(L"s1: " << std::wstring(string1, string1 + count).c_str() << L"\ns2: " << std::wstring(string2, string2 + count).c_str() << L"\n");
 	return wcsncmp(string1, string2, count); 
 }
 
@@ -395,7 +394,7 @@ public:
 		else
 		{
 			int size_needed = MultiByteToWideChar(CP_UTF8, 0, s._buf, (int)s.size(), NULL, 0);
-			_used = size_needed / siezof(wchar_t);
+			_used = size_needed; // / sizeof(char) = 1;
 			if (_used >= _reserved)
 			{
 				if (_buf)
@@ -587,8 +586,8 @@ public:
 	template <typename V>
 	bool iwildcard(const basic_string_base<T, V>& pat, U pos = 0, V patPos = 0) const { return GetValue().iwildcard(pat, pos, patPos); }
 
-	void UTF8(const basic_string_base<wchar_t, U> &s) { GetValue().UTF8(s); }
-	void UTF8(const basic_string_base<char, U> &s)    { GetValue().UTF8(s); }
+	void UTF8(const basic_string_base<wchar_t, U> &s) { NeedUniq(); GetValue().UTF8(s); }
+	void UTF8(const basic_string_base<char, U> &s)    { NeedUniq(); GetValue().UTF8(s); }
 };
 
 

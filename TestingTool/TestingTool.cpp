@@ -4,6 +4,19 @@
 #include "stdafx.h"
 #include "BAMEngine.h"
 
+void LoadVK()
+{
+	HMODULE hm = NULL;
+	SetErrorMode(SEM_FAILCRITICALERRORS);	// prevent MessageBox from poping up
+	hm = LoadLibrary(L"RenderingEngineVK.dll");
+	SetErrorMode(0);
+
+	typedef void func(void);
+
+	func *RegisterModule = (func *)GetProcAddress(hm, "RenderingEngine_RegisterModule");
+	if (RegisterModule)
+		RegisterModule();	
+}
 
 const char * UUID2String(GUID &g)
 {
@@ -128,59 +141,64 @@ int main()
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
 	
 	BAMS::Initialize(); // Starts Game Engine Thread, it will create all needed threads ...
-
+	LoadVK();
 	{
+		BAMS::CEngine en;
+		using namespace BAMS;
+		en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, nullptr);
+
 		BAMS::DoTests();
-		BAMS::CResourceManager rm;
-		rm.RootDir(L"C:\\Work\\test");
+			BAMS::CResourceManager rm;
+			rm.RootDir(L"C:\\Work\\test");
+			rm.LoadSync();
 
-		rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
-		rm.LoadSync();
-		auto r = rm.GetRawDataByName("ReadMe");
-		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
-		rm.LoadSync();
-		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no"); 
-		auto ruid = r.GetUID();
-		auto rpath = r.GetPath();
-		auto rname = r.GetName();
-		auto rdata = r.GetData();
-		auto rsize = r.GetSize();
+			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
+			rm.LoadSync();
+			auto r = rm.GetRawDataByName("ReadMe");
+			printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
+			rm.LoadSync();
+			printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
+			auto ruid = r.GetUID();
+			auto rpath = r.GetPath();
+			auto rname = r.GetName();
+			auto rdata = r.GetData();
+			auto rsize = r.GetSize();
 
-		auto res = rm.FindByName("ReadMe");
-		auto uid = res.GetUID();
-		auto path = res.GetPath();
-		auto name = res.GetName();
+			auto res = rm.FindByName("ReadMe");
+			auto uid = res.GetUID();
+			auto path = res.GetPath();
+			auto name = res.GetName();
 
-		auto rr = rm.GetRawDataByUID(uid);
-		uid = rr.GetUID();
-		path = rr.GetPath();
-		name = rr.GetName();
+			auto rr = rm.GetRawDataByUID(uid);
+			uid = rr.GetUID();
+			path = rr.GetPath();
+			name = rr.GetName();
 
 
-		wait_for_esc();
+			wait_for_esc();
 
-		rm.LoadSync();
+			rm.LoadSync();
 
-		BAMS::IResource *resList[10];
-		uint32_t resCount = 10;
-		rm.Filter(resList, &resCount, "*");
-		for (uint32_t i = 0; i < resCount; ++i)
-		{
-			BAMS::CResource r(resList[i]);
-			if (!r.IsLoaded())
-				rm.LoadSync();
-			printf("%3d: \"%s\", %#010x, %s", i, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
-			wprintf(L", \"%s\"\n", r.GetPath());
-			auto rd = rm.GetRawDataByName(r.GetName());
-			auto rdata = rd.GetData();
-			auto rsize = rd.GetSize();
-			if (rsize > 32) 
-				rsize = 32;
-			printf("     ");
-			DumpHex(rdata, rsize);
-			printf("\n");
+			BAMS::IResource *resList[10];
+			uint32_t resCount = 10;
+			rm.Filter(resList, &resCount, "*");
+			for (uint32_t i = 0; i < resCount; ++i)
+			{
+				BAMS::CResource r(resList[i]);
+				if (!r.IsLoaded())
+					rm.LoadSync();
+				printf("%3d: \"%s\", %#010x, %s", i, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
+				wprintf(L", \"%s\"\n", r.GetPath());
+				auto rd = rm.GetRawDataByName(r.GetName());
+				auto rdata = rd.GetData();
+				auto rsize = rd.GetSize();
+				if (rsize > 32)
+					rsize = 32;
+				printf("     ");
+				DumpHex(rdata, rsize);
+				printf("\n");
 
-		}
+			}
 	}
 
 	BAMS::Finalize();

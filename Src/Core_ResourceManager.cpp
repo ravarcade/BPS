@@ -121,6 +121,7 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 	bool _killWorkerFlag;
 	std::mutex _fileLoadingMutex;
 	WSTR _rootDir;
+	WSTR _manifestFileName;
 
 	InternalData() :
 		_worker(nullptr),
@@ -130,7 +131,7 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 	virtual ~InternalData()
 	{
 		StopMonitoring();
-
+		SaveManifest();
 		for (auto *pRes : _resources)
 		{
 			make_delete<ResourceBase>(pRes);
@@ -145,67 +146,51 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 		return res;
 	}
 
+	bool IsUniqFile(CWSTR path)
+	{
+		return FilterByFilename(path) == nullptr;
+	}
+
 	ResourceBase *AddResource(CWSTR path)
 	{
+		if (!IsUniqFile(path))
+			return nullptr;
+
 		auto res = make_new<ResourceBase>();
 		res->Init(path);
 		_resources.push_back(res);
 		return res;
 	}
 
-	void FilterByFilename(ResourceBase ** resList, U32 * resCount, CWSTR filename, U32 *skip = 0)
+	ResourceBase *FilterByFilename(WSTR &filename)
 	{
-		I32 counter = 0;
-		I32 max = (resCount && resList) ? *resCount : 0;
-		I32 pos = 0;
-		WSTR fn(filename);
-
 		for (auto &res : _resources)
 		{
-			if (res->Path == fn)
+			if (res->Path == filename)
 			{
-				if (&skip && pos < max)
-				{
-					resList[pos] = res;
-					++pos;
-				}
-				else
-				{
-					--skip;
-				}
-
-				++counter;
+				return res;
 			}
 		}
-
-		if (resCount)
-			*resCount = counter;
+		return nullptr;
 	}
 
-	bool FindResourceByFilename(ResourceBase *&out, CWSTR filename)
-	{
-		WString fn(static_cast<U32>(WString::length(filename)), const_cast<wchar_t*>(filename));
 
-		auto f = _resources.begin();
+	ResourceBase *FilterByFilename(CWSTR filename)
+	{
+		WSTR fn(filename);
+		return FilterByFilename(fn);
+	}
+
+	bool FindResourceByFilename(ResourceBase **&out, const WSTR &filename)
+	{
+		auto f = out ? ++out : _resources.begin();
 		auto l = _resources.end();
-		if (out)
-		{
-			while (f != l)
-			{
-				if (*f == out)
-				{
-					++f;
-					break;
-				}
-				++f;
-			}
-		}
 
 		while (f != l)
 		{
-			if ((*f)->Path == fn)
+			if ((*f)->Path.startWith(filename) && ((*f)->Path.size() == filename.size() || (*f)->Path[filename.size()] == Tools::directorySeparatorChar))
 			{
-				out = *f;
+				out = f;
 				return true;
 			}
 			++f;
@@ -214,37 +199,92 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 		return false;
 	}
 
-	void UpdateResource(CWSTR filename)
+
+	// check all resources if they are modified or removed
+	void CheckForUpdates()
 	{
-		for (ResourceBase *res = nullptr; FindResourceByFilename(res, filename); )
+		auto waitTime = clock::now() + ResourceBase::defaultDelay;
+		for (auto res : _resources)
 		{
-			if (!res->_isDeleted)
+			SIZE_T resSize = 0;
+			time_t resTime = 0;
+			if (!Tools::InfoFile(&resSize, &resTime, res->Path))
 			{
-				res->_waitWithUpdate = clock::now() + ResourceBase::defaultDelay;
-				res->_isModified = true;
+				// removed!? Do second check
+				if (!Tools::Exist(res->Path))
+					res->_isDeleted = true;
+					
+			}
+			else
+			{
+				if (res->_fileTimeStamp != resTime ||
+					res->_resourceSize != resSize)
+				{
+					// modified
+					res->_waitWithUpdate = waitTime;
+					res->_isModified = true;
+				}
 			}
 		}
 	}
 
-	void RemoveResource(CWSTR filename)
+	static void SearchForFilesCallback(WSTR &filename, U64 fileSize, time_t timestamp, void *ctrl)
 	{
-		for (ResourceBase *res = nullptr; FindResourceByFilename(res, filename); )
+		auto rm = reinterpret_cast<ResourceManager::InternalData *>(ctrl);
+		if (!(filename == rm->_manifestFileName))
+			rm->AddResource(filename.c_str());
+
+	}
+
+	void ScanRootdir()
+	{
+		Tools::SearchForFiles(_rootDir, &SearchForFilesCallback, this);
+	}
+
+	void UpdateResource(const WSTR &filename)
+	{
+		auto waitTime = clock::now() + ResourceBase::defaultDelay;
+		for (ResourceBase **res = nullptr; FindResourceByFilename(res, filename); )
 		{
-			if (!res->_isDeleted)
+			if (!(*res)->_isDeleted)
 			{
-				res->_isDeleted = true;
+				(*res)->_waitWithUpdate = waitTime;
+				(*res)->_isModified = true;
 			}
 		}
 	}
 
-	void RenameResource(CWSTR filename, CWSTR newfilename)
+	void RemoveResource(const WSTR &filename)
 	{
-		for (ResourceBase *res = nullptr; FindResourceByFilename(res, filename); )
+		for (ResourceBase **res = nullptr; FindResourceByFilename(res, filename); )
 		{
-			if (!res->_isDeleted)
+			if (!(*res)->_isDeleted)
 			{
-				res->Path = newfilename;
+				(*res)->_isDeleted = true;
 			}
+		}
+	}
+
+	void RenameResource(const WSTR &filename, const WSTR newfilename)
+	{
+		I32 fnlen = static_cast<I32>(filename.size());
+		WSTR nfn = newfilename;
+		for (int i = fnlen - 1; i >= 0; --i)
+		{
+			if (filename[i] == Tools::directorySeparatorChar)
+			{
+				nfn = filename.substr(0, i + 1);
+				nfn += newfilename;
+				break;
+			}
+		}
+		if (_rootDir.startWith(filename) && (_rootDir.size() == fnlen || _rootDir[fnlen] == Tools::directorySeparatorChar))
+		{
+			_rootDir = nfn + _rootDir.substr(fnlen);
+		}
+		for (ResourceBase **res = nullptr; FindResourceByFilename(res, filename); )
+		{
+			(*res)->Path = nfn + (*res)->Path.substr(fnlen);
 		}
 	}
 
@@ -264,6 +304,8 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 		AddDirToMonitor(path, 0);
 		_rootDir = path;
 		Tools::NormalizePath(_rootDir);
+		LoadManifest();
+		ScanRootdir();
 	}
 	
 	void SetResourceType(ResourceBase *res, U32 resTypeId)
@@ -301,8 +343,17 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 			SetResourceType(res, RawData::GetTypeId());
 
 		data = Tools::LoadFile(&size, &res->_fileTimeStamp, res->Path, res->GetMemoryAllocator());
-		res->ResourceLoad(data, size);
-		res->_isModified = false;
+		
+
+		// mark resource as deleted if file not exist and can't be loaded
+		if (data == nullptr && size == 0)
+			res->_isDeleted = !Tools::Exist(res->Path);
+
+		if (!res->_isDeleted)
+		{
+			res->ResourceLoad(data, size);
+			res->_isModified = false;
+		}
 	}	
 
 	WSTR fileName, fileNameRenameTo;
@@ -329,9 +380,14 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 				switch (ev->action)
 				{
 				case FILE_ACTION_ADDED:
-					rm->AddResource(rm->fileName.c_str());
-					wprintf(L"Add: [%s] \n", fn.c_str());
-					++rm->addcount;
+					if (!Tools::IsDirectory(rm->fileName))
+					{
+						if (rm->AddResource(rm->fileName.c_str()))
+						{
+							wprintf(L"Add: [%s] \n", fn.c_str());
+							++rm->addcount;
+						}
+					}
 					break;
 				case FILE_ACTION_REMOVED:
 					rm->RemoveResource(rm->fileName.c_str());
@@ -339,12 +395,15 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 					++rm->remcount;
 					break;
 				case FILE_ACTION_MODIFIED:
-					rm->UpdateResource(rm->fileName.c_str());
-					wprintf(L"Modify: [%s]\n", fn.c_str());
-					++rm->modcount;
+					if (!Tools::IsDirectory(rm->fileName))
+					{
+						rm->UpdateResource(fn);
+						wprintf(L"Modify: [%s]\n", fn.c_str());
+						++rm->modcount;
+					}
 					break;
 				case FILE_ACTION_RENAMED_NEW_NAME:
-					rm->RenameResource(rm->fileName.c_str(), rm->fileNameRenameTo.c_str());
+					rm->RenameResource(fn, frn);
 					wprintf(L"Rename: [%s] -> [%s]\n", fn.c_str(), frn.c_str());
 					++rm->rencount;
 					break;
@@ -365,8 +424,10 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 		bool allLoaded = true;
 		std::lock_guard<std::mutex> lck(_fileLoadingMutex);
 		auto now = clock::now();
+		int cnt = 0;
 		for (auto &res : _resources)
 		{
+			++cnt;
 			if (res->_isLoaded && (res->_isDeleted || (res->_isModified && res->_waitWithUpdate > now)))
 			{
 				res->GetImplementation()->Release(res);
@@ -419,31 +480,88 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 
 		_monitoredDirs.Stop();
 	}
+
+	void LoadManifest()
+	{
+		WSTR rpath = _rootDir + Tools::wDirectorySeparator;
+		_manifestFileName = rpath + MANIFESTFILENAME;
+		SIZE_T manifestSize = 0;
+		WSTR cvt;
+		STR fn;
+
+
+		char *manifest = reinterpret_cast<char *>(Tools::LoadFile(&manifestSize, nullptr, _manifestFileName, GetMemoryAllocator()));
+		if (manifest)
+		{
+			XMLDocument xml;
+			xml.Parse(manifest, manifestSize);
+
+			auto root = xml.FirstChildElement("ResourcesManifest");
+			auto qty = root->IntAttribute("qty");
+			for (auto r = root->FirstChildElement("Resource"); r; r = r->NextSiblingElement())
+			{
+				fn = r->GetText();
+				cvt.UTF8(fn);
+				WSTR wfn = (cvt.size() > 2 && cvt[1] == ':' && cvt[2] == Tools::directorySeparatorChar) ?  cvt : rpath + cvt;
+
+				auto res = make_new<ResourceBase>();
+				res->Path = wfn;
+				res->Name = r->Attribute("Name");
+				SetResourceType(res, r->UnsignedAttribute("Type", ResourceBase::UNKNOWN));
+				const char *uid = r->Attribute("UID");
+				Tools::String2UUID(res->UID, uid);
+				res->_fileTimeStamp = r->Int64Attribute("Update", 0);
+				res->_resourceSize = r->Int64Attribute("Size", 0);
+				_resources.push_back(res);
+			}
+		}
+		if (manifest)
+			GetMemoryAllocator()->deallocate(manifest);
+	}
+
+	void SaveManifest()
+	{
+		XMLDocument out;
+		auto *rm = out.NewElement("ResourcesManifest");
+		rm->SetAttribute("qty", (int)_resources.size());
+		STR cvt;
+		char uidbuf[40];
+		WSTR rpath = _rootDir + Tools::wDirectorySeparator;
+		U32 rplen = static_cast<U32>(rpath.size());
+
+		for (auto *res : _resources)
+		{
+			if (res->_isDeleted)
+				continue;
+			cvt.UTF8(res->Path.startWith(rpath) ? res->Path.substr(rplen) : res->Path);
+			Tools::UUID2String(res->UID, uidbuf);
+			auto *entry = out.NewElement("Resource");
+			entry->SetAttribute("Name", res->Name.c_str());
+			entry->SetAttribute("Type", res->Type);
+			entry->SetAttribute("Update", res->_fileTimeStamp);
+			entry->SetAttribute("UID", uidbuf);
+			entry->SetAttribute("Size", (I64)res->_resourceSize);
+			entry->SetText(cvt.c_str());
+			rm->InsertEndChild(entry);
+		}
+
+		out.InsertFirstChild(rm);
+		XMLPrinter prn;
+		out.Print(&prn);
+
+		WSTR manifestFileName = rpath + MANIFESTFILENAME;
+
+		Tools::SaveFile(prn.CStrSize() - 1, prn.CStr(), manifestFileName);
+		printf("-------------- xml ------------------\n%s\n-------------------------------\n", prn.CStr());
+	}
 };
 
 // ============================================================================ ResourceManager ===
 
-ResourceManager::ResourceManager()
-{
-	_data = make_new<InternalData>();
-}
-
-ResourceManager::~ResourceManager()
-{
-	_data->StopMonitoring();
-	SaveManifest();
-	make_delete<InternalData>(_data);
-}
-
-ResourceManager * ResourceManager::Create()
-{
-	return make_new<ResourceManager>();
-}
-
-void ResourceManager::Destroy(ResourceManager *rm)
-{
-	make_delete<ResourceManager>(rm);
-}
+ResourceManager::ResourceManager()                 { _data = make_new<InternalData>(); }
+ResourceManager::~ResourceManager()                { make_delete<InternalData>(_data); }
+ResourceManager * ResourceManager::Create()        { return make_new<ResourceManager>(); }
+void ResourceManager::Destroy(ResourceManager *rm) { make_delete<ResourceManager>(rm); }
 
 void ResourceManager::Filter(ResourceBase ** resList, U32 * resCount, CSTR & _pattern)
 {
@@ -556,52 +674,14 @@ ResourceBase * ResourceManager::Get(const UUID & resUID)
 }
 
 
-// few "one liners"
+// few more "one liners"
 void ResourceManager::LoadSync() { _data->LoadEverything(); }
-
 ResourceBase *ResourceManager::Add(CWSTR path) { return _data->AddResource(path); }
 void ResourceManager::AddDir(CWSTR path) { _data->AddDirToMonitor(path, 0); }
 void ResourceManager::RootDir(CWSTR path) { _data->RootDir(path); }
 void ResourceManager::StartDirectoryMonitor() { _data->StartMonitoring(); }
 void ResourceManager::StopDirectoryMonitor() { _data->StopMonitoring(); }
 
-void ResourceManager::LoadManifest()
-{
-}
-
-void ResourceManager::SaveManifest()
-{
-	XMLDocument out;
-	auto *rm = out.NewElement("ResourcesManifest");
-	rm->SetAttribute("qty", (int)_data->_resources.size());
-	STR cvt;
-	char uidbuf[40];
-	WSTR rpath = _data->_rootDir + Tools::wDirectorySeparator;
-	U32 rplen = static_cast<U32>(rpath.size());
-
-	for (auto *res : _data->_resources)
-	{
-		cvt.UTF8(res->Path.startWith(rpath) ? res->Path.substr(rplen) : res->Path);
-		Tools::UUID2String(res->UID, uidbuf);
-		auto *entry = out.NewElement("Resource");
-		entry->SetAttribute("Name", res->Name.c_str());
-		entry->SetAttribute("Type", res->Type);
-		entry->SetAttribute("Update", res->_fileTimeStamp);
-		entry->SetAttribute("UID", uidbuf);
-		entry->SetAttribute("Size", (I64)res->_resourceSize);
-		entry->SetText(cvt.c_str());
-		rm->InsertEndChild(entry);
-	}
-
-	out.InsertFirstChild(rm);
-	XMLPrinter prn;
-	out.Print(&prn);
-	
-	WSTR manifestFileName = rpath + MANIFESTFILENAME;
-
-	Tools::SaveFile(prn.CStrSize() - 1, prn.CStr(), manifestFileName);
-	printf("-------------- xml ------------------\n%s\n-------------------------------\n",prn.CStr());
-}
 
 // ============================================================================ ResourceManagerModule ===
 
@@ -624,7 +704,7 @@ void ResourceManagerModule::Finalize()
 	globalResourceManager = nullptr;
 }
 
-void ResourceManagerModule::SendMessage(Message *msg)
+void ResourceManagerModule::SendMsg(Message *msg)
 {
 	switch (msg->id)
 	{

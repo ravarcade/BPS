@@ -12,7 +12,7 @@ public:
 	void Update(float dt);
 	void Initialize();
 	void Finalize();
-	void SendMessage(Message *msg);
+	void SendMsg(Message *msg);
 	U32 GetModuleId() { return IModule::EngineModule; }
 
 	~EngineModule();

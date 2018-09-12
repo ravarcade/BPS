@@ -189,7 +189,31 @@ extern "C" {
 		return MemmoryAllocatorsPrivate::DebugStats.list(current, size, counter, data);
 	}
 
+	// ========================================================================
+
+
+	BAMS_EXPORT void IEngine_RegisterExternalModule(
+		uint32_t moduleId,
+		ExternalModule_Initialize *moduleInitialize,
+		ExternalModule_Finalize *moduleFinalize,
+		ExternalModule_Update *moduleUpdate,
+		BAMS::ExternalModule_SendMsg *moduleSendMsg,
+		ExternalModule_Destroy *moduleDestroy,
+		const void *moduleData)
+	{
+		BAMS::CORE::IEngine::RegisterExternalModule(moduleId, moduleInitialize, moduleFinalize, moduleUpdate, reinterpret_cast<CORE::IEngine::ExternalModule_SendMsg*>(moduleSendMsg), moduleDestroy, moduleData);
+	}
 	
+	BAMS_EXPORT void IEngine_SendMsg(
+		uint32_t msgId,
+		uint32_t msgDst,
+		uint32_t msgSrc,
+		const void *data)
+	{
+		CORE::Message msg = { msgId, msgDst, msgSrc, data };
+		BAMS::CORE::IEngine::SendMsg(&msg);
+	}
+
 	// ========================================================================
 
 	void TestRingBuffer()

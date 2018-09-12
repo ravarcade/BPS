@@ -163,14 +163,16 @@ struct MonitoredDir
 	char buffer[4096];
 	DWORD bufferSize;
 	EventQueue *events;
+	bool isStopped;
 	
 	MonitoredDir(PathSTR &&_path, U32 _type, EventQueue *_eventsFromOs) :
-		hDir(0), 
-		path(_path), 
+		hDir(0),
+		path(_path),
 		pathHash(hash<PathSTR>()(path)),
-		type(_type), 
-		events(_eventsFromOs), 
-		bufferSize(0) 
+		type(_type),
+		events(_eventsFromOs),
+		bufferSize(0),
+		isStopped(true)
 	{ 
 		memset(&pollingOverlap, 0, sizeof(pollingOverlap)); 
 	}
@@ -196,9 +198,15 @@ struct MonitoredDir
 
 	void Stop()
 	{
-		if (!hDir && hDir != INVALID_HANDLE_VALUE)
+		if (hDir && hDir != INVALID_HANDLE_VALUE)
 		{
 			CancelIo(hDir);
+			int cnt = 100;
+			while (!isStopped && cnt > 0)
+			{
+				SleepEx(5, TRUE);
+				--cnt;
+			}
 			CloseHandle(hDir);
 		}
 		hDir = 0;
@@ -210,7 +218,7 @@ struct MonitoredDir
 		memset(&pollingOverlap, 0, sizeof(pollingOverlap));
 		bufferSize = 0;
 		pollingOverlap.hEvent = this;
-
+		isStopped = false;
 		BOOL success = ::ReadDirectoryChangesW(
 			hDir,
 			&buffer,
@@ -232,13 +240,19 @@ struct MonitoredDir
 		DWORD dwNumberOfBytesTransfered,					// number of bytes transferred
 		LPOVERLAPPED lpOverlapped)							// I/O information buffer
 	{
-		MonitoredDir* md = (MonitoredDir*)lpOverlapped->hEvent;
-
-		if (dwErrorCode == ERROR_OPERATION_ABORTED)
+		MonitoredDir* md = lpOverlapped && lpOverlapped->hEvent ? (MonitoredDir*)lpOverlapped->hEvent : nullptr;
+		if (dwErrorCode == ERROR_OPERATION_ABORTED && md)
 		{
-			TRACE("NotificationCompletion: dwErrorCode == ERROR_OPERATION_ABORTED ... EXIT?");
+			md->isStopped = true;
 			return;
 		}
+		if (dwErrorCode != ERROR_SUCCESS || lpOverlapped == 0 || lpOverlapped->hEvent == 0)
+		{
+			TRACE("NotificationCompletion: dwErrorCode = " << dwErrorCode << " ... EXIT?");
+			return;
+		}
+
+//		MonitoredDir* md = (MonitoredDir*)lpOverlapped->hEvent;
 
 		if (!dwNumberOfBytesTransfered) // !? what? dwNumberOfBytesTransfered must be > (3x sizeof(DWORD) + 1x sizeof(WCHAR) and we test if it is ZERO?
 		{

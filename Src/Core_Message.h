@@ -8,8 +8,8 @@
 
 struct Message
 {
-	U32 source;
-	U32 targetModule;
 	U32 id;
-	void *data;
+	U32 destination;
+	U32 source;
+	const void *data;
 };

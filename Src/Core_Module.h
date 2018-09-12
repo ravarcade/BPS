@@ -16,13 +16,14 @@ public:
 	virtual void Finalize(void) = 0;
 
 	// This recieves any messages sent to the core engine in Engine.cpp
-	virtual void SendMessage(Message *msg) = 0;
+	virtual void SendMsg(Message *msg) = 0;
 
 	virtual U32 GetModuleId(void) = 0;
 
 	enum {
 		EngineModule = 0x100,
 		ResourceManagerModule = 0x101
+		// 0x200-0x2ff - rendering module
 	};
 };
 
@@ -37,12 +38,31 @@ public:
 
 struct IEngine
 {
+	typedef void ExternalModule_Initialize(const void *moduleData);
+	typedef void ExternalModule_Finalize(const void *moduleData);
+	typedef void ExternalModule_Update(float dt, const void *moduleData);
+	typedef void ExternalModule_SendMsg(Message *msg, const void *moduleData);
+	typedef void ExternalModule_Destroy(const void *moduleData);
+	class ExternalModule;
+
 	static void Update(float dt);
 	static void Initialize();
 	static void Finalize();
 	static IModule *GetModule(U32 moduleId);
 
-	static void SendMessage(Message *msg);
+	static void SendMsg(Message *msg);
+
+	static void RegisterExternalModule(
+		uint32_t moduleId,
+		ExternalModule_Initialize *moduleInitialize,
+		ExternalModule_Finalize *moduleFinalize,
+		ExternalModule_Update *moduleUpdate,
+		ExternalModule_SendMsg *moduleSendMessage,
+		ExternalModule_Destroy *moduleDestroy,
+		const void *moduleData);
 };
+
+
+
 
 

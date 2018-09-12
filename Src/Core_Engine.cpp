@@ -16,7 +16,7 @@ void EngineModule::Finalize()
 {
 }
 
-void EngineModule::SendMessage(Message *msg)
+void EngineModule::SendMsg(Message *msg)
 {
 }
 

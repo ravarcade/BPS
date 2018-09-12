@@ -19,7 +19,7 @@ extern "C" {
 	BAMS_EXPORT void Finalize();
 
 	BAMS_EXPORT IModule *GetModule(uint32_t moduleId);
-//	BAMS_EXPORT void SendMessage();
+//	BAMS_EXPORT void SendMsg();
 
 	// MemoryAllocators
 	BAMS_EXPORT void GetMemoryAllocationStats(uint64_t *Max, uint64_t *Current, uint64_t *Counter);
@@ -54,6 +54,37 @@ extern "C" {
 	BAMS_EXPORT unsigned char *IRawData_GetData(IRawData *res);
 	BAMS_EXPORT size_t IRawData_GetSize(IRawData *res);
 
+	// Module
+	struct Message
+	{
+		U32 id;
+		U32 targetModule;
+		U32 source;
+		void *data;
+	};
+
+	typedef void ExternalModule_Initialize(const void *moduleData);
+	typedef void ExternalModule_Finalize(const void *moduleData);
+	typedef void ExternalModule_Update(float dt, const void *moduleData);
+	typedef void ExternalModule_SendMsg(BAMS::Message *msg, const void *moduleData);
+	typedef void ExternalModule_Destroy(const void *moduleData);
+	
+	BAMS_EXPORT void IEngine_RegisterExternalModule(
+		uint32_t moduleId, 
+		ExternalModule_Initialize *moduleInitialize,
+		ExternalModule_Finalize *moduleFinalize,
+		ExternalModule_Update *moduleUpdate,
+		ExternalModule_SendMsg *moduleSendMsg,
+		ExternalModule_Destroy *moduleDestroy,
+		const void *moduleData);
+
+	BAMS_EXPORT void IEngine_SendMsg(
+		uint32_t msgId,
+		uint32_t msgDst,
+		uint32_t msgSrc,
+		const void *data);
+
+	// ================================================================================== Classes ===
 
 	class ResourceSmartPtr
 	{
@@ -158,6 +189,65 @@ extern "C" {
 
 	};
 
+	class CEngine
+	{
+	public:
+		static void RegisterExternalModule(
+			uint32_t moduleId,
+			ExternalModule_Initialize *moduleInitialize,
+			ExternalModule_Finalize *moduleFinalize,
+			ExternalModule_Update *moduleUpdate,
+			ExternalModule_SendMsg *moduleSendMsg,
+			ExternalModule_Destroy *moduleDestroy,
+			const void *moduleData)
+		{
+			IEngine_RegisterExternalModule(
+				moduleId,
+				moduleInitialize,
+				moduleFinalize,
+				moduleUpdate,
+				moduleSendMsg,
+				moduleDestroy,
+				moduleData);
+		}
+
+		static void SendMsg(
+			uint32_t msgId,
+			uint32_t msgDst,
+			uint32_t msgSrc,
+			const void *data)
+		{
+			IEngine_SendMsg( msgId, msgDst, msgSrc, data);
+		}
+	};
 
 	BAMS_EXPORT void DoTests();
 }
+
+template<typename T, uint32_t moduleId>
+class IExternalModule
+{
+protected:
+	static void _Initialize(const void *p) { reinterpret_cast<T*>(const_cast<void *>(p))->Initialize(); }
+	static void _Finalize(const void *p) { reinterpret_cast<T*>(const_cast<void *>(p))->Finalize(); }
+	static void _Update(float dt, const void *p) { reinterpret_cast<T*>(const_cast<void *>(p))->Update(dt); }
+	static void _SendMsg(Message* msg, const void *p) { reinterpret_cast<T*>(const_cast<void *>(p))->SendMsg(msg); }
+	static void _Destroy(const void *p) { reinterpret_cast<T*>(const_cast<void *>(p))->Destroy(); }
+
+public:
+	IExternalModule() {}
+
+	void Register()
+	{
+		IEngine_RegisterExternalModule(moduleId, _Initialize, _Finalize, _Update, _SendMsg, _Destroy, this);
+	}
+};
+
+enum { // msgDst
+	RENDERING_ENGINE = 0x201 // VK
+};
+
+enum { // msgId
+	// to RENDERING_ENGINE
+	CREATE_3D_WINDOW = 0X20001 
+};
