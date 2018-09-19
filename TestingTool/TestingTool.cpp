@@ -6,10 +6,7 @@
 
 void LoadVK()
 {
-	HMODULE hm = NULL;
-	SetErrorMode(SEM_FAILCRITICALERRORS);	// prevent MessageBox from poping up
-	hm = LoadLibrary(L"RenderingEngineVK.dll");
-	SetErrorMode(0);
+	auto hm = LoadLibrary(L"RenderingEngineVK.dll");
 
 	typedef void func(void);
 
@@ -125,7 +122,8 @@ void wait_for_esc()
 	for (;;)
 	{
 //		Sleep(100);
-		SleepEx(100, TRUE);
+		BAMS::CEngine::Update(25.0f);
+		SleepEx(25, TRUE);
 		updateAllKeysScan();
 		if (GetKeyPressed(VK_ESCAPE))
 			break;
@@ -145,12 +143,12 @@ int main()
 	{
 		BAMS::CEngine en;
 		using namespace BAMS;
-		en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, nullptr);
 
 		BAMS::DoTests();
 			BAMS::CResourceManager rm;
 			rm.RootDir(L"C:\\Work\\test");
 			rm.LoadSync();
+			en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, nullptr);
 
 			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 			rm.LoadSync();

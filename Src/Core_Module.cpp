@@ -32,42 +32,6 @@ ModuleRegistrationBase *ModuleRegistrationBase::first = nullptr;
 MODULE(ResourceManagerModule);
 MODULE(EngineModule);
 
-void IEngine::Update(float dT)
-{
-	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
-		f->Update(dT);
-}
-
-void IEngine::Initialize()
-{
-	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
-		f->Initialize();
-}
-
-void IEngine::Finalize()
-{
-	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
-		f->Finalize();
-}
-
-IModule *IEngine::GetModule(U32 moduleId)
-{
-	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
-		if (f->GetModuleId() == moduleId)
-			return f->GetModule();
-
-	return nullptr;
-}
-
-void IEngine::SendMsg(Message *msg)
-{
-	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
-		if (msg->destination == 0 || msg->destination == f->GetModuleId())
-			f->SendMsg(msg);
-}
-
-
-
 class IEngine::ExternalModule : ModuleRegistrationBase
 {
 private:
@@ -118,7 +82,44 @@ public:
 	IModule *GetModule() { return this; }
 };
 
+
 basic_array<IEngine::ExternalModule> externalModules;
+
+void IEngine::Update(float dT)
+{
+	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
+		f->Update(dT);
+}
+
+void IEngine::Initialize()
+{
+	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
+		f->Initialize();
+}
+
+void IEngine::Finalize()
+{
+	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
+		f->Finalize();
+	externalModules.reset();
+	ModuleRegistrationBase::first = nullptr;
+}
+
+IModule *IEngine::GetModule(U32 moduleId)
+{
+	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
+		if (f->GetModuleId() == moduleId)
+			return f->GetModule();
+
+	return nullptr;
+}
+
+void IEngine::SendMsg(Message *msg)
+{
+	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
+		if (msg->destination == 0 || msg->destination == f->GetModuleId())
+			f->SendMsg(msg);
+}
 
 void IEngine::RegisterExternalModule(
 	uint32_t moduleId,
@@ -131,6 +132,7 @@ void IEngine::RegisterExternalModule(
 {
 	auto em = externalModules.add_empty();
 	new (em) ExternalModule(moduleId, moduleInitialize, moduleFinalize, moduleUpdate, moduleSendMsg, moduleDestroy, moduleData);
+	em->Initialize();
 }
 
 NAMESPACE_CORE_END

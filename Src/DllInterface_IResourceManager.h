@@ -84,6 +84,8 @@ extern "C" {
 		uint32_t msgSrc,
 		const void *data);
 
+	BAMS_EXPORT void IEngine_Update(float dt);
+
 	// ================================================================================== Classes ===
 
 	class ResourceSmartPtr
@@ -218,6 +220,11 @@ extern "C" {
 			const void *data)
 		{
 			IEngine_SendMsg( msgId, msgDst, msgSrc, data);
+		}
+
+		static void Update(float dt)
+		{
+			IEngine_Update(dt);
 		}
 	};
 

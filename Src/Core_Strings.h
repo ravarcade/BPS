@@ -18,6 +18,7 @@ struct basic_string_base
 	basic_string_base() {}
 	basic_string_base(U reserved, U used = 0, T* buf = nullptr) : _reserved(reserved), _used(used), _buf(buf) {}
 	basic_string_base(U used, T *buf) : _buf(buf), _used(used), _reserved(used) {}
+	basic_string_base(basic_string_base &src) : _buf(src._buf), _used(src._used), _reserved(src._reserved) {} // copy contructor
 
 	inline const basic_string_base &ToBasicString() const { return *this; }
 
@@ -558,7 +559,12 @@ public:
 
 	// === operator +
 	template<typename V>
-	shared_string operator + (const V &src)  const { shared_string tmp(GetValue()); tmp += src; return tmp; }
+	shared_string operator + (const V &src)  const { 
+		auto vv = ToBasicString();
+		shared_string tmp(vv);
+		tmp += src; 
+		return tmp; 
+	}
 
 	// === compare
 	bool operator == (const basic_string_base<T, U> &str) const { return GetValue() == str; }
@@ -588,6 +594,11 @@ public:
 
 	void UTF8(const basic_string_base<wchar_t, U> &s) { NeedUniq(); GetValue().UTF8(s); }
 	void UTF8(const basic_string_base<char, U> &s)    { NeedUniq(); GetValue().UTF8(s); }
+
+	void Dump() const
+	{
+		TRACEW(L"" << _idx << " (" << _pool[_idx].refCounter << ") : [" << GetValue().size() << " ]" << "\n");
+	}
 };
 
 

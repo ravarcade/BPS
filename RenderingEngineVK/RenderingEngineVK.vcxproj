@@ -72,23 +72,23 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\Src;$(IncludePath)</IncludePath>
-    <LibraryPath>..\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(VK_SDK_PATH)\Include;..\Src;..\3rdParty;$(IncludePath)</IncludePath>
+    <LibraryPath>$(VK_SDK_PATH)\lib;..\Lib;..\3rdParty;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\Src;$(IncludePath)</IncludePath>
-    <LibraryPath>..\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(VK_SDK_PATH)\Include;..\Src;..\3rdParty;$(IncludePath)</IncludePath>
+    <LibraryPath>$(VK_SDK_PATH)\lib32;..\Lib;..\3rdParty;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\Src;$(IncludePath)</IncludePath>
-    <LibraryPath>..\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(VK_SDK_PATH)\Include;..\Src;..\3rdParty;$(IncludePath)</IncludePath>
+    <LibraryPath>$(VK_SDK_PATH)\lib32;..\Lib;..\3rdParty;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\Src;$(IncludePath)</IncludePath>
-    <LibraryPath>..\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(VK_SDK_PATH)\Include;..\Src;..\3rdParty;$(IncludePath)</IncludePath>
+    <LibraryPath>$(VK_SDK_PATH)\lib;..\Lib;..\3rdParty;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

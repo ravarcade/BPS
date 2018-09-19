@@ -214,6 +214,11 @@ extern "C" {
 		BAMS::CORE::IEngine::SendMsg(&msg);
 	}
 
+	BAMS_EXPORT void IEngine_Update(float dt)
+	{
+		BAMS::CORE::IEngine::Update(dt);
+	}
+
 	// ========================================================================
 
 	void TestRingBuffer()

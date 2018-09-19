@@ -16,7 +16,7 @@
 template <typename T, class A = Allocators::Default, SIZE_T S = 48>
 class shared_base
 {
-private:
+protected:
 	struct Entry
 	{
 		T value;
