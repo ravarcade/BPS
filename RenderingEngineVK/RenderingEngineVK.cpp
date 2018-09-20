@@ -6,6 +6,49 @@
 
 using namespace BAMS;
 
+#pragma pack(push,1)
+struct Point3D { float x, y, z; };
+struct Point2D { float x, y; };
+
+struct Model 
+{
+	uint32_t noVertices;
+	uint32_t noFaces;
+	Point3D *vertices;
+	Point3D *normals;
+	Point2D *textCoord;
+	uint32_t *faces;
+};
+
+#pragma pack(pop)
+
+Point3D defaultBoxVertices[] = {
+	{ -1, -1, -1 },
+	{  1, -1, -1 },
+	{  1,  1, -1 },
+	{ -1,  1, -1 },
+
+	{ -1, -1,  1 },
+	{  1, -1,  1 },
+	{  1,  1,  1 },
+	{ -1,  1,  1 }
+};
+
+uint32_t defaultBoxFaces[] = {
+	0, 1, 2, 2, 3, 0,
+	0, 4, 5, 1, 0, 5,
+};
+
+Model defaultBox = {
+	8, 16,
+	defaultBoxVertices,
+	nullptr,
+	nullptr,
+	defaultBoxFaces
+};
+
+// ============================================================================ iglwf ====
+
 class iglwf {
 	static void ErrorCallback(int err, const char* err_str)
 	{
@@ -64,7 +107,7 @@ public:
 		main3DWindow_height = height;
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 		main3Dwindow = glfwCreateWindow(main3DWindow_width, main3DWindow_height, "Rendering Engine: Vulkan", nullptr, nullptr);
 	}
 };
@@ -287,6 +330,26 @@ public:
 const std::vector<const char*> ivk::validationLayers = { "VK_LAYER_LUNARG_standard_validation" };
 const std::vector<const char*> ivk::deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
+const std::vector<ivk::Vertex> vertices = {
+	{ { -0.5f, -0.5f,  0.5f },{ 1.0f, 0.0f, 0.0f } },
+	{ { 0.5f, -0.5f,  0.5f },{ 0.0f, 1.0f, 0.0f } },
+	{ { 0.5f,  0.5f,  0.5f },{ 0.0f, 0.0f, 1.0f } },
+	{ { -0.5f,  0.5f,  0.5f },{ 1.0f, 1.0f, 1.0f } },
+	{ { -0.5f, -0.5f, -0.5f },{ 1.0f, 0.0f, 0.0f } },
+	{ { 0.5f, -0.5f, -0.5f },{ 0.0f, 1.0f, 0.0f } },
+	{ { 0.5f,  0.5f, -0.5f },{ 0.0f, 0.0f, 1.0f } },
+	{ { -0.5f,  0.5f, -0.5f },{ 1.0f, 1.0f, 1.0f } }
+};
+
+const std::vector<uint16_t> indices = {
+	0, 1, 2,  2, 3, 0,
+	0, 4, 5,  1, 0, 5,
+	1, 5, 6,  2, 1, 6,
+	2, 6, 7,  3, 2, 7,
+	3, 7, 4,  0, 3, 4,
+	5, 4, 6,  7, 6, 4
+};
+
 ivk vk;
 
 void ivk::Init()
@@ -300,6 +363,9 @@ void ivk::Cleanup()
 	if (_instance)
 	{
 		CleanupSwapChain();
+		if (_transferPool != VK_NULL_HANDLE)
+			vkDestroyCommandPool(_device, _transferPool, _allocator);
+		vkDestroyCommandPool(_device, _commandPool, _allocator);
 
 		vkDestroyDescriptorPool(_device, _descriptorPool, _allocator);
 		vkDestroyDescriptorSetLayout(_device, _descriptorSetLayout, _allocator);
@@ -321,6 +387,9 @@ void ivk::Cleanup()
 		vkDestroySurfaceKHR(_instance, _surface, _allocator);
 		DestroyDebugReportCallbackEXT(_instance, _callback, _allocator);
 		vkDestroyInstance(_instance, _allocator);
+
+		_commandPool = VK_NULL_HANDLE;
+		_transferPool = VK_NULL_HANDLE;
 		_swapChain = VK_NULL_HANDLE;
 		_device = VK_NULL_HANDLE;
 		_surface = VK_NULL_HANDLE;
@@ -339,9 +408,6 @@ void ivk::CleanupSwapChain()
 	}
 
 	vkFreeCommandBuffers(_device, _commandPool, static_cast<uint32_t>(_commandBuffers.size()), _commandBuffers.data());
-	if (_transferPool != VK_NULL_HANDLE)
-		vkDestroyCommandPool(_device, _transferPool, _allocator);
-	vkDestroyCommandPool(_device, _commandPool, _allocator);
 
 	vkDestroyPipeline(_device, _graphicsPipeline, _allocator);
 	vkDestroyPipelineLayout(_device, _pipelineLayout, _allocator);
@@ -366,6 +432,7 @@ void ivk::UpdateUniformBuffer()
 
 	UniformBufferObject ubo = {};
 	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+//	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
@@ -1455,23 +1522,6 @@ void ivk::CreateDepthResources()
 	TransitionImageLayout(_depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
-const std::vector<ivk::Vertex> vertices = {
-	{ { -0.5f, -0.5f,  0.5f },{ 1.0f, 0.0f, 0.0f }},
-	{ {  0.5f, -0.5f,  0.5f },{ 0.0f, 1.0f, 0.0f }},
-	{ {  0.5f,  0.5f,  0.5f },{ 0.0f, 0.0f, 1.0f }},
-	{ { -0.5f,  0.5f,  0.5f },{ 1.0f, 1.0f, 1.0f }},
-	{ { -0.5f, -0.5f, -0.5f },{ 1.0f, 0.0f, 0.0f }},
-	{ {  0.5f, -0.5f, -0.5f },{ 0.0f, 1.0f, 0.0f }},
-	{ {  0.5f,  0.5f, -0.5f },{ 0.0f, 0.0f, 1.0f }},
-	{ { -0.5f,  0.5f, -0.5f },{ 1.0f, 1.0f, 1.0f }}
-};
-
-const std::vector<uint16_t> indices = {
-	0, 1, 2,  2, 3, 0,
-	0, 4, 5,  1, 0, 5
-//	4, 5, 6,  6, 7, 4
-};
-
 void ivk::CreateVertexBuffer() 
 {
 /*
@@ -2046,7 +2096,9 @@ public:
 	void Update(float dt) 
 	{ 
 		glwf.Update(dt);
-		vk.Update(dt);
+		if (glwf.main3Dwindow) {
+			vk.Update(dt);
+		}
 	}
 
 	void SendMsg(Message *msg) 

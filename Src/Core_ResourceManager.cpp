@@ -308,6 +308,28 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 		ScanRootdir();
 	}
 	
+	void CreateResourceImplementation(ResourceBase *res)
+	{
+		// we must have resource implemented
+		if (res->_resourceImplementation == nullptr)
+		{
+			// we must have res type set
+			if (res->Type == ResourceBase::UNKNOWN)
+				res->Type = RawData::GetTypeId();
+
+			// we need to find correct "create" function ...
+			for (auto f = ResourceFactoryChain::First; f; f->Next)
+			{
+				if (f->TypeId == res->Type)
+				{
+					// ... an create it
+					res->_resourceImplementation = f->Create();
+					break;
+				}
+			}
+		}
+	}
+
 	void SetResourceType(ResourceBase *res, U32 resTypeId)
 	{
 		if (res->Type != ResourceBase::UNKNOWN)
@@ -339,9 +361,12 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 
 		SIZE_T size = 0;
 		BYTE *data = nullptr;
-		if (res->Type == ResourceBase::UNKNOWN)
-			SetResourceType(res, RawData::GetTypeId());
 
+		if (res->Type == ResourceBase::UNKNOWN) 
+			res->_resourceImplementation->Release(res);
+
+		CreateResourceImplementation(res);
+	
 		data = Tools::LoadFile(&size, &res->_fileTimeStamp, res->Path, res->GetMemoryAllocator());
 		
 
@@ -583,28 +608,6 @@ void ResourceManager::Filter(ResourceBase ** resList, U32 * resCount, CSTR & _pa
 		*resCount = counter;
 }
 
-void ResourceManager::CreateResourceImplementation(ResourceBase *res)
-{
-	// we must have res type set
-	if (res->Type == ResourceBase::UNKNOWN)
-		res->Type = RawData::GetTypeId();
-
-	// we must have resource implemented
-	if (res->_resourceImplementation == nullptr)
-	{
-		// we need to find correct "create" function ...
-		for (auto f = ResourceFactoryChain::First; f; f->Next)
-		{
-			if (f->TypeId == res->Type)
-			{
-				// ... an create it
-				res->_resourceImplementation = f->Create();
-				break;
-			}
-		}
-	}
-}
-
 ResourceBase * ResourceManager::Get(const STR & resName, U32 typeId)
 {
 	ResourceBase *ret = nullptr;
@@ -677,6 +680,7 @@ ResourceBase * ResourceManager::Get(const UUID & resUID)
 // few more "one liners"
 void ResourceManager::LoadSync() { _data->LoadEverything(); }
 ResourceBase *ResourceManager::Add(CWSTR path) { return _data->AddResource(path); }
+void ResourceManager::CreateResourceImplementation(ResourceBase *res) { _data->CreateResourceImplementation(res); }
 void ResourceManager::AddDir(CWSTR path) { _data->AddDirToMonitor(path, 0); }
 void ResourceManager::RootDir(CWSTR path) { _data->RootDir(path); }
 void ResourceManager::StartDirectoryMonitor() { _data->StartMonitoring(); }

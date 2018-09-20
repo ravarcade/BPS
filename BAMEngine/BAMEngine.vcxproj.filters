@@ -21,6 +21,9 @@
     <Filter Include="3rdParty\TinyXML2">
       <UniqueIdentifier>{ef3d5c09-2237-4d4e-bbe6-2e53bf21e077}</UniqueIdentifier>
     </Filter>
+    <Filter Include="RenderingEngine">
+      <UniqueIdentifier>{e7041efe-79b5-48c8-88e4-475b721f1c72}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -104,6 +107,15 @@
     <ClInclude Include="..\3rdParty\tinyxml2\tinyxml2.h">
       <Filter>3rdParty\TinyXML2</Filter>
     </ClInclude>
+    <ClInclude Include="..\Src\RenderingEngine_Config.h">
+      <Filter>RenderingEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\RenderingEngine.h">
+      <Filter>RenderingEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\RenderingEngine_DllInterface.h">
+      <Filter>DllInterface</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -141,6 +153,9 @@
     </ClCompile>
     <ClCompile Include="..\3rdParty\tinyxml2\tinyxml2.cpp">
       <Filter>3rdParty\TinyXML2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\RenderingEngine_Config.cpp">
+      <Filter>RenderingEngine</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

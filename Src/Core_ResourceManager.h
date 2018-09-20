@@ -114,6 +114,7 @@ public:
 		--_refCounter; 
 		if (_refCounter == 0 && _resourceImplementation != nullptr)
 		{	// resource not used (with _refCounter == 0) don't need resource implementation... "Destroy" will delete it.
+			_resourceImplementation->Release(this);
 			_resourceImplementation->GetFactory()->Destroy(_resourceImplementation);
 			_resourceImplementation = nullptr;
 		}

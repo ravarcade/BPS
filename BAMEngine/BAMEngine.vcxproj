@@ -190,6 +190,9 @@
     <ClInclude Include="..\Src\Core_Types.h" />
     <ClInclude Include="..\Src\DllInterface.h" />
     <ClInclude Include="..\Src\DllInterface_IResourceManager.h" />
+    <ClInclude Include="..\Src\RenderingEngine.h" />
+    <ClInclude Include="..\Src\RenderingEngine_Config.h" />
+    <ClInclude Include="..\Src\RenderingEngine_DllInterface.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -209,6 +212,7 @@
     <ClCompile Include="..\Src\Core_Tools.cpp" />
     <ClCompile Include="..\Src\Core_Types.cpp" />
     <ClCompile Include="..\Src\DllInterface_IResourceManager.cpp" />
+    <ClCompile Include="..\Src\RenderingEngine_Config.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

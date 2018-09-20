@@ -4,9 +4,11 @@
 
 
 #ifdef BPS_BUILD_DLL
+
 #define BAMS_EXPORT __declspec(dllexport)
 
 #include "BAMEngineInternal.h"
+#include "BAMEngineImport.h"
 
 #else
 
