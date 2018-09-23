@@ -193,6 +193,7 @@
     <ClInclude Include="..\Src\RenderingEngine.h" />
     <ClInclude Include="..\Src\RenderingEngine_Config.h" />
     <ClInclude Include="..\Src\RenderingEngine_DllInterface.h" />
+    <ClInclude Include="..\Src\RenderingEngine_VertexData.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>

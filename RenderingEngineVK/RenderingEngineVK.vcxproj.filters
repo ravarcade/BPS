@@ -27,6 +27,12 @@
     <ClInclude Include="RenderingEngineVK.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="iglfw.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ire.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -36,6 +42,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="dllmain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="iglfw.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ire.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

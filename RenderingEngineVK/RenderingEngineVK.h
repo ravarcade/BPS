@@ -28,3 +28,13 @@
 #include "glm\vec4.hpp"
 #include "glm\mat4x4.hpp"
 
+enum {
+	MAINWND = 0,
+	BACKBOXWND = 1,
+	DMDWND = 2,
+	MAX_WINDOWS
+};
+
+#include "iglfw.h"
+#include "ire.h"
+

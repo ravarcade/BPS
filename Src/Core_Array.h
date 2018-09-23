@@ -134,6 +134,8 @@ public:
 			_buf = nullptr;
 		}
 	}
+
+	void resize(SIZE_T newSize) { _Realocate(newSize); }
 };
 
 template <typename T, class Alloc = Allocators::Default, SIZE_T minReservedSize = 48>

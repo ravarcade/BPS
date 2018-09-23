@@ -318,7 +318,7 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 				res->Type = RawData::GetTypeId();
 
 			// we need to find correct "create" function ...
-			for (auto f = ResourceFactoryChain::First; f; f->Next)
+			for (auto f = ResourceFactoryChain::First; f; f = f->Next)
 			{
 				if (f->TypeId == res->Type)
 				{
@@ -342,7 +342,7 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 		if (resTypeId != ResourceBase::UNKNOWN)
 		{
 			// we need to find correct "create" function ...
-			for (auto f = ResourceFactoryChain::First; f; f->Next)
+			for (auto f = ResourceFactoryChain::First; f; f = f->Next)
 			{
 				if (f->TypeId == resTypeId)
 				{

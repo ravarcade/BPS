@@ -2,7 +2,6 @@
 // standard windows headers:
 #include <windows.h>
 
-
 #ifdef BPS_BUILD_DLL
 
 #define BAMS_EXPORT __declspec(dllexport)

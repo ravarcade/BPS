@@ -37,6 +37,10 @@
 #  endif
 #endif
 
+typedef ptrdiff_t Size;
+template< class Type, Size n >
+Size COUNT_OF(Type(&)[n]) { return n; }
+
 #include "..\3rdParty\tinyxml2\tinyxml2.h"
 #include "Core_BasicTypes.h"
 
