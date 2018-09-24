@@ -2,6 +2,9 @@
 
 // ============================================================================ tmp data ===
 
+#include <chrono>
+#include <glm/gtc/matrix_transform.hpp>
+
 const std::vector<ire::Vertex> vertices = {
 	{ { -0.5f, -0.5f,  0.5f },{ 1.0f, 0.0f, 0.0f } },
 	{ { 0.5f, -0.5f,  0.5f },{ 0.0f, 1.0f, 0.0f } },
@@ -31,298 +34,6 @@ bool ire::enableValidationLayers = false;
 
 ire re;
 
-// ============================================================================ old code ===
-
-/// <summary>
-/// Initializes VK instance.
-/// All common structores for all windows.
-/// ... but no window creation, no framebuffers, no command lists, no data.
-/// </summary>
-void ire::Init()
-{
-	CreateInstance();
-	SetupDebugCallback();
-}
-
-/// <summary>
-/// Creates vulkan instance.
-/// [Init. Step 1.]
-/// </summary>
-void ire::CreateInstance()
-{
-#ifdef _DEBUG
-	enableValidationLayers = true;
-#endif
-
-	ListVKExtensions(std::cout);
-	if (enableValidationLayers && !IsValidationLayerSupported())
-	{
-		throw std::runtime_error("validation layers requested, but not available!");
-	}
-
-	// TODO: Fill ApplicationName, EngineName with real info. Now it is only "placeholder"
-	VkApplicationInfo appInfo = {};
-	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = "BAMS";
-	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.pEngineName = "BAMS Rendering Engine";
-	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.apiVersion = VK_API_VERSION_1_0;
-
-	auto extensions = GetRequiredExtensions();
-	auto layers = GetRequiredLayers();
-
-	VkInstanceCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	createInfo.pApplicationInfo = &appInfo;
-	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-	createInfo.ppEnabledExtensionNames = extensions.size() ? extensions.data() : nullptr;
-	createInfo.enabledLayerCount = static_cast<uint32_t>(layers.size());
-	createInfo.ppEnabledLayerNames = layers.size() ? layers.data() : nullptr;
-
-	if (vkCreateInstance(&createInfo, _allocator, &_instance) != VK_SUCCESS)
-	{
-		throw std::runtime_error("failed to create instance!");
-	}
-}
-
-/// <summary>
-/// Setups the debug callback.
-/// [Init. Step 2.]
-/// </summary>
-void ire::SetupDebugCallback()
-{
-	if (enableValidationLayers)
-	{
-
-		VkDebugReportCallbackCreateInfoEXT createInfo = {};
-		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-		createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
-		createInfo.pfnCallback = DebugCallback;
-
-		if (CreateDebugReportCallbackEXT(_instance, &createInfo, _allocator, &_callback) != VK_SUCCESS)
-		{
-			throw std::runtime_error("failed to set up debug callback!");
-		}
-	}
-}
-
-// ============================================================================
-
-void ire::Cleanup()
-{
-	if (_instance)
-	{
-		for (auto outputWindow : this->outputWindows)
-			outputWindow.Cleanup();
-
-		if (_callback)
-			DestroyDebugReportCallbackEXT(_instance, _callback, _allocator);
-		vkDestroyInstance(_instance, _allocator);
-
-		_callback = VK_NULL_HANDLE;
-		_instance = VK_NULL_HANDLE;
-	}
-}
-
-#include <chrono>
-#include <glm/gtc/matrix_transform.hpp>
-
-void ire::UpdateUniformBuffer()
-{
-	outputWindows[MAINWND].UpdateUniformBuffer();
-}
-
-void ire::RecreateSwapChain()
-{
-	outputWindows[MAINWND].RecreateSwapChain();
-}
-
-void ire::DrawFrame()
-{
-	outputWindows[MAINWND].DrawFrame();
-}
-
-void ire::Update(float dt)
-{
-	UpdateUniformBuffer();
-	DrawFrame();
-}
-
-
-
-void ire::Create_main3dwindow()
-{
-	CreateWnd(MAINWND);
-}
-
-
-
-
-
-/// <summary>
-/// Vulkan debug callback function.
-/// See: https://vulkan.lunarg.com/doc/view/1.0.37.0/linux/vkspec.chunked/ch32s02.html
-/// </summary>
-/// <param name="flags">The flags.</param>
-/// <param name="objType">Type of the object.</param>
-/// <param name="obj">The object.</param>
-/// <param name="location">The location.</param>
-/// <param name="code">The code.</param>
-/// <param name="layerPrefix">The layer prefix.</param>
-/// <param name="msg">The message.</param>
-/// <param name="userData">The user data.</param>
-/// <returns></returns>
-VKAPI_ATTR VkBool32 VKAPI_CALL ire::DebugCallback(
-	VkDebugReportFlagsEXT flags,
-	VkDebugReportObjectTypeEXT objType,
-	uint64_t obj,
-	size_t location,
-	int32_t code,
-	const char* layerPrefix,
-	const char* msg,
-	void* userData)
-{
-
-	std::cerr << "validation layer: " << msg << std::endl;
-	//errorInConsoleWindow = true;
-	return VK_FALSE;
-}
-
-
-
-
-
-/// <summary>
-/// Checks the vulkan validation layer support.
-/// [Init. Step 1.1.]
-/// </summary>
-/// <returns></returns>
-bool ire::IsValidationLayerSupported()
-{
-	uint32_t layerCount;
-	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-	std::vector<VkLayerProperties> availableLayers(layerCount);
-	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-	for (const char* layerName : validationLayers)
-	{
-		bool layerFound = false;
-
-		for (const auto& layerProperties : availableLayers)
-		{
-			if (strcmp(layerName, layerProperties.layerName) == 0)
-			{
-				layerFound = true;
-				break;
-			}
-		}
-
-		if (!layerFound)
-		{
-			return false;
-		}
-	}
-
-	return true;
-}
-
-/// <summary>
-/// Gets the required vulkan extensions.
-/// </summary>
-/// <returns></returns>
-std::vector<const char*> ire::GetRequiredExtensions()
-{
-	std::vector<const char*> extensions;
-
-	uint32_t glfwExtensionCount = 0;
-	const char** glfwExtensions;
-	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-	for (unsigned int i = 0; i < glfwExtensionCount; i++)
-	{
-		extensions.push_back(glfwExtensions[i]);
-	}
-
-	if (enableValidationLayers)
-	{
-		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
-	}
-
-	return extensions;
-}
-
-/// <summary>
-/// Gets the required vulkan layers (validation layer if debug is enabled).
-/// </summary>
-/// <returns></returns>
-std::vector<const char*> ire::GetRequiredLayers()
-{
-	return enableValidationLayers ? validationLayers : std::vector<const char *>();
-}
-
-/// <summary>
-/// Lists the vulkan extensions.
-/// Debug only.
-/// </summary>
-/// <param name="out">The out. ostream.</param>
-void ire::ListVKExtensions(std::ostream &out)
-{
-	uint32_t extensionCount = 0;
-	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-	VkExtensionProperties *extensions = new VkExtensionProperties[extensionCount];
-	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions);
-
-	out << "available extensions:" << std::endl;
-	for (uint32_t i = 0; i < extensionCount; ++i)
-	{
-		out << "\t" << extensions[i].extensionName << std::endl;
-	}
-
-	delete[] extensions;
-}
-
-/// <summary>
-/// Creates the debug report callback.
-/// </summary>
-/// <param name="instance">The vk instance.</param>
-/// <param name="pCreateInfo">The create information.</param>
-/// <param name="pAllocator">The allocator.</param>
-/// <param name="pCallback">The pointer where old callback function will be stored.</param>
-/// <returns></returns>
-VkResult ire::CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback)
-{
-	auto func = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
-	if (func != nullptr)
-	{
-		return func(instance, pCreateInfo, pAllocator, pCallback);
-	}
-	else
-	{
-		return VK_ERROR_EXTENSION_NOT_PRESENT;
-	}
-}
-
-/// <summary>
-/// Destroys the debug report callback.
-/// </summary>
-/// <param name="instance">The vk instance.</param>
-/// <param name="callback">The previous callback function.</param>
-/// <param name="pAllocator">The allocator.</param>
-void ire::DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator)
-{
-	auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
-	if (func != nullptr)
-	{
-		func(instance, callback, pAllocator);
-	}
-}
-
-
-
-// ============================================================================ new code ===
-
 ire::SwapChainSupportDetails::SwapChainSupportDetails(VkPhysicalDevice device, VkSurfaceKHR surface)
 {
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities);
@@ -349,6 +60,7 @@ ire::SwapChainSupportDetails::SwapChainSupportDetails(VkPhysicalDevice device, V
 
 ire::OutputWindow::OutputWindow() :
 	instance(VK_NULL_HANDLE),
+	wnd(MAX_WINDOWS),
 	window(nullptr),
 	allocator(VK_NULL_HANDLE)
 {
@@ -370,9 +82,10 @@ void ire::OutputWindow::Init()
 
 // ----------------------------------------------------------------------------
 
-void ire::OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAllocationCallbacks* _allocator)
+void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _window, const VkAllocationCallbacks* _allocator)
 {
 	instance = _instance;
+	wnd = _wnd;
 	window = _window;
 	allocator = _allocator;
 
@@ -1706,15 +1419,185 @@ void ire::OutputWindow::DrawFrame()
 
 // ============================================================================ ire : Rendering Engine ===
 
-void ire::CreateWnd(int wnd)
+/// <summary>
+/// Initializes VK instance.
+/// All common structores for all windows.
+/// ... but no window creation, no framebuffers, no command lists, no data.
+/// </summary>
+void ire::Init()
+{
+	CreateInstance();
+	SetupDebugCallback();
+}
+
+/// <summary>
+/// Creates vulkan instance.
+/// [Init. Step 1.]
+/// </summary>
+void ire::CreateInstance()
+{
+#ifdef _DEBUG
+	enableValidationLayers = true;
+#endif
+
+	_ListVKExtensions(std::cout);
+	if (enableValidationLayers && !_IsValidationLayerSupported())
+	{
+		throw std::runtime_error("validation layers requested, but not available!");
+	}
+
+	// TODO: Fill ApplicationName, EngineName with real info. Now it is only "placeholder"
+	VkApplicationInfo appInfo = {};
+	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+	appInfo.pApplicationName = "BAMS";
+	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.pEngineName = "BAMS Rendering Engine";
+	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+	appInfo.apiVersion = VK_API_VERSION_1_0;
+
+	auto extensions = _GetRequiredExtensions();
+	auto layers = _GetRequiredLayers();
+
+	VkInstanceCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	createInfo.pApplicationInfo = &appInfo;
+	createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+	createInfo.ppEnabledExtensionNames = extensions.size() ? extensions.data() : nullptr;
+	createInfo.enabledLayerCount = static_cast<uint32_t>(layers.size());
+	createInfo.ppEnabledLayerNames = layers.size() ? layers.data() : nullptr;
+
+	if (vkCreateInstance(&createInfo, _allocator, &_instance) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to create instance!");
+	}
+}
+
+/// <summary>
+/// Setups the debug callback.
+/// [Init. Step 2.]
+/// </summary>
+void ire::SetupDebugCallback()
+{
+	if (enableValidationLayers)
+	{
+
+		VkDebugReportCallbackCreateInfoEXT createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+		createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+		createInfo.pfnCallback = _DebugCallback;
+
+		if (_CreateDebugReportCallbackEXT(_instance, &createInfo, _allocator, &_callback) != VK_SUCCESS)
+		{
+			throw std::runtime_error("failed to set up debug callback!");
+		}
+	}
+}
+
+// ============================================================================
+
+void ire::Cleanup()
+{
+	if (_instance)
+	{
+		for (auto &outputWindow : outputWindows)
+			if (outputWindow.Exist())
+				outputWindow.Cleanup();
+
+		if (_callback)
+			_DestroyDebugReportCallbackEXT(_instance, _callback, _allocator);
+		vkDestroyInstance(_instance, _allocator);
+
+		_callback = VK_NULL_HANDLE;
+		_instance = VK_NULL_HANDLE;
+	}
+}
+
+void ire::Update(float dt)
+{
+	for (auto &outputWindow : outputWindows)
+	{
+		if (outputWindow.IsValid()) 
+		{
+			outputWindow.UpdateUniformBuffer();
+			outputWindow.DrawFrame();
+		}
+	}
+}
+
+void ire::CreateWnd(int wnd, const void *params)
 {
 	auto window = glfw.CreateWnd(wnd, 800, 600);
 	auto &ow = outputWindows[wnd];
-	ow.Prepare(_instance, window, _allocator);
+	ow.Prepare(_instance, wnd, window, _allocator);
 }
 
 
 // ============================================================================ ire : Rendering Engine - protected methods ===
+
+/// <summary>
+/// Vulkan debug callback function.
+/// See: https://vulkan.lunarg.com/doc/view/1.0.37.0/linux/vkspec.chunked/ch32s02.html
+/// </summary>
+/// <param name="flags">The flags.</param>
+/// <param name="objType">Type of the object.</param>
+/// <param name="obj">The object.</param>
+/// <param name="location">The location.</param>
+/// <param name="code">The code.</param>
+/// <param name="layerPrefix">The layer prefix.</param>
+/// <param name="msg">The message.</param>
+/// <param name="userData">The user data.</param>
+/// <returns></returns>
+VKAPI_ATTR VkBool32 VKAPI_CALL ire::_DebugCallback(
+	VkDebugReportFlagsEXT flags,
+	VkDebugReportObjectTypeEXT objType,
+	uint64_t obj,
+	size_t location,
+	int32_t code,
+	const char* layerPrefix,
+	const char* msg,
+	void* userData)
+{
+
+	std::cerr << "validation layer: " << msg << std::endl;
+	//errorInConsoleWindow = true;
+	return VK_FALSE;
+}
+
+/// <summary>
+/// Creates the debug report callback.
+/// </summary>
+/// <param name="instance">The vk instance.</param>
+/// <param name="pCreateInfo">The create information.</param>
+/// <param name="pAllocator">The allocator.</param>
+/// <param name="pCallback">The pointer where old callback function will be stored.</param>
+/// <returns></returns>
+VkResult ire::_CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback)
+{
+	auto func = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+	if (func != nullptr)
+	{
+		return func(instance, pCreateInfo, pAllocator, pCallback);
+	}
+	else
+	{
+		return VK_ERROR_EXTENSION_NOT_PRESENT;
+	}
+}
+
+/// <summary>
+/// Destroys the debug report callback.
+/// </summary>
+/// <param name="instance">The vk instance.</param>
+/// <param name="callback">The previous callback function.</param>
+/// <param name="pAllocator">The allocator.</param>
+void ire::_DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator)
+{
+	auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+	if (func != nullptr)
+	{
+		func(instance, callback, pAllocator);
+	}
+}
 
 /// <summary>
 /// Checks the device extension support.
@@ -1804,3 +1687,94 @@ bool ire::_HasStencilComponent(VkFormat format)
 {
 	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
+
+/// <summary>
+/// Lists the vulkan extensions.
+/// Debug only.
+/// </summary>
+/// <param name="out">The out. ostream.</param>
+void ire::_ListVKExtensions(std::ostream &out)
+{
+	uint32_t extensionCount = 0;
+	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+	VkExtensionProperties *extensions = new VkExtensionProperties[extensionCount];
+	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions);
+
+	out << "available extensions:" << std::endl;
+	for (uint32_t i = 0; i < extensionCount; ++i)
+	{
+		out << "\t" << extensions[i].extensionName << std::endl;
+	}
+
+	delete[] extensions;
+}
+
+/// <summary>
+/// Checks the vulkan validation layer support.
+/// [Init. Step 1.1.]
+/// </summary>
+/// <returns></returns>
+bool ire::_IsValidationLayerSupported()
+{
+	uint32_t layerCount;
+	vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+	std::vector<VkLayerProperties> availableLayers(layerCount);
+	vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+	for (const char* layerName : validationLayers)
+	{
+		bool layerFound = false;
+
+		for (const auto& layerProperties : availableLayers)
+		{
+			if (strcmp(layerName, layerProperties.layerName) == 0)
+			{
+				layerFound = true;
+				break;
+			}
+		}
+
+		if (!layerFound)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+/// <summary>
+/// Gets the required vulkan extensions.
+/// </summary>
+/// <returns></returns>
+std::vector<const char*> ire::_GetRequiredExtensions()
+{
+	std::vector<const char*> extensions;
+
+	uint32_t glfwExtensionCount = 0;
+	const char** glfwExtensions;
+	glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+	for (unsigned int i = 0; i < glfwExtensionCount; i++)
+	{
+		extensions.push_back(glfwExtensions[i]);
+	}
+
+	if (enableValidationLayers)
+	{
+		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+	}
+
+	return extensions;
+}
+
+/// <summary>
+/// Gets the required vulkan layers (validation layer if debug is enabled).
+/// </summary>
+/// <returns></returns>
+std::vector<const char*> ire::_GetRequiredLayers()
+{
+	return enableValidationLayers ? validationLayers : std::vector<const char *>();
+}
+

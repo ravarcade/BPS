@@ -51,13 +51,13 @@ public:
 
 	// ------------------------------------
 
-	void ListVKExtensions(std::ostream &out);
-	bool IsValidationLayerSupported();
-	std::vector<const char*> GetRequiredExtensions();
-	std::vector<const char*> GetRequiredLayers();
+	void _ListVKExtensions(std::ostream &out);
+	bool _IsValidationLayerSupported();
+	std::vector<const char*> _GetRequiredExtensions();
+	std::vector<const char*> _GetRequiredLayers();
 
-	VkResult CreateDebugReportCallbackEXT(VkInstance _instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback);
-	void DestroyDebugReportCallbackEXT(VkInstance _instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator);
+	VkResult _CreateDebugReportCallbackEXT(VkInstance _instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback);
+	void _DestroyDebugReportCallbackEXT(VkInstance _instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator);
 
 	// VK intialization steps:
 	void CreateInstance();
@@ -65,7 +65,7 @@ public:
 	
 
 protected:
-	static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
+	static VKAPI_ATTR VkBool32 VKAPI_CALL _DebugCallback(
 		VkDebugReportFlagsEXT flags,
 		VkDebugReportObjectTypeEXT objType,
 		uint64_t obj,
@@ -86,25 +86,6 @@ protected:
 	static bool _HasStencilComponent(VkFormat format);
 
 public:
-	ire() :
-		_allocator(nullptr),
-		_callback(VK_NULL_HANDLE)
-	{}
-
-	void Init();
-
-	void Cleanup();
-
-	void UpdateUniformBuffer();
-
-	void RecreateSwapChain();
-
-	void DrawFrame();
-
-	void Update(float dt);
-
-	void Create_main3dwindow();
-
 	// ============================================================= new code ===
 
 private:
@@ -133,6 +114,7 @@ private:
 	{
 	private:
 		VkInstance instance;
+		int wnd;
 		GLFWwindow* window;
 		const VkAllocationCallbacks* allocator;
 		// ---- 
@@ -203,21 +185,37 @@ private:
 	public:
 		OutputWindow();
 		void Init();
-		void Prepare(VkInstance _instance, GLFWwindow* _window, const VkAllocationCallbacks* _allocator);
+		void Prepare(VkInstance _instance, int _wnd, GLFWwindow* _window, const VkAllocationCallbacks* _allocator);
 	
 		void Cleanup();
 
 		void UpdateUniformBuffer();
 		void RecreateSwapChain();
 		void DrawFrame();
+		bool Exist() { return device != VK_NULL_HANDLE; }
+		bool IsValid() {
+			if (window)
+			{
+				window = glfw.GetWnd(wnd);
+				return window != nullptr;
+			}
+			return false;
+		}
 	};
 
 	OutputWindow outputWindows[MAX_WINDOWS];
 
 
 public:
+	ire() :
+		_allocator(nullptr),
+		_callback(VK_NULL_HANDLE)
+	{}
 
-	void CreateWnd(int wnd);
+	void Init();
+	void Cleanup();
+	void Update(float dt);
+	void CreateWnd(int wnd, const void *params);
 };
 
 extern ire re;

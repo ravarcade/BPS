@@ -74,9 +74,7 @@ public:
 	void Update(float dt) 
 	{ 
 		glfw.Update(dt);
-		if (glfw.GetWnd(MAINWND)) {
-			re.Update(dt);
-		}
+		re.Update(dt);
 	}
 
 	void SendMsg(Message *msg) 
@@ -87,7 +85,10 @@ public:
 		{
 			//int width = 800, height = 600;
 			//glfw.CreateWnd(MAINWND, width, height);
-			re.Create_main3dwindow();
+//			re.Create_main3dwindow();
+			re.CreateWnd(MAINWND, nullptr);
+			re.CreateWnd(BACKBOXWND, nullptr);
+			re.CreateWnd(DMDWND, nullptr);
 		}
 			break;
 		}
