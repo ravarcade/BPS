@@ -84,7 +84,8 @@ protected:
 	static VkPresentModeKHR _ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> availablePresentModes);
 	static VkExtent2D _ChooseSwapExtent(const VkSurfaceCapabilitiesKHR & capabilities, GLFWwindow* window);
 	static bool _HasStencilComponent(VkFormat format);
-
+	static VkSampleCountFlagBits _GetMaxUsableSampleCount(VkPhysicalDevice physicalDevice);
+	
 public:
 	// ============================================================= new code ===
 
@@ -113,14 +114,14 @@ private:
 	class OutputWindow
 	{
 	private:
-		VkInstance instance;
+		VkInstance instance;				// required to: (1) create and destroy VkSurfaceKHR, (2) select physical device matching surface
+		VkPhysicalDevice physicalDevice;
 		int wnd;
 		GLFWwindow* window;
 		const VkAllocationCallbacks* allocator;
 		// ---- 
 		VkSurfaceKHR surface;
-		VkPhysicalDevice physicalDevice;
-		VkDevice device;
+		VkDevice device; // logical device
 		VkQueue graphicsQueue;
 		VkQueue presentQueue;
 		VkQueue transferQueue;
@@ -134,10 +135,14 @@ private:
 		VkImage depthImage;
 		VkDeviceMemory depthImageMemory;
 		VkImageView depthImageView;
+		VkImage colorImage;
+		VkDeviceMemory colorImageMemory;
+		VkImageView colorImageView;
 		VkCommandPool commandPool;
 		VkCommandPool transferPool;
 		VkSemaphore imageAvailableSemaphore;
 		VkSemaphore renderFinishedSemaphore;
+		VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
 		// === for demo cube ===
 		VkDescriptorSetLayout descriptorSetLayout;
@@ -156,12 +161,15 @@ private:
 
 		bool _IsDeviceSuitable(VkPhysicalDevice device);
 		QueueFamilyIndices _FindQueueFamilies(VkPhysicalDevice device);
-		VkImageView _CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 		VkFormat _FindDepthFormat();
 		VkFormat _FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
-		void _CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage & image, VkDeviceMemory & imageMemory);
-		uint32_t _FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+		// image functions
+		void _CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage & image, VkDeviceMemory & imageMemory);
+		VkImageView _CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 		void _TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+
+		uint32_t _FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 		VkCommandBuffer _BeginSingleTimeCommands();
 		void _EndSingleTimeCommands(VkCommandBuffer commandBuffer);
 		void _CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer & buffer, VkDeviceMemory & bufferMemory, VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE);
@@ -182,6 +190,8 @@ private:
 		void _CreateDescriptorPool();
 		void _CreateDescriptorSet();
 		void _CreateCommandBuffers();
+
+		UniformBufferObject *m_ubodata = nullptr;
 	public:
 		OutputWindow();
 		void Init();

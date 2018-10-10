@@ -10,10 +10,11 @@ const std::vector<ire::Vertex> vertices = {
 	{ { 0.5f, -0.5f,  0.5f },{ 0.0f, 1.0f, 0.0f } },
 	{ { 0.5f,  0.5f,  0.5f },{ 0.0f, 0.0f, 1.0f } },
 	{ { -0.5f,  0.5f,  0.5f },{ 1.0f, 1.0f, 1.0f } },
-	{ { -0.5f, -0.5f, -0.5f },{ 1.0f, 0.0f, 0.0f } },
-	{ { 0.5f, -0.5f, -0.5f },{ 0.0f, 1.0f, 0.0f } },
-	{ { 0.5f,  0.5f, -0.5f },{ 0.0f, 0.0f, 1.0f } },
-	{ { -0.5f,  0.5f, -0.5f },{ 1.0f, 1.0f, 1.0f } }
+
+	{ { -0.5f, -0.5f, -0.5f },{ 0.0f, 0.0f, 1.0f } },
+	{ { 0.5f, -0.5f, -0.5f },{ 1.0f, 1.0f, 1.0f } },
+	{ { 0.5f,  0.5f, -0.5f },{ 1.0f, 0.0f, 0.0f } },
+	{ { -0.5f,  0.5f, -0.5f },{ 0.0f, 1.0f, 0.0f } }
 };
 
 const std::vector<uint16_t> indices = {
@@ -71,8 +72,10 @@ ire::OutputWindow::OutputWindow() :
 
 void ire::OutputWindow::Init()
 {
-	surface = VK_NULL_HANDLE;
+	instance = VK_NULL_HANDLE;
 	physicalDevice = VK_NULL_HANDLE;
+	surface = VK_NULL_HANDLE;
+	
 	device = VK_NULL_HANDLE;
 	graphicsQueue = VK_NULL_HANDLE;
 	presentQueue = VK_NULL_HANDLE;
@@ -107,6 +110,8 @@ void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _win
 		if (_IsDeviceSuitable(device))
 		{
 			physicalDevice = device;
+			msaaSamples = _GetMaxUsableSampleCount(physicalDevice);
+			msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 			break;
 		}
 	}
@@ -118,7 +123,7 @@ void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _win
 	// queues: one from graphics family one from present family (it may be same)
 	QueueFamilyIndices indices = _FindQueueFamilies(physicalDevice);
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-	std::set<int> uniqueQueueFamilies = { indices.graphicsFamily, indices.presentFamily, indices.transferFamily };
+	std::set<int> uniqueQueueFamilies = { indices.graphicsFamily, indices.presentFamily, indices.transferFamily }; // "std::set<int>" here will remove repeated values, so instead { 0, 0, 1 } we will have {0, 1}
 
 	float queuePriority = 1.0f;
 	for (int queueFamily : uniqueQueueFamilies) {
@@ -244,6 +249,7 @@ ire::QueueFamilyIndices ire::OutputWindow::_FindQueueFamilies(VkPhysicalDevice d
 	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
 	int i = 0;
+	int backup_transferFamily = -1;
 	for (const auto& queueFamily : queueFamilies)
 	{
 		VkBool32 presentSupport = false;
@@ -255,16 +261,26 @@ ire::QueueFamilyIndices ire::OutputWindow::_FindQueueFamilies(VkPhysicalDevice d
 		{
 			indices.graphicsFamily = i;
 			indices.presentFamily = i;
-			if (indices.isComplete())
-			{
+
+			if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)	{
+				backup_transferFamily = i;
+			}
+
+			if (indices.isComplete()) {
 				break;
 			}
 		}
 
+		// allow to select 2 different queues, one for graphics, one for present (only if we don't have one with both)
 		if (queueFamily.queueCount > 0 &&
-			queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
+			queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT &&
+			indices.graphicsFamily == -1)
 		{
 			indices.graphicsFamily = i;
+			if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT &&
+				backup_transferFamily == -1) {
+				backup_transferFamily = i;
+			}
 		}
 
 		if (queueFamily.queueCount > 0 &&
@@ -276,7 +292,7 @@ ire::QueueFamilyIndices ire::OutputWindow::_FindQueueFamilies(VkPhysicalDevice d
 
 		if (queueFamily.queueCount > 0 &&
 			queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT &&
-			(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0)
+			(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) // we want different transfer queue than graphics
 		{
 			indices.transferFamily = i;
 		}
@@ -284,9 +300,9 @@ ire::QueueFamilyIndices ire::OutputWindow::_FindQueueFamilies(VkPhysicalDevice d
 		i++;
 	}
 
-	if (indices.transferFamily == -1)
+	if (indices.transferFamily == -1) // in case if we don't have separate transfer queue, use graphics queue (it will have 
 	{
-		indices.transferFamily = indices.graphicsFamily;
+		indices.transferFamily = backup_transferFamily;
 	}
 
 	return indices;
@@ -364,23 +380,33 @@ void ire::OutputWindow::_CreateSwapChain()
 	// ------------------------------------------------------------------------ create render pass
 	VkAttachmentDescription colorAttachment = {};
 	colorAttachment.format = swapChainImageFormat;
-	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	colorAttachment.samples = msaaSamples;
 	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	colorAttachment.finalLayout = msaaSamples == VK_SAMPLE_COUNT_1_BIT ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	VkAttachmentDescription depthAttachment = {};
 	depthAttachment.format = _FindDepthFormat();
-	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	depthAttachment.samples = msaaSamples;
 	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentDescription colorAttachmentResolve = {};
+	colorAttachmentResolve.format = swapChainImageFormat;
+	colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+	colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 	VkAttachmentReference colorAttachmentRef = {};
 	colorAttachmentRef.attachment = 0;
@@ -390,23 +416,30 @@ void ire::OutputWindow::_CreateSwapChain()
 	depthAttachmentRef.attachment = 1;
 	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+	VkAttachmentReference colorAttachmentResolveRef = {};
+	colorAttachmentResolveRef.attachment = 2;
+	colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colorAttachmentRef;
 	subpass.pDepthStencilAttachment = &depthAttachmentRef;
+	subpass.pResolveAttachments = msaaSamples != VK_SAMPLE_COUNT_1_BIT ?  &colorAttachmentResolveRef : nullptr;
 
 	VkSubpassDependency dependency = {};
 	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.srcAccessMask = 0;
 	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;
 	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 
 
-	std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
+	std::vector<VkAttachmentDescription> attachments = { colorAttachment, depthAttachment };
+	if (msaaSamples != VK_SAMPLE_COUNT_1_BIT)
+		attachments.emplace_back(colorAttachmentResolve);
 
 	VkRenderPassCreateInfo renderPassInfo = {};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -420,11 +453,17 @@ void ire::OutputWindow::_CreateSwapChain()
 	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &renderPass) != VK_SUCCESS)
 		throw std::runtime_error("failed to create render pass!");
 
+	// ------------------------------------------------------------------------ create color resources
+	VkFormat colorFormat = swapChainImageFormat;
+
+	_CreateImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
+	colorImageView = _CreateImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+
+	_TransitionImageLayout(colorImage, colorFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	// ------------------------------------------------------------------------ create depth resources
 	VkFormat depthFormat = _FindDepthFormat();
-	_CreateImage(swapChainExtent.width, swapChainExtent.height, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
+	_CreateImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
 	depthImageView = _CreateImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-
 	_TransitionImageLayout(depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
 	// ------------------------------------------------------------------------ create frame buffers
@@ -432,11 +471,9 @@ void ire::OutputWindow::_CreateSwapChain()
 
 	for (size_t i = 0; i < swapChainImageViews.size(); i++) 
 	{
-		std::array<VkImageView, 2> attachments = {
-			swapChainImageViews[i],
-			depthImageView 
-		};
-
+		std::vector<VkImageView> attachments = { swapChainImageViews[i], depthImageView };
+		if (msaaSamples != VK_SAMPLE_COUNT_1_BIT)
+			attachments = { colorImageView, depthImageView,  swapChainImageViews[i] };
 
 		VkFramebufferCreateInfo framebufferInfo = {};
 		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -452,31 +489,11 @@ void ire::OutputWindow::_CreateSwapChain()
 	}
 }
 
-VkImageView ire::OutputWindow::_CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
-{
-	VkImageViewCreateInfo viewInfo = {};
-	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-	viewInfo.image = image;
-	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-	viewInfo.format = format;
-	viewInfo.subresourceRange.aspectMask = aspectFlags;
-	viewInfo.subresourceRange.baseMipLevel = 0;
-	viewInfo.subresourceRange.levelCount = 1;
-	viewInfo.subresourceRange.baseArrayLayer = 0;
-	viewInfo.subresourceRange.layerCount = 1;
-
-	VkImageView imageView;
-	if (vkCreateImageView(device, &viewInfo, allocator, &imageView) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create texture image view!");
-	}
-
-	return imageView;
-}
 
 VkFormat ire::OutputWindow::_FindDepthFormat()
 {
 	return _FindSupportedFormat(
-	{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+	{ VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT },
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
 	);
@@ -501,7 +518,9 @@ VkFormat ire::OutputWindow::_FindSupportedFormat(const std::vector<VkFormat>& ca
 	throw std::runtime_error("failed to find supported format!");
 }
 
-void ire::OutputWindow::_CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
+// ============================================================================ Image (textures) ===
+
+void ire::OutputWindow::_CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
 {
 	VkImageCreateInfo imageInfo = {};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -509,13 +528,13 @@ void ire::OutputWindow::_CreateImage(uint32_t width, uint32_t height, VkFormat f
 	imageInfo.extent.width = width;
 	imageInfo.extent.height = height;
 	imageInfo.extent.depth = 1;
-	imageInfo.mipLevels = 1;
+	imageInfo.mipLevels = mipLevels;
 	imageInfo.arrayLayers = 1;
 	imageInfo.format = format;
 	imageInfo.tiling = tiling;
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	imageInfo.usage = usage;
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.samples = numSamples;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
 	if (vkCreateImage(device, &imageInfo, allocator, &image) != VK_SUCCESS) {
@@ -537,22 +556,39 @@ void ire::OutputWindow::_CreateImage(uint32_t width, uint32_t height, VkFormat f
 	vkBindImageMemory(device, image, imageMemory, 0);
 }
 
-uint32_t ire::OutputWindow::_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+VkImageView ire::OutputWindow::_CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
 {
-	VkPhysicalDeviceMemoryProperties memProperties;
-	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+	VkImageViewCreateInfo viewInfo = {};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image = image;
+	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = format;
+	viewInfo.components = {
+		VK_COMPONENT_SWIZZLE_IDENTITY,
+		VK_COMPONENT_SWIZZLE_IDENTITY,
+		VK_COMPONENT_SWIZZLE_IDENTITY,
+		VK_COMPONENT_SWIZZLE_IDENTITY };
+	viewInfo.subresourceRange.aspectMask = aspectFlags;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS; // 1;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS; // 1;
 
-	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) 
-	{
-		if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
-		{
-			return i;
-		}
+	VkImageView imageView;
+	if (vkCreateImageView(device, &viewInfo, allocator, &imageView) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create texture image view!");
 	}
 
-	throw std::runtime_error("failed to find suitable memory type!");
+	return imageView;
 }
 
+/// <summary>
+/// Transitions the image layout.
+/// </summary>
+/// <param name="image">The image.</param>
+/// <param name="format">The format.</param>
+/// <param name="oldLayout">The old layout.</param>
+/// <param name="newLayout">The new layout.</param>
 void ire::OutputWindow::_TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
 	VkCommandBuffer commandBuffer = _BeginSingleTimeCommands();
@@ -607,6 +643,12 @@ void ire::OutputWindow::_TransitionImageLayout(VkImage image, VkFormat format, V
 		sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 	}
+	else if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	}
 	else {
 		throw std::invalid_argument("unsupported layout transition!");
 	}
@@ -622,6 +664,26 @@ void ire::OutputWindow::_TransitionImageLayout(VkImage image, VkFormat format, V
 
 	_EndSingleTimeCommands(commandBuffer);
 }
+
+// ===========================================================================
+
+uint32_t ire::OutputWindow::_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+{
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) 
+	{
+		if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
+		{
+			return i;
+		}
+	}
+
+	throw std::runtime_error("failed to find suitable memory type!");
+}
+
+// ============================================================================
 
 VkCommandBuffer ire::OutputWindow::_BeginSingleTimeCommands()
 {
@@ -658,6 +720,8 @@ void ire::OutputWindow::_EndSingleTimeCommands(VkCommandBuffer commandBuffer)
 	vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 }
 
+// ============================================================================ Buffer ===
+
 void ire::OutputWindow::_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory, VkSharingMode sharingMode)
 {
 	VkBufferCreateInfo bufferInfo = {};
@@ -691,6 +755,7 @@ void ire::OutputWindow::_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usag
 
 	vkBindBufferMemory(device, buffer, bufferMemory, 0);
 }
+
 
 void ire::OutputWindow::_CreateBufferAndCopy(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, const void *srcData, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
 {
@@ -730,7 +795,7 @@ void ire::OutputWindow::_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDe
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
-
+	
 	//		vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
 	//		vkQueueWaitIdle(graphicsQueue);
 	vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
@@ -807,6 +872,10 @@ void ire::OutputWindow::_CleanupSwapChain()
 	vkDestroyPipeline(device, graphicsPipeline, allocator);
 	vkDestroyPipelineLayout(device, pipelineLayout, allocator);
 
+	vkDestroyImageView(device, colorImageView, allocator);
+	vkDestroyImage(device, colorImage, allocator);
+	vkFreeMemory(device, colorImageMemory, allocator);
+
 	vkDestroyImageView(device, depthImageView, allocator);
 	vkDestroyImage(device, depthImage, allocator);
 	vkFreeMemory(device, depthImageMemory, allocator);
@@ -858,12 +927,25 @@ void ire::OutputWindow::_CreateDemoCube()
 
 		if (vkCreateDescriptorSetLayout(device, &layoutInfo, allocator, &descriptorSetLayout) != VK_SUCCESS)
 			throw std::runtime_error("failed to create descriptor set layout!");
+
+		// ------------------------------------------------------------------- pipelineLayout
+		VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutInfo.setLayoutCount = 1;
+		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+		pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
+		pipelineLayoutInfo.pPushConstantRanges = 0; // Optional
+
+		if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, allocator, &pipelineLayout) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create pipeline layout!");
+		}
 	}
 	// --------------------------------------------------------------------
 	_CreateGraphicsPipeline();
 	_CreateVertexBuffer();
 	_CreateIndexBuffer();
 	_CreateUniformBuffer();
+
 	_CreateDescriptorPool();
 	_CreateDescriptorSet();
 	_CreateCommandBuffers();
@@ -873,6 +955,11 @@ void ire::OutputWindow::_CleanupDemoCube()
 {
 	vkDestroyDescriptorPool(device, descriptorPool, allocator);
 	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, allocator);
+
+	if (m_ubodata) {
+		vkUnmapMemory(device, uniformBufferMemory);
+		m_ubodata = nullptr;
+	}
 
 	vkDestroyBuffer(device, uniformBuffer, allocator);
 	vkFreeMemory(device, uniformBufferMemory, allocator);
@@ -888,6 +975,24 @@ void ire::OutputWindow::_CleanupDemoCube()
 
 void ire::OutputWindow::_CreateGraphicsPipeline()
 {
+	/* Graphics pipeline is build from:
+	* 1. Shader programs (for selected stages, vert+frag is minimum?)
+	* 2. Vertex buffer info.
+	* 3. Assembly info. (triangle/lines // strip/fan/list)
+	* 4. Viewport. (window position + depth min/max & list of scissors 2d rect)
+	* 5. Resterization. Polygons are filled, backface culling, CCW or CW
+	* 6. Multisampling
+	* 7. Depth/Stencil
+	* 8. Color blending
+	* 9. Dynamic states (list of params changed while drawning ???) 
+	* + PipelineLineout (VBO + UBO) 
+	* + Renderpass (.... hm .... ???)
+	* + Subpass (???)
+	*
+	* After Graphics Pipeline is created, shader modules can be destroyes... so... all must be compiled again if GP is recreated.
+	*/
+
+	// ============= 1. Shader programs ==============
 	// compile programs
 	VkShaderModule vertShaderModule = _CreateShaderModule("vert");
 	VkShaderModule fragShaderModule = _CreateShaderModule("frag");
@@ -905,11 +1010,14 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 	fragShaderStageInfo.module = fragShaderModule;
 	fragShaderStageInfo.pName = "main";
 
-	VkPipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+	std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertShaderStageInfo, fragShaderStageInfo };
+	// result: shaderStages 
 
-	// from vertex shader get binding descriptions and attributes
-	std::vector<VkVertexInputBindingDescription> bindingDescription(0);
-	std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+
+	// ================ 2. Vertex buffer info ==========================
+	// from vertex shader get binding descriptions and attributes of vertex buffer
+	std::vector<VkVertexInputBindingDescription> bindingDescription(0); // <- info about: [1] binding point, [2] data stride (in bytes), [3] input rate: per vertex or per instance
+	std::vector<VkVertexInputAttributeDescription> attributeDescriptions; // <- info about: [1] location (see vert-shader program), [2] binding (bufer from where data are read), [3] format (flota/int/bool // single val/no. of elements in vector), [4] offset in buffer
 
 	bindingDescription.push_back(Vertex::GetBindingDescription());
 	auto att = Vertex::GetAttributeDescriptions();
@@ -926,13 +1034,18 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
 	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
+	// result: vertexInputInfo
 
+
+	// ================= 3. Assembly info =============== 
 	// how we will draw: triangles
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
 	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	inputAssembly.primitiveRestartEnable = VK_FALSE;
+	// result: inputAssembly
 
+	// ================= 4.View port ================
 	// view port: whole window
 	VkViewport viewport = {};
 	viewport.x = 0.0f;
@@ -955,6 +1068,9 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 	viewportState.scissorCount = 1;
 	viewportState.pScissors = &scissor;
 
+	// result : viewportState
+
+	// ================== 5. Resterization ===============
 	VkPipelineRasterizationStateCreateInfo rasterizer = {};
 	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 	rasterizer.depthClampEnable = VK_FALSE;
@@ -967,16 +1083,18 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 	rasterizer.depthBiasConstantFactor = 0.0f; // Optional
 	rasterizer.depthBiasClamp = 0.0f; // Optional
 	rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
-
+	
+	// ================== 6. Multisampling ===============
 	VkPipelineMultisampleStateCreateInfo multisampling = {};
 	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisampling.sampleShadingEnable = VK_FALSE;
-	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampling.rasterizationSamples = msaaSamples;
 	multisampling.minSampleShading = 1.0f; // Optional
 	multisampling.pSampleMask = nullptr; // Optional
 	multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
 	multisampling.alphaToOneEnable = VK_FALSE; // Optional
 
+	// ==================== 7. Depth/Stencil ===============
 	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
 	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
 	depthStencil.depthTestEnable = VK_TRUE;
@@ -989,6 +1107,7 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 	depthStencil.front = {}; // Optional
 	depthStencil.back = {}; // Optional
 
+	// =================== 8. color blending ==================
 	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
 	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 	colorBlendAttachment.blendEnable = VK_FALSE;
@@ -998,6 +1117,7 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
 	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
 	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
 														 /* alpha blending
 														 colorBlendAttachment.blendEnable = VK_TRUE;
@@ -1011,6 +1131,7 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 
 	VkPipelineColorBlendStateCreateInfo colorBlending = {};
 	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+	colorBlending.flags = 0;
 	colorBlending.logicOpEnable = VK_FALSE;
 	colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
 	colorBlending.attachmentCount = 1;
@@ -1020,32 +1141,22 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 	colorBlending.blendConstants[2] = 0.0f; // Optional
 	colorBlending.blendConstants[3] = 0.0f; // Optional
 
+	// ================== 9. Dynamic states ===================
 	VkDynamicState dynamicStates[] = {
-		VK_DYNAMIC_STATE_VIEWPORT,
-		VK_DYNAMIC_STATE_LINE_WIDTH
+		VK_DYNAMIC_STATE_VIEWPORT
 	};
 
 	VkPipelineDynamicStateCreateInfo dynamicState = {};
 	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicState.dynamicStateCount = 2;
+	dynamicState.dynamicStateCount = 1;
 	dynamicState.pDynamicStates = dynamicStates;
 
-	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-	pipelineLayoutInfo.setLayoutCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-	pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-	pipelineLayoutInfo.pPushConstantRanges = 0; // Optional
 
-	if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, allocator, &pipelineLayout) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create pipeline layout!");
-	}
-
-
+	// create graphics pipeline
 	VkGraphicsPipelineCreateInfo pipelineInfo = {};
 	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineInfo.stageCount = 2;
-	pipelineInfo.pStages = shaderStages;
+	pipelineInfo.stageCount = (uint32_t)shaderStages.size();
+	pipelineInfo.pStages = shaderStages.data();
 	pipelineInfo.pVertexInputState = &vertexInputInfo;
 	pipelineInfo.pInputAssemblyState = &inputAssembly;
 	pipelineInfo.pViewportState = &viewportState;
@@ -1062,6 +1173,7 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, allocator, &graphicsPipeline) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create graphics pipeline!");
 	}
+
 	vkDestroyShaderModule(device, fragShaderModule, allocator);
 	vkDestroyShaderModule(device, vertShaderModule, allocator);
 }
@@ -1108,8 +1220,7 @@ void ire::OutputWindow::_CreateVertexBuffer()
 		bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		stagingBuffer,
-		stagingBufferMemory);
+		stagingBuffer, stagingBufferMemory);
 
 	void* data;
 	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
@@ -1136,14 +1247,22 @@ void ire::OutputWindow::_CreateIndexBuffer()
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
-	_CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+	_CreateBuffer(
+		bufferSize, 
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		stagingBuffer, stagingBufferMemory);
 
 	void* data;
 	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
 	memcpy(data, indices.data(), (size_t)bufferSize);
 	vkUnmapMemory(device, stagingBufferMemory);
 
-	_CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+	_CreateBuffer(
+		bufferSize, 
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
+		indexBuffer, indexBufferMemory);
 
 	_CopyBuffer(stagingBuffer, indexBuffer, bufferSize);
 
@@ -1154,7 +1273,13 @@ void ire::OutputWindow::_CreateIndexBuffer()
 void ire::OutputWindow::_CreateUniformBuffer()
 {
 	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-	_CreateBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffer, uniformBufferMemory);
+	_CreateBuffer(
+		bufferSize, 
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
+		uniformBuffer, uniformBufferMemory);
+
+	vkMapMemory(device, uniformBufferMemory, 0, sizeof(bufferSize), 0, (void **)&m_ubodata);
 }
 
 void ire::OutputWindow::_CreateDescriptorPool()
@@ -1266,9 +1391,8 @@ void ire::OutputWindow::_CreateCommandBuffers()
 
 		renderPassInfo.renderArea.offset = { 0, 0 };
 		renderPassInfo.renderArea.extent = swapChainExtent;
-
 		std::array<VkClearValue, 2> clearValues = {};
-		clearValues[0].color = { 0.1f, 0.1f, 0.1f, 1.0f };
+		clearValues[0].color = { 0.2f, 0.2f, 0.2f, 1.0f };
 		clearValues[1].depthStencil = { 1.0f, 0 };
 		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 		renderPassInfo.pClearValues = clearValues.data();
@@ -1317,7 +1441,15 @@ void ire::OutputWindow::_CreateCommandBuffers()
 		}
 		*/
 		vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-
+		VkClearAttachment ca = {
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			0,
+			{ 0.2f, 0.8f, 0.2f, 1.0f }};
+		VkClearRect cr = {
+			{{0, 0}, {100, 100}},
+			0,
+			1};
+		vkCmdClearAttachments(commandBuffers[i], 1, &ca, 1, &cr);
 		vkCmdEndRenderPass(commandBuffers[i]);
 
 		if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -1333,7 +1465,8 @@ void ire::OutputWindow::UpdateUniformBuffer()
 	auto currentTime = std::chrono::high_resolution_clock::now();
 	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
 
-	UniformBufferObject ubo = {};
+//	UniformBufferObject ubo = {};
+	UniformBufferObject &ubo = *m_ubodata;
 	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	//	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -1342,6 +1475,7 @@ void ire::OutputWindow::UpdateUniformBuffer()
 	ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
 	ubo.proj[1][1] *= -1;
 
+	return;
 	void* data;
 	vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &data);
 	memcpy(data, &ubo, sizeof(ubo));
@@ -1686,6 +1820,22 @@ VkExtent2D ire::_ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, 
 bool ire::_HasStencilComponent(VkFormat format)
 {
 	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
+VkSampleCountFlagBits ire::_GetMaxUsableSampleCount(VkPhysicalDevice physicalDevice)
+{
+	VkPhysicalDeviceProperties physicalDeviceProperties;
+	vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
+
+	VkSampleCountFlags counts = std::min(physicalDeviceProperties.limits.framebufferColorSampleCounts, physicalDeviceProperties.limits.framebufferDepthSampleCounts);
+	if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }
+	if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
+	if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
+	if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
+	if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
+	if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
+
+	return VK_SAMPLE_COUNT_1_BIT;
 }
 
 /// <summary>

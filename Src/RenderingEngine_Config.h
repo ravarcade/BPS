@@ -30,7 +30,7 @@ enum TUsage {
 	BONE_WEIGHT = 8
 };
 
-struct BAMS_EXPORT Optimize {
+struct RE_EXPORT Optimize {
 	Optimize();
 	U32 normals;							// normals, tangents, bitangents
 	U32 stride;
@@ -49,6 +49,6 @@ struct BAMS_EXPORT Optimize {
 	U32 max_num_of_bones_in_vertex;
 };
 
-Optimize BAMS_EXPORT *GetOptimize();
+Optimize RE_EXPORT *GetOptimize();
 
 #endif

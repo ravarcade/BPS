@@ -6,8 +6,9 @@
 
 #define BAMS_EXPORT __declspec(dllexport)
 
-#include "BAMEngineInternal.h"
 #include "BAMEngineImport.h"
+#include "BAMEngineInternal.h"
+
 
 #else
 

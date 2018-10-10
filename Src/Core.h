@@ -42,10 +42,10 @@ template< class Type, Size n >
 Size COUNT_OF(Type(&)[n]) { return n; }
 
 #include "..\3rdParty\tinyxml2\tinyxml2.h"
-#include "Core_BasicTypes.h"
 
 NAMESPACE_CORE_BEGIN
 
+#include "Core_BasicTypes.h"
 #include "Core_MemoryAllocator.h"
 #include "Core_Types.h"
 #include "Core_Message.h"

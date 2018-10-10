@@ -15,5 +15,4 @@ NAMESPACE_BAMS_BEGIN
 #include "Core_BasicTypes.h"
 #include "DllInterface_IResourceManager.h"
 
-
 NAMESPACE_BAMS_END
