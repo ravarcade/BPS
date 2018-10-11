@@ -111,7 +111,7 @@ void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _win
 		{
 			physicalDevice = device;
 			msaaSamples = _GetMaxUsableSampleCount(physicalDevice);
-			msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+			//msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 			break;
 		}
 	}
@@ -440,7 +440,7 @@ void ire::OutputWindow::_CreateSwapChain()
 	std::vector<VkAttachmentDescription> attachments = { colorAttachment, depthAttachment };
 	if (msaaSamples != VK_SAMPLE_COUNT_1_BIT)
 		attachments.emplace_back(colorAttachmentResolve);
-
+	
 	VkRenderPassCreateInfo renderPassInfo = {};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
 	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
@@ -449,6 +449,7 @@ void ire::OutputWindow::_CreateSwapChain()
 	renderPassInfo.pSubpasses = &subpass;
 	renderPassInfo.dependencyCount = 1;
 	renderPassInfo.pDependencies = &dependency;
+
 
 	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &renderPass) != VK_SUCCESS)
 		throw std::runtime_error("failed to create render pass!");
@@ -519,7 +520,19 @@ VkFormat ire::OutputWindow::_FindSupportedFormat(const std::vector<VkFormat>& ca
 }
 
 // ============================================================================ Image (textures) ===
-
+/// <summary>
+/// Creates the image.
+/// </summary>
+/// <param name="width">The width.</param>
+/// <param name="height">The height.</param>
+/// <param name="mipLevels">The mip levels.</param>
+/// <param name="numSamples">Liczba próbek</param>
+/// <param name="format">The format.</param>
+/// <param name="tiling">The tiling.</param>
+/// <param name="usage">The usage.</param>
+/// <param name="properties">The properties.</param>
+/// <param name="image">The image.</param>
+/// <param name="imageMemory">The image memory.</param>
 void ire::OutputWindow::_CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
 {
 	VkImageCreateInfo imageInfo = {};
