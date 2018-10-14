@@ -145,8 +145,6 @@ private:
 		VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
 		// === for demo cube ===
-		VkDescriptorSetLayout descriptorSetLayout;
-		VkPipelineLayout pipelineLayout;
 		VkPipeline graphicsPipeline;
 		VkBuffer vertexBuffer;
 		VkDeviceMemory vertexBufferMemory;
@@ -158,6 +156,7 @@ private:
 		VkDescriptorSet descriptorSet;
 		std::vector<VkCommandBuffer> commandBuffers;
 
+		ShadersReflections cubeShader;
 
 		bool _IsDeviceSuitable(VkPhysicalDevice device);
 		QueueFamilyIndices _FindQueueFamilies(VkPhysicalDevice device);
@@ -177,7 +176,7 @@ private:
 		void _CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 		VkShaderModule _CreateShaderModule(const char * shaderName);
 
-		void _CreateSwapChain();
+		bool _CreateSwapChain();
 		void _CleanupSwapChain();
 
 
@@ -211,6 +210,28 @@ private:
 			}
 			return false;
 		}
+
+		template<typename T> void vkDestroy(T &v) { if (v) { vkDestroyDevice(v, allocator); v = VK_NULL_HANDLE; } }
+#define Define_vkDestroy(t) template<> void vkDestroy(Vk##t &v) { if (v) { vkDestroy##t(device, v, allocator); v = VK_NULL_HANDLE; } }
+#define Define_vkFree(t) template<> void vkFree(Vk##t &v) { if (v) { vkFree##t(device, v, allocator); v = VK_NULL_HANDLE; } }
+		Define_vkDestroy(Pipeline);
+		Define_vkDestroy(PipelineLayout);
+		Define_vkDestroy(ImageView);
+		Define_vkDestroy(Image);
+		Define_vkDestroy(Framebuffer);
+		Define_vkDestroy(RenderPass);
+		Define_vkDestroy(SwapchainKHR);
+		Define_vkDestroy(DescriptorPool);
+		Define_vkDestroy(DescriptorSetLayout);
+		Define_vkDestroy(Buffer);
+		Define_vkDestroy(Semaphore);
+		Define_vkDestroy(CommandPool);
+		Define_vkDestroy(ShaderModule);
+		template<> void vkDestroy(VkSurfaceKHR &v) { if (v) { vkDestroySurfaceKHR(instance, v, allocator); v = VK_NULL_HANDLE; } }
+
+		void vkFree(VkDeviceMemory &v) { if (v) { vkFreeMemory(device, v, allocator); v = nullptr; } }
+		void vkFree(VkCommandPool &v1, std::vector<VkCommandBuffer> &v2) { if (v1 && v2.size()) { vkFreeCommandBuffers(device, v1, static_cast<uint32_t>(v2.size()), v2.data()); v2.clear(); } }
+		void vkFree(VkDescriptorPool &v1, std::vector<VkDescriptorSet> &v2) { if (v1 && v2.size()) { vkFreeDescriptorSets(device, v1, static_cast<uint32_t>(v2.size()), v2.data()); v2.clear(); } }
 	};
 
 	OutputWindow outputWindows[MAX_WINDOWS];

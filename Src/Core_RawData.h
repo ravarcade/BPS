@@ -25,7 +25,8 @@ public:
 	void Release(ResourceBase *res)
 	{
 		res->ResourceLoad(nullptr, 0);
-		res->GetMemoryAllocator()->deallocate(Data);
+		if (Data)
+			res->GetMemoryAllocator()->deallocate(Data);
 		Data = nullptr;
 		Size = 0;
 	}

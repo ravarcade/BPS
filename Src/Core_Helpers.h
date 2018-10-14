@@ -71,6 +71,28 @@ protected:
 		_idx = idx;
 	}
 
+	void Clone()
+	{
+		U32 idx = _firstFreeEntry;
+		Entry *pEntry;
+		if (idx)
+		{
+			pEntry = &_pool[idx];
+			_firstFreeEntry = pEntry->nextFree;
+		}
+		else
+		{
+			CheckIfInitialized();
+			idx = static_cast<U32>(_pool.size());
+			pEntry = _pool.add_empty();
+		}
+		++_used;
+		pEntry->refCounter = 1;
+		new (&pEntry->value) T(_pool[_idx].value);
+
+		_idx = idx;
+	}
+
 	inline void NeedUniq()
 	{
 		auto &src = _pool[_idx];
@@ -78,7 +100,7 @@ protected:
 		{
 			if (_idx)
 				--src.refCounter;
-			MakeNewEntry(src.value);
+			Clone();
 		}
 	}
 

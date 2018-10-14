@@ -193,10 +193,6 @@ void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _win
 		}
 	}
 
-	// ------------------------------------------------------------------------ 
-
-	_CreateSwapChain();
-
 	// ------------------------------------------------------------------------ create semaphores
 
 	VkSemaphoreCreateInfo semaphoreInfo = {};
@@ -207,7 +203,12 @@ void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _win
 		throw std::runtime_error("failed to create semaphores!");
 	}
 
-	_CreateDemoCube();
+	// ------------------------------------------------------------------------ 
+
+	if (_CreateSwapChain())
+	{
+		_CreateDemoCube();
+	}
 }
 
 
@@ -310,7 +311,7 @@ ire::QueueFamilyIndices ire::OutputWindow::_FindQueueFamilies(VkPhysicalDevice d
 
 // ----------------------------------------------------------------------------
 
-void ire::OutputWindow::_CreateSwapChain()
+bool ire::OutputWindow::_CreateSwapChain()
 {
 	// ------------------------------------------------------------------------ create swap chain
 	SwapChainSupportDetails swapChainSupport(physicalDevice, surface);
@@ -318,6 +319,8 @@ void ire::OutputWindow::_CreateSwapChain()
 	VkSurfaceFormatKHR surfaceFormat = ire::_ChooseSwapSurfaceFormat(swapChainSupport.formats);
 	VkPresentModeKHR presentMode = ire::_ChooseSwapPresentMode(swapChainSupport.presentModes);
 	VkExtent2D extent = ire::_ChooseSwapExtent(swapChainSupport.capabilities, window);
+	if (extent.height == 0 || extent.width == 0)
+		return false;
 
 	uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
 	if (swapChainSupport.capabilities.maxImageCount > 0 &&
@@ -488,6 +491,8 @@ void ire::OutputWindow::_CreateSwapChain()
 		if (vkCreateFramebuffer(device, &framebufferInfo, allocator, &swapChainFramebuffers[i]) != VK_SUCCESS)
 			throw std::runtime_error("failed to create framebuffer!");
 	}
+
+	return true;
 }
 
 
@@ -847,113 +852,58 @@ void ire::OutputWindow::Cleanup()
 	// do nothing for: graphicsQueue, presentQueue, transferQueue;
 	_CleanupSwapChain();
 
-	if (renderFinishedSemaphore) {
-		vkDestroySemaphore(device, renderFinishedSemaphore, allocator);
-		renderFinishedSemaphore = VK_NULL_HANDLE;
-	}
+	vkDestroy(renderFinishedSemaphore);
+	vkDestroy(imageAvailableSemaphore);
 
-	if (imageAvailableSemaphore) {
-		vkDestroySemaphore(device, imageAvailableSemaphore, allocator);
-		imageAvailableSemaphore = VK_NULL_HANDLE;
-	}
+	vkDestroy(transferPool);
+	vkDestroy(commandPool);
 
-	if (transferPool) {
-		vkDestroyCommandPool(device, transferPool, allocator);
-		transferPool = VK_NULL_HANDLE;
-	}
-
-	if (commandPool) {
-		vkDestroyCommandPool(device, commandPool, allocator);
-		commandPool = VK_NULL_HANDLE;
-	}
-
-	if (device) {
-		vkDestroyDevice(device, allocator);
-		device = VK_NULL_HANDLE;
-	}
-
+	vkDestroy(device);
 	// do nothing for: physicalDevice
 
-	if (surface) {
-		vkDestroySurfaceKHR(instance, surface, allocator);
-		surface = VK_NULL_HANDLE;
-	}
+	vkDestroy(surface);
 }
 
 void ire::OutputWindow::_CleanupSwapChain()
 {
-	vkDestroyPipeline(device, graphicsPipeline, allocator);
-	vkDestroyPipelineLayout(device, pipelineLayout, allocator);
+	// use template method vkDestroy(val).
+	// it will call vkDestroy_something(device, val, allocator);
+	// ... and will set val = nullptr;
+	// same about vkFree
 
-	vkDestroyImageView(device, colorImageView, allocator);
-	vkDestroyImage(device, colorImage, allocator);
-	vkFreeMemory(device, colorImageMemory, allocator);
+	vkDestroy(colorImageView);
+	vkDestroy(colorImage);
+	vkFree(colorImageMemory);
 
-	vkDestroyImageView(device, depthImageView, allocator);
-	vkDestroyImage(device, depthImage, allocator);
-	vkFreeMemory(device, depthImageMemory, allocator);
+	vkDestroy(depthImageView);
+	vkDestroy(depthImage);
+	vkFree(depthImageMemory);
 
-	vkDestroyRenderPass(device, renderPass, allocator);
+	vkDestroy(renderPass);
 
-	vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+	vkFree(commandPool, commandBuffers);
 
 	for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
-		vkDestroyFramebuffer(device, swapChainFramebuffers[i], allocator);
+		vkDestroy(swapChainFramebuffers[i]);
 	}
 
 	for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-		vkDestroyImageView(device, swapChainImageViews[i], allocator);
+		vkDestroy(swapChainImageViews[i]);
 	}
 
-	vkDestroySwapchainKHR(device, swapChain, allocator);
+	vkDestroy(swapChain);
 }
 
 // ============================================================================ Demo Cube ===
 
 void ire::OutputWindow::_CreateDemoCube()
 {
-	// ------------------------------------------------------------------------ DescriptorSetLayout
-	{
-		VkDescriptorSetLayoutBinding uboLayoutBinding = {};
-		uboLayoutBinding.binding = 0;
-		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		uboLayoutBinding.descriptorCount = 1;
-		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-		uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
+	cubeShader.LoadPrograms({ "vert", "frag" });
+//	cubeShader.LoadPrograms({ "diag2.vert", "frag" });
+	cubeShader.BuildVkStructures(device, allocator); // descriptorSetLayout, pipelineLayout
 
-													   /*
-													   VkDescriptorSetLayoutBinding samplerLayoutBinding = {};
-													   samplerLayoutBinding.binding = 1;
-													   samplerLayoutBinding.descriptorCount = 1;
-													   samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-													   samplerLayoutBinding.pImmutableSamplers = nullptr;
-													   samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-													   std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
-													   */
-		std::array<VkDescriptorSetLayoutBinding, 1> bindings = { uboLayoutBinding };
-		VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-		layoutInfo.pBindings = bindings.data();
-
-
-		if (vkCreateDescriptorSetLayout(device, &layoutInfo, allocator, &descriptorSetLayout) != VK_SUCCESS)
-			throw std::runtime_error("failed to create descriptor set layout!");
-
-		// ------------------------------------------------------------------- pipelineLayout
-		VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 1;
-		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
-		pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-		pipelineLayoutInfo.pPushConstantRanges = 0; // Optional
-
-		if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, allocator, &pipelineLayout) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create pipeline layout!");
-		}
-	}
 	// --------------------------------------------------------------------
+
 	_CreateGraphicsPipeline();
 	_CreateVertexBuffer();
 	_CreateIndexBuffer();
@@ -966,24 +916,27 @@ void ire::OutputWindow::_CreateDemoCube()
 
 void ire::OutputWindow::_CleanupDemoCube()
 {
-	vkDestroyDescriptorPool(device, descriptorPool, allocator);
-	vkDestroyDescriptorSetLayout(device, descriptorSetLayout, allocator);
-
 	if (m_ubodata) {
 		vkUnmapMemory(device, uniformBufferMemory);
 		m_ubodata = nullptr;
 	}
+	
+	cubeShader.ReleaseVk(device, allocator);
 
-	vkDestroyBuffer(device, uniformBuffer, allocator);
-	vkFreeMemory(device, uniformBufferMemory, allocator);
+	vkDestroy(graphicsPipeline);
+//	vkDestroy(pipelineLayout);
+//	vkDestroy(descriptorSetLayout);
 
+	vkDestroy(descriptorPool);
 
-	vkDestroyBuffer(device, indexBuffer, allocator);
-	vkFreeMemory(device, indexBufferMemory, allocator);
+	vkDestroy(uniformBuffer);
+	vkFree(uniformBufferMemory);
 
-	vkDestroyBuffer(device, vertexBuffer, allocator);
-	vkFreeMemory(device, vertexBufferMemory, allocator);
+	vkDestroy(indexBuffer);
+	vkFree(indexBufferMemory);
 
+	vkDestroy(vertexBuffer);
+	vkFree(vertexBufferMemory);
 }
 
 void ire::OutputWindow::_CreateGraphicsPipeline()
@@ -1007,24 +960,7 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 
 	// ============= 1. Shader programs ==============
 	// compile programs
-	VkShaderModule vertShaderModule = _CreateShaderModule("vert");
-	VkShaderModule fragShaderModule = _CreateShaderModule("frag");
-
-	// put fragment and vertex shader in one program 
-	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
-	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	vertShaderStageInfo.module = vertShaderModule;
-	vertShaderStageInfo.pName = "main";
-
-	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
-	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-	fragShaderStageInfo.module = fragShaderModule;
-	fragShaderStageInfo.pName = "main";
-
-	std::vector<VkPipelineShaderStageCreateInfo> shaderStages = { vertShaderStageInfo, fragShaderStageInfo };
-	// result: shaderStages 
+	auto &shaderStages = cubeShader.GetShaderStages();
 
 
 	// ================ 2. Vertex buffer info ==========================
@@ -1048,7 +984,6 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
 	// result: vertexInputInfo
-
 
 	// ================= 3. Assembly info =============== 
 	// how we will draw: triangles
@@ -1178,7 +1113,7 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 	pipelineInfo.pDepthStencilState = &depthStencil;
 	pipelineInfo.pColorBlendState = &colorBlending;
 	pipelineInfo.pDynamicState = nullptr; // Optional
-	pipelineInfo.layout = pipelineLayout;
+	pipelineInfo.layout = cubeShader.GetPipelineLayout();// pipelineLayout;
 	pipelineInfo.renderPass = renderPass;
 	pipelineInfo.subpass = 0;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
@@ -1187,8 +1122,13 @@ void ire::OutputWindow::_CreateGraphicsPipeline()
 		throw std::runtime_error("failed to create graphics pipeline!");
 	}
 
-	vkDestroyShaderModule(device, fragShaderModule, allocator);
-	vkDestroyShaderModule(device, vertShaderModule, allocator);
+	// ================== cleanup ===================
+	for (auto shaderStage : shaderStages)
+	{
+		vkDestroy(shaderStage.module);
+	}
+//	vkDestroy(vertShaderModule);
+//	vkDestroy(fragShaderModule);
 }
 
 void ire::OutputWindow::_CreateVertexBuffer()
@@ -1297,16 +1237,17 @@ void ire::OutputWindow::_CreateUniformBuffer()
 
 void ire::OutputWindow::_CreateDescriptorPool()
 {
-	//	std::array<VkDescriptorPoolSize, 2> poolSizes = {};
-	//	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	//	poolSizes[0].descriptorCount = 1;
-	//	poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	//	poolSizes[1].descriptorCount = 1;
-
-	std::array<VkDescriptorPoolSize, 1> poolSizes = {};
-	poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	poolSizes[0].descriptorCount = 1;
-
+	std::vector<uint32_t> pools;
+	uint32_t s = cubeShader.AddDescriptorPoolsSize(pools);
+	std::vector<VkDescriptorPoolSize> poolSizes(s);
+	uint32_t idx = 0;
+	for (uint32_t i = 0; i < pools.size(); ++i) {
+		if (pools[i]) {
+			poolSizes[idx].type = static_cast<VkDescriptorType>(VK_DESCRIPTOR_TYPE_BEGIN_RANGE + i);
+			poolSizes[idx].descriptorCount = pools[i];
+		}
+	}
+	
 	VkDescriptorPoolCreateInfo poolInfo = {};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
@@ -1322,12 +1263,14 @@ void ire::OutputWindow::_CreateDescriptorPool()
 
 void ire::OutputWindow::_CreateDescriptorSet()
 {
-	VkDescriptorSetLayout layouts[] = { descriptorSetLayout };
+	auto &layouts = cubeShader.GetDescriptorSetLayout();
+
+//	VkDescriptorSetLayout layouts[] = { descriptorSetLayout };
 	VkDescriptorSetAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	allocInfo.descriptorPool = descriptorPool;
-	allocInfo.descriptorSetCount = 1;
-	allocInfo.pSetLayouts = layouts;
+	allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
+	allocInfo.pSetLayouts = layouts.data();
 
 	if (vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
 		throw std::runtime_error("failed to allocate descriptor set!");
@@ -1414,7 +1357,7 @@ void ire::OutputWindow::_CreateCommandBuffers()
 
 		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, cubeShader.GetPipelineLayout() /*pipelineLayout*/, 0, 1, &descriptorSet, 0, nullptr);
 
 		VkBuffer vertexBuffers[] = { vertexBuffer };
 		VkDeviceSize offsets[] = { 0 };
@@ -1473,6 +1416,8 @@ void ire::OutputWindow::_CreateCommandBuffers()
 
 void ire::OutputWindow::UpdateUniformBuffer()
 {
+	if (!m_ubodata)
+		return;
 	static auto startTime = std::chrono::high_resolution_clock::now();
 
 	auto currentTime = std::chrono::high_resolution_clock::now();
@@ -1502,12 +1447,18 @@ void ire::OutputWindow::RecreateSwapChain()
 	_CleanupDemoCube();
 	_CleanupSwapChain();
 	
-	_CreateSwapChain();
-	_CreateDemoCube();
+	if (_CreateSwapChain())
+	{
+		_CreateDemoCube();
+	}
 }
 
 void ire::OutputWindow::DrawFrame()
 {
+	if (!swapChain) {
+		RecreateSwapChain();
+		return;
+	}
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -1518,6 +1469,8 @@ void ire::OutputWindow::DrawFrame()
 	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 		throw std::runtime_error("failed to acquire swap chain image!");
 	}
+	if (!m_ubodata)
+		return;
 
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

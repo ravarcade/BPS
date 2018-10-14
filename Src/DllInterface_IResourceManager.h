@@ -106,6 +106,7 @@ extern "C" {
 		}
 
 	public:
+		ResourceSmartPtr() { val = nullptr; }
 		ResourceSmartPtr(IResource *p) { val = new ResourceSmartPtrData(p); }
 		ResourceSmartPtr(const ResourceSmartPtr &s) : val(s.val) { ++val->count; }
 		ResourceSmartPtr(ResourceSmartPtr &&s) : val(s.val) { s.val = nullptr; }
@@ -113,8 +114,8 @@ extern "C" {
 			Release();
 		}
 
-		ResourceSmartPtr & operator = (const ResourceSmartPtr &s) { Release(); val = s.val; ++val->count; }
-		ResourceSmartPtr & operator = (ResourceSmartPtr &&s) { val = s.val; s.val = nullptr; }
+		ResourceSmartPtr & operator = (const ResourceSmartPtr &s) { Release(); val = s.val; ++val->count; return *this; }
+		ResourceSmartPtr & operator = (ResourceSmartPtr &&s) { val = s.val; s.val = nullptr; return *this; }
 
 		inline IResource *Get() { return val ? val->ptr : nullptr; }
 	};
@@ -127,6 +128,7 @@ extern "C" {
 		inline IResource *Get() { return _res.Get(); }
 
 	public:
+		CResource() {}
 		CResource(IResource *r) : _res(r) { AddRef(); }
 		CResource(const CResource &src) : _res(src._res) {}
 		CResource(CResource &&src) : _res(std::move(src._res)) {}
@@ -149,6 +151,7 @@ extern "C" {
 	class CRawData : public CResource
 	{
 	public:
+		CRawData() {}
 		CRawData(IRawData *r) : CResource(static_cast<IResource*>(r)) {}
 		CRawData(const CRawData &src) : CResource(src) {}
 		CRawData(CRawData &&src) : CResource(std::move(src)) {}

@@ -362,8 +362,8 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 		SIZE_T size = 0;
 		BYTE *data = nullptr;
 
-		if (res->Type == ResourceBase::UNKNOWN) 
-			res->_resourceImplementation->Release(res);
+		//if (res->Type == ResourceBase::UNKNOWN) 
+		//	res->_resourceImplementation->Release(res);
 
 		CreateResourceImplementation(res);
 	
@@ -458,7 +458,10 @@ struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
 				res->GetImplementation()->Release(res);
 			}
 
-			if (!res->_isLoaded && res->_refCounter && !res->_isDeleted && (!res->_isModified || res->_waitWithUpdate < now))
+			if (res->_isDeleted)
+				continue;
+
+			if (!res->_isLoaded && res->_refCounter && (!res->_isModified || res->_waitWithUpdate < now))
 			{
 				wprintf(L"Loading: %s\n", res->Path.c_str());
 				Load(res);

@@ -20,6 +20,8 @@
 # endif
 #endif
 
+#include <intrin.h> // _BitScanForward
+
 #define GLFW_INCLUDE_VULKAN
 #include "glfw\glfw3.h"
 
@@ -34,6 +36,8 @@ enum {
 	DMDWND = 2,
 	MAX_WINDOWS
 };
+#include "Utils.h"
+#include "ShadersReflections.h"
 
 #include "iglfw.h"
 #include "ire.h"

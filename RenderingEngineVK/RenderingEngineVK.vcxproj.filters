@@ -67,6 +67,9 @@
     <ClInclude Include="..\3rdParty\SPRIV-Cross\spirv_reflect.hpp">
       <Filter>SPRIV-Cross</Filter>
     </ClInclude>
+    <ClInclude Include="Utils.h">
+      <Filter>Src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

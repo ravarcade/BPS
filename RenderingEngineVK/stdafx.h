@@ -18,10 +18,11 @@
 #include <algorithm>
 
 // TODO: reference additional headers your program requires here
-#define REVK_BUILD_DLL
-#include "RenderingEngineVK.h"
-
 
 #include "BAMEngine.h"
 #pragma  comment(lib, "BAMEngine.lib")
+
+#define REVK_BUILD_DLL
+#include "RenderingEngineVK.h"
+
 

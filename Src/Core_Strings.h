@@ -527,7 +527,7 @@ public:
 	template<typename V,
 			 typename = std::enable_if_t<has_method_ToBasicString<V>::value> 
 	>
-	shared_string(const V &src) { MakeNewEntry(src.ToBasicString()); }
+	shared_string(const V &src) { MakeNewEntry(src.ToBasicString()); } // this is not dangerous. "src" is not from same shared_string type. It has own pool and arg to MakeNewEntry will not get invalid
 
 	// 6. reserve memory for string
 	shared_string(U reserve) { MakeNewEntry(reserve); }
@@ -542,6 +542,7 @@ public:
 
 	T operator[](SIZE_T pos) const { return GetValue()[pos]; }
 	T& operator[](SIZE_T pos) { NeedUniq(); return GetValue()[pos]; }
+//	const T& operator[](SIZE_T pos) { return GetValue()[pos]; }
 
 	// === string concatenations: operator +=
 	// 1. For all classes with GetValue (derived from shared_base)
