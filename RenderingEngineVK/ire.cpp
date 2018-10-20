@@ -5,16 +5,29 @@
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
 
-const std::vector<ire::Vertex> vertices = {
-	{ { -0.5f, -0.5f,  0.5f },{ 1.0f, 0.0f, 0.0f } },
-	{ { 0.5f, -0.5f,  0.5f },{ 0.0f, 1.0f, 0.0f } },
-	{ { 0.5f,  0.5f,  0.5f },{ 0.0f, 0.0f, 1.0f } },
-	{ { -0.5f,  0.5f,  0.5f },{ 1.0f, 1.0f, 1.0f } },
 
-	{ { -0.5f, -0.5f, -0.5f },{ 0.0f, 0.0f, 1.0f } },
-	{ { 0.5f, -0.5f, -0.5f },{ 1.0f, 1.0f, 1.0f } },
-	{ { 0.5f,  0.5f, -0.5f },{ 1.0f, 0.0f, 0.0f } },
-	{ { -0.5f,  0.5f, -0.5f },{ 0.0f, 1.0f, 0.0f } }
+//const std::vector<ire::Vertex> vertices = {
+//	{ { -0.5f, -0.5f,  0.5f },{ 1.0f, 0.0f, 0.0f } },
+//	{ { 0.5f, -0.5f,  0.5f },{ 0.0f, 1.0f, 0.0f } },
+//	{ { 0.5f,  0.5f,  0.5f },{ 0.0f, 0.0f, 1.0f } },
+//	{ { -0.5f,  0.5f,  0.5f },{ 1.0f, 1.0f, 1.0f } },
+//
+//	{ { -0.5f, -0.5f, -0.5f },{ 0.0f, 0.0f, 1.0f } },
+//	{ { 0.5f, -0.5f, -0.5f },{ 1.0f, 1.0f, 1.0f } },
+//	{ { 0.5f,  0.5f, -0.5f },{ 1.0f, 0.0f, 0.0f } },
+//	{ { -0.5f,  0.5f, -0.5f },{ 0.0f, 1.0f, 0.0f } }
+//};
+
+const std::vector<ire::Vertex> vertices = {
+	{ { -0.5f, -0.5f,  0.5f }, 0x0000000ff },
+	{ { 0.5f, -0.5f,  0.5f },  0x0000ff00 },
+	{ { 0.5f,  0.5f,  0.5f },  0x00ff0000},
+	{ { -0.5f,  0.5f,  0.5f }, 0x00ffffff },
+
+	{ { -0.5f, -0.5f, -0.5f }, 0x00ff0000 },
+	{ { 0.5f, -0.5f, -0.5f },  0x00ffffff },
+	{ { 0.5f,  0.5f, -0.5f },  0x000000ff },
+	{ { -0.5f,  0.5f, -0.5f }, 0x0000ff00 }
 };
 
 const std::vector<uint16_t> indices = {
@@ -899,12 +912,10 @@ void ire::OutputWindow::_CleanupSwapChain()
 void ire::OutputWindow::_CreateDemoCube()
 {
 	cubeShader.LoadPrograms({ "vert", "frag" });
-//	cubeShader.LoadPrograms({ "diag2.vert", "frag" });
-	cubeShader.BuildVkStructures(device, allocator); // descriptorSetLayout, pipelineLayout
+	cubeShader.SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
+	graphicsPipeline = cubeShader.CreateGraphicsPipeline(device, allocator);
 
 	// --------------------------------------------------------------------
-
-	_CreateGraphicsPipeline();
 	_CreateVertexBuffer();
 	_CreateIndexBuffer();
 	_CreateUniformBuffer();
@@ -922,11 +933,7 @@ void ire::OutputWindow::_CleanupDemoCube()
 	}
 	
 	cubeShader.ReleaseVk(device, allocator);
-
-	vkDestroy(graphicsPipeline);
-//	vkDestroy(pipelineLayout);
-//	vkDestroy(descriptorSetLayout);
-
+	
 	vkDestroy(descriptorPool);
 
 	vkDestroy(uniformBuffer);
@@ -937,198 +944,6 @@ void ire::OutputWindow::_CleanupDemoCube()
 
 	vkDestroy(vertexBuffer);
 	vkFree(vertexBufferMemory);
-}
-
-void ire::OutputWindow::_CreateGraphicsPipeline()
-{
-	/* Graphics pipeline is build from:
-	* 1. Shader programs (for selected stages, vert+frag is minimum?)
-	* 2. Vertex buffer info.
-	* 3. Assembly info. (triangle/lines // strip/fan/list)
-	* 4. Viewport. (window position + depth min/max & list of scissors 2d rect)
-	* 5. Resterization. Polygons are filled, backface culling, CCW or CW
-	* 6. Multisampling
-	* 7. Depth/Stencil
-	* 8. Color blending
-	* 9. Dynamic states (list of params changed while drawning ???) 
-	* + PipelineLineout (VBO + UBO) 
-	* + Renderpass (.... hm .... ???)
-	* + Subpass (???)
-	*
-	* After Graphics Pipeline is created, shader modules can be destroyes... so... all must be compiled again if GP is recreated.
-	*/
-
-	// ============= 1. Shader programs ==============
-	// compile programs
-	auto &shaderStages = cubeShader.GetShaderStages();
-
-
-	// ================ 2. Vertex buffer info ==========================
-	// from vertex shader get binding descriptions and attributes of vertex buffer
-	std::vector<VkVertexInputBindingDescription> bindingDescription(0); // <- info about: [1] binding point, [2] data stride (in bytes), [3] input rate: per vertex or per instance
-	std::vector<VkVertexInputAttributeDescription> attributeDescriptions; // <- info about: [1] location (see vert-shader program), [2] binding (bufer from where data are read), [3] format (flota/int/bool // single val/no. of elements in vector), [4] offset in buffer
-
-	bindingDescription.push_back(Vertex::GetBindingDescription());
-	auto att = Vertex::GetAttributeDescriptions();
-	attributeDescriptions = std::vector<VkVertexInputAttributeDescription>(att.begin(), att.end());
-
-
-	// set binging desc and attributes desc
-	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
-	vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-	vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescription.size());
-	vertexInputInfo.pVertexBindingDescriptions = bindingDescription.data();
-
-	vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-	vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
-
-	// result: vertexInputInfo
-
-	// ================= 3. Assembly info =============== 
-	// how we will draw: triangles
-	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
-	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-	inputAssembly.primitiveRestartEnable = VK_FALSE;
-	// result: inputAssembly
-
-	// ================= 4.View port ================
-	// view port: whole window
-	VkViewport viewport = {};
-	viewport.x = 0.0f;
-	viewport.y = 0.0f;
-	viewport.width = (float)swapChainExtent.width;
-	viewport.height = (float)swapChainExtent.height;
-	viewport.minDepth = 0.0f;
-	viewport.maxDepth = 1.0f;
-
-	// no scisors
-	VkRect2D scissor = {};
-	scissor.offset = { 0, 0 };
-	scissor.extent = swapChainExtent;
-
-	// viewport and scisors in one structure: viewportState
-	VkPipelineViewportStateCreateInfo viewportState = {};
-	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewportState.viewportCount = 1;
-	viewportState.pViewports = &viewport;
-	viewportState.scissorCount = 1;
-	viewportState.pScissors = &scissor;
-
-	// result : viewportState
-
-	// ================== 5. Resterization ===============
-	VkPipelineRasterizationStateCreateInfo rasterizer = {};
-	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterizer.depthClampEnable = VK_FALSE;
-	rasterizer.rasterizerDiscardEnable = VK_FALSE;
-	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizer.lineWidth = 1.0f;
-	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-	rasterizer.depthBiasEnable = VK_FALSE;
-	rasterizer.depthBiasConstantFactor = 0.0f; // Optional
-	rasterizer.depthBiasClamp = 0.0f; // Optional
-	rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
-	
-	// ================== 6. Multisampling ===============
-	VkPipelineMultisampleStateCreateInfo multisampling = {};
-	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisampling.sampleShadingEnable = VK_FALSE;
-	multisampling.rasterizationSamples = msaaSamples;
-	multisampling.minSampleShading = 1.0f; // Optional
-	multisampling.pSampleMask = nullptr; // Optional
-	multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
-	multisampling.alphaToOneEnable = VK_FALSE; // Optional
-
-	// ==================== 7. Depth/Stencil ===============
-	VkPipelineDepthStencilStateCreateInfo depthStencil = {};
-	depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-	depthStencil.depthTestEnable = VK_TRUE;
-	depthStencil.depthWriteEnable = VK_TRUE;
-	depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-	depthStencil.depthBoundsTestEnable = VK_FALSE;
-	depthStencil.minDepthBounds = 0.0f; // Optional
-	depthStencil.maxDepthBounds = 1.0f; // Optional
-	depthStencil.stencilTestEnable = VK_FALSE;
-	depthStencil.front = {}; // Optional
-	depthStencil.back = {}; // Optional
-
-	// =================== 8. color blending ==================
-	VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_FALSE;
-	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
-	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-														 /* alpha blending
-														 colorBlendAttachment.blendEnable = VK_TRUE;
-														 colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-														 colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-														 colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-														 colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-														 colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-														 colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-														 */
-
-	VkPipelineColorBlendStateCreateInfo colorBlending = {};
-	colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	colorBlending.flags = 0;
-	colorBlending.logicOpEnable = VK_FALSE;
-	colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
-	colorBlending.attachmentCount = 1;
-	colorBlending.pAttachments = &colorBlendAttachment;
-	colorBlending.blendConstants[0] = 0.0f; // Optional
-	colorBlending.blendConstants[1] = 0.0f; // Optional
-	colorBlending.blendConstants[2] = 0.0f; // Optional
-	colorBlending.blendConstants[3] = 0.0f; // Optional
-
-	// ================== 9. Dynamic states ===================
-	VkDynamicState dynamicStates[] = {
-		VK_DYNAMIC_STATE_VIEWPORT
-	};
-
-	VkPipelineDynamicStateCreateInfo dynamicState = {};
-	dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamicState.dynamicStateCount = 1;
-	dynamicState.pDynamicStates = dynamicStates;
-
-
-	// create graphics pipeline
-	VkGraphicsPipelineCreateInfo pipelineInfo = {};
-	pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	pipelineInfo.stageCount = (uint32_t)shaderStages.size();
-	pipelineInfo.pStages = shaderStages.data();
-	pipelineInfo.pVertexInputState = &vertexInputInfo;
-	pipelineInfo.pInputAssemblyState = &inputAssembly;
-	pipelineInfo.pViewportState = &viewportState;
-	pipelineInfo.pRasterizationState = &rasterizer;
-	pipelineInfo.pMultisampleState = &multisampling;
-	pipelineInfo.pDepthStencilState = &depthStencil;
-	pipelineInfo.pColorBlendState = &colorBlending;
-	pipelineInfo.pDynamicState = nullptr; // Optional
-	pipelineInfo.layout = cubeShader.GetPipelineLayout();// pipelineLayout;
-	pipelineInfo.renderPass = renderPass;
-	pipelineInfo.subpass = 0;
-	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
-	pipelineInfo.basePipelineIndex = -1; // Optional
-	if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, allocator, &graphicsPipeline) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create graphics pipeline!");
-	}
-
-	// ================== cleanup ===================
-	for (auto shaderStage : shaderStages)
-	{
-		vkDestroy(shaderStage.module);
-	}
-//	vkDestroy(vertShaderModule);
-//	vkDestroy(fragShaderModule);
 }
 
 void ire::OutputWindow::_CreateVertexBuffer()
@@ -1356,7 +1171,27 @@ void ire::OutputWindow::_CreateCommandBuffers()
 		vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 		vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+		static VkViewport viewport = {};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = (float)swapChainExtent.width;
+		viewport.height = (float)swapChainExtent.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
 
+		// no scisors
+		static VkRect2D scissor;
+		scissor = { { 0, 0 }, swapChainExtent };
+
+		// viewport and scisors in one structure: viewportState
+		VkPipelineViewportStateCreateInfo viewportState = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+		viewportState.viewportCount = 1;
+		viewportState.pViewports = &viewport;
+		viewportState.scissorCount = 1;
+		viewportState.pScissors = &scissor;
+
+		vkCmdSetViewport(commandBuffers[i], 0, 1, &viewport);
+		vkCmdSetScissor(commandBuffers[i], 0, 1, &scissor);
 		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, cubeShader.GetPipelineLayout() /*pipelineLayout*/, 0, 1, &descriptorSet, 0, nullptr);
 
 		VkBuffer vertexBuffers[] = { vertexBuffer };

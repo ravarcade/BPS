@@ -28,4 +28,12 @@ namespace Utils {
 		x = (x + (x >> 4)) & 0x0f0f0f0f;                //put count of each 8 bits into those 8 bits 
 		return (x * 0x01010101) >> 24;          //returns left 8 bits of x + (x<<8) + (x<<16) + (x<<24) + ... 
 	}
+
+	inline bool icasecmp(const std::string& l, const std::string& r)
+	{
+		return l.size() == r.size()
+			&& equal(l.cbegin(), l.cend(), r.cbegin(),
+				[](std::string::value_type l1, std::string::value_type r1)
+		{ return toupper(l1) == toupper(r1); });
+	}
 };

@@ -49,7 +49,6 @@ Model defaultBox = {
 
 // ============================================================================
 
-void doTests();
 /// <summary>
 ///  
 /// </summary>
@@ -86,7 +85,6 @@ public:
 			//int width = 800, height = 600;
 			//glfw.CreateWnd(MAINWND, width, height);
 //			re.Create_main3dwindow();
-			doTests();
 			re.CreateWnd(MAINWND, nullptr);
 			re.CreateWnd(BACKBOXWND, nullptr);
 			re.CreateWnd(DMDWND, nullptr);

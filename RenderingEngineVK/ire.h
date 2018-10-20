@@ -10,7 +10,7 @@ class ire {
 public:
 	struct Vertex {
 		glm::vec3 pos;
-		glm::vec3 color;
+		DWORD color;
 
 		static VkVertexInputBindingDescription GetBindingDescription() {
 			VkVertexInputBindingDescription bindingDescription = {};
@@ -31,7 +31,7 @@ public:
 
 			attributeDescriptions[1].binding = 0;
 			attributeDescriptions[1].location = 1;
-			attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+			attributeDescriptions[1].format = VK_FORMAT_R8G8B8_UNORM;
 			attributeDescriptions[1].offset = offsetof(Vertex, color);
 
 			return attributeDescriptions;
