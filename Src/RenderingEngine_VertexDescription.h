@@ -63,6 +63,20 @@ struct RE_EXPORT Stream {
 	U32 m_type;
 	bool m_normalized;
 
+	Stream(U32 type,  U16 stride, bool normalized, void *data = nullptr) :
+		m_data(data),
+		m_type(type),
+		m_stride(stride),
+		m_normalized(normalized)
+	{};
+	/*
+	Stream(int type, size_t stride, bool normalized, const void *data = nullptr) :
+		m_data(data),
+		m_type(type),
+		m_stride(static_cast<U16>(stride)),
+		m_normalized(normalized)
+	{};
+	*/
 	Stream() :
 		m_data(0),
 		m_stride(0),
@@ -130,6 +144,22 @@ public:
 	Stream m_boneWeights[MAX_NUM_OF_BONES_IN_VERT];
 	Stream m_boneIDs[MAX_NUM_OF_BONES_IN_VERT];
 
+	VertexDescription() : m_numVertices(0), m_numIndices(0) {}
+
+	VertexDescription(
+		U32 numTriangles,
+		U32 numVertices,
+		F32 *pVertices,
+		U16 *pIndices,
+		F32 *pTexCoords = nullptr,
+		F32 *pNormals = nullptr,
+		F32 *pTangents = nullptr,
+		F32 *pBitangents = nullptr,
+		F32 *pColors = nullptr)
+	{
+		m_indices = Stream(IDX_UINT16_1D, sizeof(U16), false, pIndices);
+		_SetVertexDescription(numTriangles, numVertices, pVertices, pTexCoords, pNormals, pTangents, pBitangents, pColors);
+	}
 
 	VertexDescription(
 		U32 numTriangles, 
@@ -140,6 +170,38 @@ public:
 		F32 *pNormals = nullptr,
 		F32 *pTangents = nullptr,
 		F32 *pBitangents = nullptr, 
+		F32 *pColors = nullptr)
+	{
+		m_indices = Stream(IDX_UINT32_1D, sizeof(U32), false, pIndices);
+		bool uint16IsFine = true;
+		const U32 MAX_UINT16 = 0xffff;
+
+		for (unsigned int i = 0; i < m_numIndices; ++i)
+		{
+			if (pIndices[i] > MAX_UINT16)
+			{
+				uint16IsFine = false;
+				break;
+			}
+		}
+
+		if (uint16IsFine)
+		{
+			m_indices.m_type = IDX_UINT16_1D;
+		}
+
+		_SetVertexDescription(numTriangles, numVertices, pVertices, pTexCoords, pNormals, pTangents, pBitangents, pColors);
+	}
+
+private:
+	void _SetVertexDescription(
+		U32 numTriangles,
+		U32 numVertices,
+		F32 *pVertices,
+		F32 *pTexCoords = nullptr,
+		F32 *pNormals = nullptr,
+		F32 *pTangents = nullptr,
+		F32 *pBitangents = nullptr,
 		F32 *pColors = nullptr)
 	{
 		m_numVertices = numVertices;
@@ -154,7 +216,7 @@ public:
 
 		if (pBitangents)
 			m_bitangents = Stream(pBitangents);
-		
+
 		if (pColors)
 		{
 			uint32_t i = 0;
@@ -184,27 +246,7 @@ public:
 				}
 			}
 		}
-
-
-		m_indices = Stream(pIndices,1);
-		bool uint16IsFine = true;
-		const int MAX_UINT16 = 0xffff;
-
-		for (unsigned int i = 0; i < m_numIndices; ++i)
-		{
-			if (pIndices[i] > MAX_UINT16)
-			{
-				uint16IsFine = false;
-				break;
-			}
-		}
-		if (uint16IsFine)
-		{
-			m_indices.m_type = IDX_UINT16_1D;			
-		}
-
 	}
-
 	/*
 	VertexDescription(const aiMesh *mesh, BonesFactory *boneMap)
 	{

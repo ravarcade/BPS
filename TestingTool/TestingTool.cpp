@@ -144,7 +144,7 @@ int main()
 		BAMS::CEngine en;
 		using namespace BAMS;
 
-		BAMS::RENDERINENGINE::VertexDescription vd(0,0,0,0);
+		BAMS::RENDERINENGINE::VertexDescription vd;
 
 
 		BAMS::DoTests();

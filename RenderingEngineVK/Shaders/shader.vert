@@ -1,6 +1,8 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
+const int CTRL_DEPTHWRITE = 1;
+
 layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
     mat4 view;

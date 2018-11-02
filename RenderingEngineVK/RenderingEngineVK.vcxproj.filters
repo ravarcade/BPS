@@ -70,6 +70,12 @@
     <ClInclude Include="Utils.h">
       <Filter>Src</Filter>
     </ClInclude>
+    <ClInclude Include="ShaderProgram.h">
+      <Filter>Src</Filter>
+    </ClInclude>
+    <ClInclude Include="AttribStreamConverter.h">
+      <Filter>Src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -113,6 +119,12 @@
     </ClCompile>
     <ClCompile Include="..\3rdParty\SPRIV-Cross\spirv_reflect.cpp">
       <Filter>SPRIV-Cross</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderProgram.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="AttribStreamConverter.cpp">
+      <Filter>Src</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

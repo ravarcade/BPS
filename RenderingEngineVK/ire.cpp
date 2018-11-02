@@ -1,6 +1,7 @@
 #include "stdafx.h"
 
 // ============================================================================ tmp data ===
+using namespace BAMS;
 
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
@@ -48,7 +49,9 @@ bool ire::enableValidationLayers = false;
 
 ire re;
 
-ire::SwapChainSupportDetails::SwapChainSupportDetails(VkPhysicalDevice device, VkSurfaceKHR surface)
+// ============================================================================ SwapChainSupportDetails ===
+
+SwapChainSupportDetails::SwapChainSupportDetails(VkPhysicalDevice device, VkSurfaceKHR surface)
 {
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &capabilities);
 
@@ -70,9 +73,77 @@ ire::SwapChainSupportDetails::SwapChainSupportDetails(VkPhysicalDevice device, V
 	}
 }
 
+// ============================================================================ QueueFamilyIndices ===
+
+QueueFamilyIndices::QueueFamilyIndices(VkPhysicalDevice device, VkSurfaceKHR surface)
+{
+	uint32_t queueFamilyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+	int i = 0;
+	int backup_transferFamily = -1;
+	for (const auto& queueFamily : queueFamilies)
+	{
+		VkBool32 presentSupport = false;
+		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+
+		if (queueFamily.queueCount > 0 &&
+			queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT &&
+			presentSupport)
+		{
+			graphicsFamily = i;
+			presentFamily = i;
+
+			if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT) {
+				backup_transferFamily = i;
+			}
+
+			if (isComplete()) {
+				break;
+			}
+		}
+
+		// allow to select 2 different queues, one for graphics, one for present (only if we don't have one with both)
+		if (queueFamily.queueCount > 0 &&
+			queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT &&
+			graphicsFamily == -1)
+		{
+			graphicsFamily = i;
+			if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT &&
+				backup_transferFamily == -1) {
+				backup_transferFamily = i;
+			}
+		}
+
+		if (queueFamily.queueCount > 0 &&
+			presentSupport &&
+			presentFamily == -1)
+		{
+			presentFamily = i;
+		}
+
+		if (queueFamily.queueCount > 0 &&
+			queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT &&
+			(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) // we want different transfer queue than graphics
+		{
+			transferFamily = i;
+		}
+
+		i++;
+	}
+
+	if (transferFamily == -1) // in case if we don't have separate transfer queue, use graphics queue (it will have 
+	{
+		transferFamily = backup_transferFamily;
+	}
+}
+
 // ============================================================================ OutputWindow ===
 
-ire::OutputWindow::OutputWindow() :
+OutputWindow::OutputWindow() :
 	instance(VK_NULL_HANDLE),
 	wnd(MAX_WINDOWS),
 	window(nullptr),
@@ -83,7 +154,7 @@ ire::OutputWindow::OutputWindow() :
 
 // ----------------------------------------------------------------------------
 
-void ire::OutputWindow::Init()
+void OutputWindow::Init()
 {
 	instance = VK_NULL_HANDLE;
 	physicalDevice = VK_NULL_HANDLE;
@@ -98,7 +169,7 @@ void ire::OutputWindow::Init()
 
 // ----------------------------------------------------------------------------
 
-void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _window, const VkAllocationCallbacks* _allocator)
+void OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _window, const VkAllocationCallbacks* _allocator)
 {
 	instance = _instance;
 	wnd = _wnd;
@@ -123,7 +194,7 @@ void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _win
 		if (_IsDeviceSuitable(device))
 		{
 			physicalDevice = device;
-			msaaSamples = _GetMaxUsableSampleCount(physicalDevice);
+			msaaSamples = ire::_GetMaxUsableSampleCount(physicalDevice);
 			//msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 			break;
 		}
@@ -134,7 +205,7 @@ void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _win
 
 	// ------------------------------------------------------------------------ create logical device
 	// queues: one from graphics family one from present family (it may be same)
-	QueueFamilyIndices indices = _FindQueueFamilies(physicalDevice);
+	QueueFamilyIndices indices(physicalDevice, surface);
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
 	std::set<int> uniqueQueueFamilies = { indices.graphicsFamily, indices.presentFamily, indices.transferFamily }; // "std::set<int>" here will remove repeated values, so instead { 0, 0, 1 } we will have {0, 1}
 
@@ -159,14 +230,14 @@ void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _win
 	createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 	createInfo.pQueueCreateInfos = queueCreateInfos.data();
 	createInfo.pEnabledFeatures = &deviceFeatures;
-	createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
-	createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+	createInfo.enabledExtensionCount = static_cast<uint32_t>(ire::deviceExtensions.size());
+	createInfo.ppEnabledExtensionNames = ire::deviceExtensions.data();
 
 	// add validation layer for logical device
 	if (ire::enableValidationLayers)
 	{
-		createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-		createInfo.ppEnabledLayerNames = validationLayers.data();
+		createInfo.enabledLayerCount = static_cast<uint32_t>(ire::validationLayers.size());
+		createInfo.ppEnabledLayerNames = ire::validationLayers.data();
 	}
 	else {
 		createInfo.enabledLayerCount = 0;
@@ -181,7 +252,7 @@ void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _win
 
 	// ------------------------------------------------------------------------ create command pool
 	{
-		QueueFamilyIndices queueFamilyIndices = _FindQueueFamilies(physicalDevice);
+		QueueFamilyIndices queueFamilyIndices(physicalDevice, surface);
 
 		VkCommandPoolCreateInfo poolInfo = {};
 		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -225,7 +296,7 @@ void ire::OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _win
 }
 
 
-bool ire::OutputWindow::_IsDeviceSuitable(VkPhysicalDevice device)
+bool OutputWindow::_IsDeviceSuitable(VkPhysicalDevice device)
 {
 	VkPhysicalDeviceProperties deviceProperties;
 	VkPhysicalDeviceFeatures deviceFeatures;
@@ -233,7 +304,7 @@ bool ire::OutputWindow::_IsDeviceSuitable(VkPhysicalDevice device)
 	vkGetPhysicalDeviceProperties(device, &deviceProperties);
 	vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
 
-	QueueFamilyIndices indices = _FindQueueFamilies(device);
+	QueueFamilyIndices indices(device, surface);
 
 	bool extensionsSupported = ire::_CheckDeviceExtensionSupport(device);
 
@@ -252,79 +323,9 @@ bool ire::OutputWindow::_IsDeviceSuitable(VkPhysicalDevice device)
 		swapChainAdequate;
 }
 
-ire::QueueFamilyIndices ire::OutputWindow::_FindQueueFamilies(VkPhysicalDevice device)
-{
-	QueueFamilyIndices indices;
-
-	uint32_t queueFamilyCount = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-
-	std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-
-	int i = 0;
-	int backup_transferFamily = -1;
-	for (const auto& queueFamily : queueFamilies)
-	{
-		VkBool32 presentSupport = false;
-		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
-
-		if (queueFamily.queueCount > 0 &&
-			queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT &&
-			presentSupport)
-		{
-			indices.graphicsFamily = i;
-			indices.presentFamily = i;
-
-			if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT)	{
-				backup_transferFamily = i;
-			}
-
-			if (indices.isComplete()) {
-				break;
-			}
-		}
-
-		// allow to select 2 different queues, one for graphics, one for present (only if we don't have one with both)
-		if (queueFamily.queueCount > 0 &&
-			queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT &&
-			indices.graphicsFamily == -1)
-		{
-			indices.graphicsFamily = i;
-			if (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT &&
-				backup_transferFamily == -1) {
-				backup_transferFamily = i;
-			}
-		}
-
-		if (queueFamily.queueCount > 0 &&
-			presentSupport &&
-			indices.presentFamily == -1)
-		{
-			indices.presentFamily = i;
-		}
-
-		if (queueFamily.queueCount > 0 &&
-			queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT &&
-			(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) // we want different transfer queue than graphics
-		{
-			indices.transferFamily = i;
-		}
-
-		i++;
-	}
-
-	if (indices.transferFamily == -1) // in case if we don't have separate transfer queue, use graphics queue (it will have 
-	{
-		indices.transferFamily = backup_transferFamily;
-	}
-
-	return indices;
-}
-
 // ----------------------------------------------------------------------------
 
-bool ire::OutputWindow::_CreateSwapChain()
+bool OutputWindow::_CreateSwapChain()
 {
 	// ------------------------------------------------------------------------ create swap chain
 	SwapChainSupportDetails swapChainSupport(physicalDevice, surface);
@@ -353,7 +354,7 @@ bool ire::OutputWindow::_CreateSwapChain()
 	createInfo.imageArrayLayers = 1;
 	createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // VK_IMAGE_USAGE_TRANSFER_DST_BIT 
 
-	QueueFamilyIndices indices = _FindQueueFamilies(physicalDevice);
+	QueueFamilyIndices indices(physicalDevice, surface);
 	uint32_t queueFamilyIndices[] = { (uint32_t)indices.graphicsFamily, (uint32_t)indices.presentFamily };
 
 	if (indices.graphicsFamily != indices.presentFamily) {
@@ -509,7 +510,7 @@ bool ire::OutputWindow::_CreateSwapChain()
 }
 
 
-VkFormat ire::OutputWindow::_FindDepthFormat()
+VkFormat OutputWindow::_FindDepthFormat()
 {
 	return _FindSupportedFormat(
 	{ VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT },
@@ -518,7 +519,7 @@ VkFormat ire::OutputWindow::_FindDepthFormat()
 	);
 }
 
-VkFormat ire::OutputWindow::_FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features)
+VkFormat OutputWindow::_FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features)
 {
 	for (VkFormat format : candidates)
 	{
@@ -551,7 +552,7 @@ VkFormat ire::OutputWindow::_FindSupportedFormat(const std::vector<VkFormat>& ca
 /// <param name="properties">The properties.</param>
 /// <param name="image">The image.</param>
 /// <param name="imageMemory">The image memory.</param>
-void ire::OutputWindow::_CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
+void OutputWindow::_CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
 {
 	VkImageCreateInfo imageInfo = {};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -587,7 +588,7 @@ void ire::OutputWindow::_CreateImage(uint32_t width, uint32_t height, uint32_t m
 	vkBindImageMemory(device, image, imageMemory, 0);
 }
 
-VkImageView ire::OutputWindow::_CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
+VkImageView OutputWindow::_CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
 {
 	VkImageViewCreateInfo viewInfo = {};
 	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -620,7 +621,7 @@ VkImageView ire::OutputWindow::_CreateImageView(VkImage image, VkFormat format, 
 /// <param name="format">The format.</param>
 /// <param name="oldLayout">The old layout.</param>
 /// <param name="newLayout">The new layout.</param>
-void ire::OutputWindow::_TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
+void OutputWindow::_TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
 {
 	VkCommandBuffer commandBuffer = _BeginSingleTimeCommands();
 
@@ -698,7 +699,7 @@ void ire::OutputWindow::_TransitionImageLayout(VkImage image, VkFormat format, V
 
 // ===========================================================================
 
-uint32_t ire::OutputWindow::_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
+uint32_t OutputWindow::_FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
 {
 	VkPhysicalDeviceMemoryProperties memProperties;
 	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
@@ -716,7 +717,7 @@ uint32_t ire::OutputWindow::_FindMemoryType(uint32_t typeFilter, VkMemoryPropert
 
 // ============================================================================
 
-VkCommandBuffer ire::OutputWindow::_BeginSingleTimeCommands()
+VkCommandBuffer OutputWindow::_BeginSingleTimeCommands()
 {
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -736,7 +737,7 @@ VkCommandBuffer ire::OutputWindow::_BeginSingleTimeCommands()
 	return commandBuffer;
 }
 
-void ire::OutputWindow::_EndSingleTimeCommands(VkCommandBuffer commandBuffer)
+void OutputWindow::_EndSingleTimeCommands(VkCommandBuffer commandBuffer)
 {
 	vkEndCommandBuffer(commandBuffer);
 
@@ -753,7 +754,7 @@ void ire::OutputWindow::_EndSingleTimeCommands(VkCommandBuffer commandBuffer)
 
 // ============================================================================ Buffer ===
 
-void ire::OutputWindow::_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory, VkSharingMode sharingMode)
+void OutputWindow::_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory, VkSharingMode sharingMode)
 {
 	VkBufferCreateInfo bufferInfo = {};
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -762,7 +763,7 @@ void ire::OutputWindow::_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usag
 	bufferInfo.sharingMode = sharingMode;
 	if (sharingMode == VK_SHARING_MODE_CONCURRENT)
 	{
-		QueueFamilyIndices indices = _FindQueueFamilies(physicalDevice);
+		QueueFamilyIndices indices(physicalDevice, surface);
 		uint32_t sharedQueueInexes[] = { static_cast<uint32_t>(indices.graphicsFamily), static_cast<uint32_t>(indices.transferFamily) };
 		bufferInfo.queueFamilyIndexCount = 2;
 		bufferInfo.pQueueFamilyIndices = sharedQueueInexes;
@@ -788,7 +789,7 @@ void ire::OutputWindow::_CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usag
 }
 
 
-void ire::OutputWindow::_CreateBufferAndCopy(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, const void *srcData, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+void OutputWindow::_CreateBufferAndCopy(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, const void *srcData, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
 {
 	_CreateBuffer(size, usage, properties, buffer, bufferMemory);
 
@@ -798,7 +799,7 @@ void ire::OutputWindow::_CreateBufferAndCopy(VkDeviceSize size, VkBufferUsageFla
 	vkUnmapMemory(device, bufferMemory);
 }
 
-void ire::OutputWindow::_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
+void OutputWindow::_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset)
 {
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -816,8 +817,8 @@ void ire::OutputWindow::_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDe
 	vkBeginCommandBuffer(commandBuffer, &beginInfo);
 
 	VkBufferCopy copyRegion = {};
-	copyRegion.srcOffset = 0; // Optional
-	copyRegion.dstOffset = 0; // Optional
+	copyRegion.srcOffset = srcOffset; // Optional
+	copyRegion.dstOffset = dstOffset; // Optional
 	copyRegion.size = size;
 	vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 	vkEndCommandBuffer(commandBuffer);
@@ -835,7 +836,7 @@ void ire::OutputWindow::_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDe
 	vkFreeCommandBuffers(device, allocInfo.commandPool, 1, &commandBuffer);
 }
 
-VkShaderModule ire::OutputWindow::_CreateShaderModule(const char *shaderName)
+VkShaderModule OutputWindow::_CreateShaderModule(const char *shaderName)
 {
 	BAMS::CResourceManager rm;
 	auto code = rm.GetRawDataByName(shaderName);
@@ -858,7 +859,7 @@ VkShaderModule ire::OutputWindow::_CreateShaderModule(const char *shaderName)
 
 // ----------------------------------------------------------------------------
 
-void ire::OutputWindow::Cleanup()
+void OutputWindow::Cleanup()
 {
 	_CleanupDemoCube();
 
@@ -877,7 +878,7 @@ void ire::OutputWindow::Cleanup()
 	vkDestroy(surface);
 }
 
-void ire::OutputWindow::_CleanupSwapChain()
+void OutputWindow::_CleanupSwapChain()
 {
 	// use template method vkDestroy(val).
 	// it will call vkDestroy_something(device, val, allocator);
@@ -909,15 +910,36 @@ void ire::OutputWindow::_CleanupSwapChain()
 
 // ============================================================================ Demo Cube ===
 
-void ire::OutputWindow::_CreateDemoCube()
+void OutputWindow::_CreateDemoCube()
 {
+	cubeShader.SetParentOutputWindow(this);
 	cubeShader.LoadPrograms({ "vert", "frag" });
-	cubeShader.SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
-	graphicsPipeline = cubeShader.CreateGraphicsPipeline(device, allocator);
+	auto outputNames = cubeShader.GetOutputNames();
+//	QueueFamilyIndices indices(physicalDevice, surface);
+//	cubeShader.Prepare(physicalDevice, device, allocator, indices.graphicsFamily, indices.presentFamily, indices.transferFamily);
+	// select renderPass
+	if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
+	{
+		cubeShader.SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
+	}
+	graphicsPipeline = cubeShader.CreateGraphicsPipeline();
 
 	// --------------------------------------------------------------------
-	_CreateVertexBuffer();
-	_CreateIndexBuffer();
+	using namespace BAMS::RENDERINENGINE;
+	VertexDescription vd;
+	vd.m_numVertices = static_cast<U32>(vertices.size());
+	vd.m_numIndices = static_cast<U32>(indices.size());
+	vd.m_vertices = Stream(FLOAT_3D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(ire::Vertex, pos));
+	vd.m_colors[0] = Stream(COL_UINT8_4D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(ire::Vertex, color));
+	vd.m_indices = Stream(IDX_UINT16_1D, sizeof(indices[0]), false, (U8 *)indices.data());
+
+	auto &rp = cubeShader;
+	rp.CreateModelBuffers(static_cast<uint32_t>(vertices.size()), static_cast<uint32_t>(indices.size()), 1);
+	rp.SendVertexData(vd);
+
+	//Add3DModel(0, 0);
+	//_CreateVertexBuffer();
+	//_CreateIndexBuffer();
 	_CreateUniformBuffer();
 
 	_CreateDescriptorPool();
@@ -925,120 +947,22 @@ void ire::OutputWindow::_CreateDemoCube()
 	_CreateCommandBuffers();
 }
 
-void ire::OutputWindow::_CleanupDemoCube()
+void OutputWindow::_CleanupDemoCube()
 {
 	if (m_ubodata) {
 		vkUnmapMemory(device, uniformBufferMemory);
 		m_ubodata = nullptr;
 	}
 	
-	cubeShader.ReleaseVk(device, allocator);
+	cubeShader.Release();
 	
 	vkDestroy(descriptorPool);
 
 	vkDestroy(uniformBuffer);
 	vkFree(uniformBufferMemory);
-
-	vkDestroy(indexBuffer);
-	vkFree(indexBufferMemory);
-
-	vkDestroy(vertexBuffer);
-	vkFree(vertexBufferMemory);
 }
 
-void ire::OutputWindow::_CreateVertexBuffer()
-{
-	/*
-	CreateBufferAndCopy(
-	sizeof(vertices[0]) * vertices.size(),
-	VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-	vertices.data(),
-	vertexBuffer,
-	vertexBufferMemory);
-	*/
-	/*
-	std::cout << "createVertexBuffer() - 1\n";
-
-	CreateBufferAndCopy(
-	sizeof(verticesPos[0]) * verticesPos.size(),
-	VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-	verticesPos.data(),
-	vertexBufferPos,
-	vertexBufferPosMemory);
-
-	std::cout << "createVertexBuffer() - 2\n";
-
-	CreateBufferAndCopy(
-	sizeof(verticesColor[0]) * verticesColor.size(),
-	VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-	VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-	verticesColor.data(),
-	vertexBufferColor,
-	vertexBufferColorMemory);
-
-	std::cout << "createVertexBuffer() - 3\n";
-	*/
-	VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
-
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-	_CreateBuffer(
-		bufferSize,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		stagingBuffer, stagingBufferMemory);
-
-	void* data;
-	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, vertices.data(), (size_t)bufferSize);
-	vkUnmapMemory(device, stagingBufferMemory);
-
-	_CreateBuffer(
-		bufferSize,
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		vertexBuffer,
-		vertexBufferMemory);
-
-	_CopyBuffer(stagingBuffer, vertexBuffer, bufferSize);
-
-	vkDestroyBuffer(device, stagingBuffer, allocator);
-	vkFreeMemory(device, stagingBufferMemory, allocator);
-}
-
-
-void ire::OutputWindow::_CreateIndexBuffer()
-{
-	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
-
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-	_CreateBuffer(
-		bufferSize, 
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-		stagingBuffer, stagingBufferMemory);
-
-	void* data;
-	vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-	memcpy(data, indices.data(), (size_t)bufferSize);
-	vkUnmapMemory(device, stagingBufferMemory);
-
-	_CreateBuffer(
-		bufferSize, 
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 
-		indexBuffer, indexBufferMemory);
-
-	_CopyBuffer(stagingBuffer, indexBuffer, bufferSize);
-
-	vkDestroyBuffer(device, stagingBuffer, allocator);
-	vkFreeMemory(device, stagingBufferMemory, allocator);
-}
-
-void ire::OutputWindow::_CreateUniformBuffer()
+void OutputWindow::_CreateUniformBuffer()
 {
 	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 	_CreateBuffer(
@@ -1050,10 +974,10 @@ void ire::OutputWindow::_CreateUniformBuffer()
 	vkMapMemory(device, uniformBufferMemory, 0, sizeof(bufferSize), 0, (void **)&m_ubodata);
 }
 
-void ire::OutputWindow::_CreateDescriptorPool()
+void OutputWindow::_CreateDescriptorPool()
 {
 	std::vector<uint32_t> pools;
-	uint32_t s = cubeShader.AddDescriptorPoolsSize(pools);
+	uint32_t s = cubeShader.GetDescriptorPoolsSize(pools);
 	std::vector<VkDescriptorPoolSize> poolSizes(s);
 	uint32_t idx = 0;
 	for (uint32_t i = 0; i < pools.size(); ++i) {
@@ -1076,7 +1000,7 @@ void ire::OutputWindow::_CreateDescriptorPool()
 
 // ------------------------------------------------------------------------
 
-void ire::OutputWindow::_CreateDescriptorSet()
+void OutputWindow::_CreateDescriptorSet()
 {
 	auto &layouts = cubeShader.GetDescriptorSetLayout();
 
@@ -1133,7 +1057,7 @@ void ire::OutputWindow::_CreateDescriptorSet()
 	vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
-void ire::OutputWindow::_CreateCommandBuffers()
+void OutputWindow::_CreateCommandBuffers()
 {
 	commandBuffers.resize(swapChainFramebuffers.size());
 
@@ -1194,11 +1118,10 @@ void ire::OutputWindow::_CreateCommandBuffers()
 		vkCmdSetScissor(commandBuffers[i], 0, 1, &scissor);
 		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, cubeShader.GetPipelineLayout() /*pipelineLayout*/, 0, 1, &descriptorSet, 0, nullptr);
 
-		VkBuffer vertexBuffers[] = { vertexBuffer };
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+		cubeShader.DrawObject(commandBuffers[i], 0);
+//		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 		//		vkCmdBindIndexBuffer(_commandBuffers[i], _indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+//		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 		/*
 		switch (vertexBufferMode)
 		{
@@ -1231,7 +1154,7 @@ void ire::OutputWindow::_CreateCommandBuffers()
 
 		}
 		*/
-		vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+//		vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 		VkClearAttachment ca = {
 			VK_IMAGE_ASPECT_COLOR_BIT,
 			0,
@@ -1249,7 +1172,7 @@ void ire::OutputWindow::_CreateCommandBuffers()
 	}
 }
 
-void ire::OutputWindow::UpdateUniformBuffer()
+void OutputWindow::UpdateUniformBuffer()
 {
 	if (!m_ubodata)
 		return;
@@ -1275,7 +1198,7 @@ void ire::OutputWindow::UpdateUniformBuffer()
 	vkUnmapMemory(device, uniformBufferMemory);
 }
 
-void ire::OutputWindow::RecreateSwapChain()
+void OutputWindow::RecreateSwapChain()
 {
 	vkDeviceWaitIdle(device);
 
@@ -1288,7 +1211,7 @@ void ire::OutputWindow::RecreateSwapChain()
 	}
 }
 
-void ire::OutputWindow::DrawFrame()
+void OutputWindow::DrawFrame()
 {
 	if (!swapChain) {
 		RecreateSwapChain();
@@ -1466,6 +1389,24 @@ void ire::CreateWnd(int wnd, const void *params)
 	ow.Prepare(_instance, wnd, window, _allocator);
 }
 
+using namespace RENDERINENGINE;
+
+void ire::Add3DModel(int wnd, const RenderingModel * params)
+{
+	VertexDescription vd;
+	vd.m_numVertices = static_cast<U32>(vertices.size());
+	vd.m_numIndices = static_cast<U32>(indices.size());
+	vd.m_vertices = Stream(FLOAT_3D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(Vertex, pos));
+	vd.m_colors[0] = Stream(COL_UINT8_4D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(Vertex, color));
+	vd.m_indices = Stream(IDX_UINT16_1D, sizeof(indices[0]), false, (U8 *)indices.data());
+	
+	auto &rp = outputWindows[wnd].cubeShader;
+	rp.CreateModelBuffers(static_cast<uint32_t>(vertices.size()), static_cast<uint32_t>(indices.size()), 1);
+	rp.SendVertexData(vd);
+//	ownd.cubeShader.;
+
+}
+
 
 // ============================================================================ ire : Rendering Engine - protected methods ===
 
@@ -1532,6 +1473,12 @@ void ire::_DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallb
 	{
 		func(instance, callback, pAllocator);
 	}
+}
+
+
+bool ire::_HasStencilComponent(VkFormat format)
+{
+	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
 /// <summary>
@@ -1616,11 +1563,6 @@ VkExtent2D ire::_ChooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities, 
 
 		return actualExtent;
 	}
-}
-
-bool ire::_HasStencilComponent(VkFormat format)
-{
-	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 
 VkSampleCountFlagBits ire::_GetMaxUsableSampleCount(VkPhysicalDevice physicalDevice)

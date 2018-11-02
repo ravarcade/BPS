@@ -29,16 +29,39 @@ struct VertexAttribDesc {
 
 	uint32_t binding;
 	uint32_t location;
-	uint32_t vecsize;
-	uint32_t type;
-	VkFormat format;
+	uint32_t vecsize;	// if vector it is size of vector ..... probably always = 1
+	uint32_t type;		// see enum above
+	VkFormat format;	// vulkan vertex format
+	uint32_t size;		// 
+	uint32_t offset;	// offset in binding
+};
+
+struct VertexAttribInfo {
+	BAMS::RENDERINENGINE::VertexDescription descriptions;
+	std::vector<VertexAttribDesc> attribs;
+	std::vector<uint32_t> strides;
 	uint32_t size;
-	uint32_t offset;
+};
+
+union VertexDescriptionInfoPack {
+	void *data;
+	uint32_t info;
+#pragma pack(push, 1)
+	struct {
+		uint16_t offset, binding;
+	};
+#pragma pack(pop)
 };
 
 enum ShaderReflectionType {
-	UNKNOWN,
-	Int32, UInt32, Float32
+	UNKNOWN = 0,
+	Int32 = 1, 
+	UInt32 = 2,
+	Int16 = 3,
+	UInt16 = 4,
+	Int8 = 5,
+	UInt8 = 6,
+	Float32 = 7,
 };
 
 struct ValMemberDetails {
@@ -61,26 +84,17 @@ struct ValDetails {
 	std::vector<ValMemberDetails> members;
 };
 
-class ShadersReflections
+class CShadersReflections
 {
 public:
-	ShadersReflections();
-	ShadersReflections(std::vector<std::string> &&programs);
+	struct ShaderProgramInfo {
+		std::string name;
+		::BAMS::CRawData resource;
+		std::string entryPointName;
+		VkShaderStageFlagBits stage;
+		//	VkShaderModule shaderModule;
+	};
 
-	void LoadPrograms(std::vector<std::string> &&programs);
-	void ReleaseVk(VkDevice device, const VkAllocationCallbacks* allocator);
-	
-	const std::vector<VkDescriptorSetLayout> &GetDescriptorSetLayout() const { return m_descriptorSetLayout; }
-	const std::vector<VkPipelineShaderStageCreateInfo> &GetShaderStages() const { return m_shaderStages; }
-	VkPipelineLayout GetPipelineLayout() const { return m_pipelineLayout; }
-	uint32_t AddDescriptorPoolsSize(std::vector<uint32_t> &poolsSize);
-
-	VkPipelineVertexInputStateCreateInfo *GetVertexInputInfo();
-	void CreatePipelineLayout(VkDevice device, const VkAllocationCallbacks* allocator);
-	VkPipeline CreateGraphicsPipeline(VkDevice device, const VkAllocationCallbacks* allocator);
-
-	void SetRenderPassAndMsaaSamples(VkRenderPass renderPass, VkSampleCountFlagBits msaaSamples) { m_renderPass = renderPass; m_msaaSamples = msaaSamples; }
-private:
 	struct ResourceLayout {
 		struct DescriptorSetLayout {
 			uint32_t uniform_buffer_mask = 0;
@@ -88,53 +102,41 @@ private:
 			uint32_t stages[VULKAN_NUM_BINDINGS] = { 0 };
 		};
 		uint32_t input_mask = 0;
-//		uint32_t output_mask = 0;
+		//		uint32_t output_mask = 0;
 		uint32_t push_constant_offset = 0;
 		uint32_t push_constant_range = 0;
 		uint32_t spec_constant_mask = 0;
 		DescriptorSetLayout descriptorSets[VULKAN_NUM_DESCRIPTOR_SETS];
 	};
 
-	struct ShaderProgramInfo {
-		std::string name;
-		::BAMS::CRawData resource;
-		std::string entryPointName;
-		VkShaderStageFlagBits stage;
-		VkShaderModule shaderModule;
-	};
+	CShadersReflections();
+	CShadersReflections(std::vector<std::string> &&programs);
 
-	std::vector<VertexAttribDesc> m_VertexAttribs;
+	VertexAttribInfo LoadPrograms(std::vector<std::string> &&programs);
+	void Release();
+
+	const std::vector<std::string> &GetOutputNames() { return m_outputNames; }
+
+
+	const std::vector<ShaderProgramInfo> &GetPrograms() { return m_programs; }
+	const ResourceLayout &GetLayout() { return m_layout; }
+private:
+
+
+	//std::vector<VertexAttribDesc> m_VertexAttribs;
 	VkPipelineVertexInputStateCreateInfo m_vertexInputInfo;
+	//BAMS::RENDERINENGINE::VertexDescription m_VertexDescription;
+
+	VertexAttribInfo vi;
 
 	std::vector<ValDetails> m_ubos;
 	std::vector<ShaderProgramInfo> m_programs;
 	ResourceLayout m_layout;
 
-	std::vector<VkPipelineShaderStageCreateInfo> m_shaderStages;
-	std::vector<VkDescriptorSetLayout> m_descriptorSetLayout;
 	bool m_enableAlpha;
 
-	VkDevice logicalDevice = nullptr;
-	const VkAllocationCallbacks* memAllocator = nullptr;
-	VkRenderPass m_renderPass;
-	VkSampleCountFlagBits m_msaaSamples;
-	VkPipelineLayout m_pipelineLayout;
-	VkPipeline m_graphicsPipeline;
+	void _ParsePrograms();
 
-	void ParsePrograms();
 
-	std::vector<VkPipelineShaderStageCreateInfo> _Compile();
-	VkPipelineVertexInputStateCreateInfo _GetVertexInputInfo();
-	VkPipelineInputAssemblyStateCreateInfo _GetInputAssembly();
-	VkPipelineViewportStateCreateInfo  _GetViewportState();
-	VkPipelineRasterizationStateCreateInfo _GetRasterizationState();
-	VkPipelineMultisampleStateCreateInfo _GetMultisampleState();
-	VkPipelineDepthStencilStateCreateInfo _GetDepthStencilState();
-	VkPipelineColorBlendStateCreateInfo _GetColorBlendState();
-	VkPipelineDynamicStateCreateInfo _GetDynamicState();
-	VkPipelineLayout _GetPipelineLayout();
-	VkRenderPass _GetRenderPass();
-
-	std::vector<VkVertexInputBindingDescription> m_bindingDescription;      // <- info about: [1] binding point, [2] data stride (in bytes), [3] input rate: per vertex or per instance
-	std::vector<VkVertexInputAttributeDescription> m_attributeDescriptions; // <- info about: [1] location (see vert-shader program), [2] binding (bufer from where data are read), [3] format (flota/int/bool // single val/no. of elements in vector), [4] offset in buffer
+	std::vector<std::string> m_outputNames;
 };

@@ -253,11 +253,21 @@ public:
 	}
 };
 
+
+// ============================================================================
+
 enum { // msgDst
 	RENDERING_ENGINE = 0x201 // VK
 };
 
 enum { // msgId
 	// to RENDERING_ENGINE
-	CREATE_3D_WINDOW = 0X20001 
+	CREATE_3D_WINDOW = 0x20001,
+	ADD_3D_MODEL     = 0x20002, // object name + model name + shader program
+};
+
+struct RenderingModel {
+	const char *object;     // uniq name
+	const char *model;	    // 3d model resource name
+	const char *shader;     // shader program
 };
