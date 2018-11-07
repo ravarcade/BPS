@@ -4,11 +4,18 @@
 const int CTRL_DEPTHWRITE = 1;
 
 layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
     mat4 view;
     mat4 proj;
 } ubo;
 
+struct DrawObjectParams {
+    mat4 model;
+    vec4 baseColor;
+};
+
+layout(push_constant) uniform PushConstants {
+   DrawObjectParams obj;
+} pc;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
@@ -16,6 +23,6 @@ layout(location = 1) in vec3 inColor;
 layout(location = 0) out vec3 fragColor;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
-    fragColor = inColor;
+    gl_Position = ubo.proj * ubo.view * pc.obj.model * vec4(inPosition, 1.0);
+    fragColor = inColor * pc.obj.baseColor.rgb;
 }

@@ -389,8 +389,8 @@ void CShaderProgram::CreatePipelineLayout()
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(m_descriptorSetLayout.size());
 	pipelineLayoutInfo.pSetLayouts = m_descriptorSetLayout.data();
-	pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
-	pipelineLayoutInfo.pPushConstantRanges = 0; // Optional
+	pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(layout.pushConstants.size());
+	pipelineLayoutInfo.pPushConstantRanges = layout.pushConstants.data();
 
 	if (vkCreatePipelineLayout(vk->device, &pipelineLayoutInfo, vk->allocator, &m_pipelineLayout) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create pipeline layout!");
@@ -400,15 +400,8 @@ void CShaderProgram::CreatePipelineLayout()
 
 void CShaderProgram::CreateModelBuffers(uint32_t numVertices, uint32_t numIndeces, uint32_t numObjects)
 {
-	uint32_t vboSize = 0;
-	std::vector<uint32_t> poolsSize;
-	_GetDescriptorPoolsSize(poolsSize);
-	for (auto ps : poolsSize)
-		vboSize += numVertices * ps;
-
-
 	vk->_CreateBuffer(
-		vboSize,
+		numVertices * m_vi.size,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		m_vertexBuffer,
@@ -497,13 +490,28 @@ void CShaderProgram::SendVertexData(VertexDescription src, void *dst)
 	conv.Convert(out, src.m_indices, src.m_numIndices);
 }
 
+#include <chrono>
+#include <glm/gtc/matrix_transform.hpp>
+
 void CShaderProgram::DrawObject(VkCommandBuffer & cb, uint32_t objectId)
 {
+	static auto startTime = std::chrono::high_resolution_clock::now();
+
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
+	static struct {
+		glm::mat4 model;
+		glm::vec4 baseColor;
+	} pushConstantData;
+	pushConstantData.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	pushConstantData.baseColor = glm::vec4(1, 0.5, 1, 1);
+
 	if (m_vertexBuffer && m_indexBuffer) {
 		VkBuffer vertexBuffers[] = { m_vertexBuffer };
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(cb, 0, 1, vertexBuffers, offsets);
 
+		vkCmdPushConstants(cb, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, 80, &pushConstantData);
 		//	vkCmdBindIndexBuffer(cb, m_indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 		vkCmdBindIndexBuffer(cb, m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 

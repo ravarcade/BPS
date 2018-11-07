@@ -66,6 +66,7 @@ enum ShaderReflectionType {
 
 struct ValMemberDetails {
 	std::string name = "";
+	std::string typenName = "";
 	uint32_t type = 0;     // int/float
 	uint32_t vecsize = 0;  // num in row (1 - scaler, 2~4 vec2~vec4,...)
 	uint32_t colsize = 0;  // matrix columns
@@ -80,7 +81,9 @@ struct ValMemberDetails {
 struct ValDetails {
 	uint32_t set = 0;
 	uint32_t binding = 0;
+	uint32_t stage = VK_SHADER_STAGE_VERTEX_BIT;
 	ValMemberDetails entry;
+
 	std::vector<ValMemberDetails> members;
 };
 
@@ -101,12 +104,9 @@ public:
 			uint32_t descriptorCount[VULKAN_NUM_BINDINGS] = { 0 };
 			uint32_t stages[VULKAN_NUM_BINDINGS] = { 0 };
 		};
-		uint32_t input_mask = 0;
-		//		uint32_t output_mask = 0;
-		uint32_t push_constant_offset = 0;
-		uint32_t push_constant_range = 0;
-		uint32_t spec_constant_mask = 0;
+
 		DescriptorSetLayout descriptorSets[VULKAN_NUM_DESCRIPTOR_SETS];
+		std::vector<VkPushConstantRange> pushConstants;
 	};
 
 	CShadersReflections();
@@ -120,16 +120,14 @@ public:
 
 	const std::vector<ShaderProgramInfo> &GetPrograms() { return m_programs; }
 	const ResourceLayout &GetLayout() { return m_layout; }
+
 private:
-
-
-	//std::vector<VertexAttribDesc> m_VertexAttribs;
 	VkPipelineVertexInputStateCreateInfo m_vertexInputInfo;
-	//BAMS::RENDERINENGINE::VertexDescription m_VertexDescription;
 
 	VertexAttribInfo vi;
 
 	std::vector<ValDetails> m_ubos;
+	std::vector<ValDetails> m_push_constants;
 	std::vector<ShaderProgramInfo> m_programs;
 	ResourceLayout m_layout;
 

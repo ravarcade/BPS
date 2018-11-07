@@ -126,8 +126,7 @@ void FindVertexAttribFormatAndSize(VertexAttribDesc &vd)
 
 void GetDetails(CompilerGLSL &comp, Resource &res, ValDetails &det)
 {
-
-	ShaderReflectionType typeConv[] = {
+	static ShaderReflectionType typeConv[] = {
 		ShaderReflectionType::UNKNOWN, // BaseType::Unknown
 		ShaderReflectionType::UNKNOWN, // BaseType::Void
 		ShaderReflectionType::UNKNOWN, // BaseType::Boolean
@@ -149,7 +148,7 @@ void GetDetails(CompilerGLSL &comp, Resource &res, ValDetails &det)
 		ShaderReflectionType::UNKNOWN, // BaseType::Sampler
 	};
 
-	uint32_t typeSize[] = {
+	static uint32_t typeSize[] = {
 		0, 0, 0, 1, 4,
 		4, 8, 8, 0, 2,
 		4, 8, 0, 0, 0,
@@ -164,6 +163,7 @@ void GetDetails(CompilerGLSL &comp, Resource &res, ValDetails &det)
 	det.set     = comp.has_decoration(res.id, spv::DecorationDescriptorSet) ? det.set = comp.get_decoration(res.id, spv::DecorationDescriptorSet) : 0;
 	det.binding = comp.has_decoration(res.id, spv::DecorationBinding) ? comp.get_decoration(res.id, spv::DecorationBinding) : 0;
 	ent.name = comp.get_name(res.id);
+	ent.typenName = comp.get_name(res.base_type_id);
 	ent.array = type.array.size() == 1 ? type.array[0] : 1;
 	ent.vecsize = type.vecsize;
 	ent.colsize = type.columns;
@@ -172,17 +172,19 @@ void GetDetails(CompilerGLSL &comp, Resource &res, ValDetails &det)
 	{
 		ent.size = static_cast<uint32_t>(comp.get_declared_struct_size(comp.get_type(res.base_type_id)));
 		auto &members = type.member_types;
-		for (uint32_t i = 0; i < members.size(); ++i) {
+		for (uint32_t i = 0; i < members.size(); ++i) 
+		{
 			SPIRType member_type = comp.get_type(members[i]);
 			ValMemberDetails mem;
 			mem.name   = comp.get_member_name(type.self, i);
+			mem.typenName = comp.get_name(members[i]);
 			mem.offset = comp.type_struct_member_offset(type, i);
 			mem.size   = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, i));
 			mem.array = !member_type.array.empty() ? member_type.array[0] : 1;
 			mem.array_stride = !member_type.array.empty() ? comp.type_struct_member_array_stride(type, i) : 0;
 			mem.vecsize = member_type.vecsize;
-			mem.colsize = member_type.columns;
-			mem.matrix_stride = member_type.columns ? comp.type_struct_member_matrix_stride(type, i) : 0;
+			mem.colsize = member_type.columns;			
+			mem.matrix_stride = comp.has_decoration(i, spv::DecorationMatrixStride) ? comp.type_struct_member_matrix_stride(type, i) : 0;
 			mem.type = typeConv[member_type.basetype];
 			det.members.push_back(mem);
 		}
@@ -263,6 +265,7 @@ void CShadersReflections::_ParsePrograms()
 			auto binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
 
 			ValDetails vd;
+			vd.stage = prg.stage;
 			GetDetails(compiler, buffer, vd);
 			m_ubos.push_back(vd);
 
@@ -275,7 +278,16 @@ void CShadersReflections::_ParsePrograms()
 			m_layout.descriptorSets[set].stages[binding] |= prg.stage;
 		}
 
-		if (prg.stage == VK_SHADER_STAGE_VERTEX_BIT) 
+		for (auto pushConst : resources.push_constant_buffers)
+		{
+			uint32_t size = static_cast<uint32_t>(compiler.get_declared_struct_size(compiler.get_type(pushConst.base_type_id)));
+			ValDetails vd;
+			vd.stage = prg.stage;
+			GetDetails(compiler, pushConst, vd);
+			m_push_constants.push_back(vd);
+		}
+
+		if (prg.stage == VK_SHADER_STAGE_VERTEX_BIT)
 		{
 			vi.attribs.clear();
 			for (auto attrib : resources.stage_inputs) 
@@ -356,6 +368,16 @@ void CShadersReflections::_ParsePrograms()
 		vdip.binding = static_cast<uint8_t>(attr.binding);
 
 		conv.ConvertAttribStreamDescription(*s, VkStream(attr.format, strides[attr.binding], vdip.data));
+	}
+
+	// push constants
+	m_layout.pushConstants.clear();
+	for (auto &pc : m_push_constants)
+	{
+		m_layout.pushConstants.push_back({
+			pc.stage,
+			0,
+			pc.entry.size });
 	}
 }
 
