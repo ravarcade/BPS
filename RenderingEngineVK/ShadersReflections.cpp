@@ -4,6 +4,7 @@
 
 using namespace spirv_cross;
 using namespace BAMS::RENDERINENGINE;
+const char *SharedUniformBufferObject = "UniformBufferObject";
 
 uint32_t FindVertexAttribType(const std::string &name)
 {
@@ -124,28 +125,45 @@ void FindVertexAttribFormatAndSize(VertexAttribDesc &vd)
 	}
 }
 
-void GetDetails(CompilerGLSL &comp, Resource &res, ValDetails &det)
+void SetSimplifiedType(ValMemberDetails &mem)
+{
+	if (mem.type == ShaderReflectionType::Float32)
+	{
+		if (mem.size == 8 && mem.vecsize == 2)
+			mem.type = ShaderReflectionType::Vec2;
+		else if (mem.size == 12 && mem.vecsize == 3)
+			mem.type = ShaderReflectionType::Vec3;
+		else if (mem.size == 16 && mem.vecsize == 4)
+			mem.type = ShaderReflectionType::Vec4;
+		else if (mem.size == 36 && mem.vecsize == 3 && mem.colsize == 3)
+			mem.type = ShaderReflectionType::Mat3;
+		else if (mem.size == 64 && mem.vecsize == 4 && mem.colsize == 4)
+			mem.type = ShaderReflectionType::Mat4;
+	}
+}
+
+void GetDetails(CompilerGLSL &comp, SPIRType &type, ValMemberDetails &ent)
 {
 	static ShaderReflectionType typeConv[] = {
-		ShaderReflectionType::UNKNOWN, // BaseType::Unknown
-		ShaderReflectionType::UNKNOWN, // BaseType::Void
-		ShaderReflectionType::UNKNOWN, // BaseType::Boolean
-		ShaderReflectionType::UNKNOWN, // BaseType::Char
-		ShaderReflectionType::Int32,   // BaseType::Int
+			ShaderReflectionType::UNKNOWN, // BaseType::Unknown
+			ShaderReflectionType::UNKNOWN, // BaseType::Void
+			ShaderReflectionType::UNKNOWN, // BaseType::Boolean
+			ShaderReflectionType::UNKNOWN, // BaseType::Char
+			ShaderReflectionType::Int32,   // BaseType::Int
 
-		ShaderReflectionType::UInt32,  // BaseType::UInt
-		ShaderReflectionType::UNKNOWN, // BaseType::Int64
-		ShaderReflectionType::UNKNOWN, // BaseType::UInt64
-		ShaderReflectionType::UNKNOWN, // BaseType::AtomicCounter
-		ShaderReflectionType::UNKNOWN, // BaseType::Half
+			ShaderReflectionType::UInt32,  // BaseType::UInt
+			ShaderReflectionType::UNKNOWN, // BaseType::Int64
+			ShaderReflectionType::UNKNOWN, // BaseType::UInt64
+			ShaderReflectionType::UNKNOWN, // BaseType::AtomicCounter
+			ShaderReflectionType::UNKNOWN, // BaseType::Half
 
-		ShaderReflectionType::Float32, // BaseType::Float
-		ShaderReflectionType::UNKNOWN, // BaseType::Double
-		ShaderReflectionType::UNKNOWN, // BaseType::Struct (UBOs too)
-		ShaderReflectionType::UNKNOWN, // BaseType::Image
-		ShaderReflectionType::UNKNOWN, // BaseType::SampledImage
+			ShaderReflectionType::Float32, // BaseType::Float
+			ShaderReflectionType::UNKNOWN, // BaseType::Double
+			ShaderReflectionType::UNKNOWN, // BaseType::Struct (UBOs too)
+			ShaderReflectionType::UNKNOWN, // BaseType::Image
+			ShaderReflectionType::UNKNOWN, // BaseType::SampledImage
 
-		ShaderReflectionType::UNKNOWN, // BaseType::Sampler
+			ShaderReflectionType::UNKNOWN, // BaseType::Sampler
 	};
 
 	static uint32_t typeSize[] = {
@@ -155,45 +173,59 @@ void GetDetails(CompilerGLSL &comp, Resource &res, ValDetails &det)
 		0
 	};
 
-	det = {};
-	auto &ent = det.entry;
-	SPIRType type = comp.get_type(res.type_id);
-	auto bitset = comp.get_decoration_bitset(res.type_id);
-	
-	det.set     = comp.has_decoration(res.id, spv::DecorationDescriptorSet) ? det.set = comp.get_decoration(res.id, spv::DecorationDescriptorSet) : 0;
-	det.binding = comp.has_decoration(res.id, spv::DecorationBinding) ? comp.get_decoration(res.id, spv::DecorationBinding) : 0;
-	ent.name = comp.get_name(res.id);
-	ent.typenName = comp.get_name(res.base_type_id);
 	ent.array = type.array.size() == 1 ? type.array[0] : 1;
 	ent.vecsize = type.vecsize;
 	ent.colsize = type.columns;
 
 	if (type.basetype == SPIRType::BaseType::Struct && type.member_types.size())
 	{
-		ent.size = static_cast<uint32_t>(comp.get_declared_struct_size(comp.get_type(res.base_type_id)));
+		//ent.size = static_cast<uint32_t>(comp.get_declared_struct_size(comp.get_type(res.base_type_id)));
+		//ent.size = static_cast<uint32_t>(comp.get_declared_struct_size(comp.get_type(type.parent_type)));
 		auto &members = type.member_types;
-		for (uint32_t i = 0; i < members.size(); ++i) 
+		for (uint32_t i = 0; i < members.size(); ++i)
 		{
 			SPIRType member_type = comp.get_type(members[i]);
 			ValMemberDetails mem;
-			mem.name   = comp.get_member_name(type.self, i);
+			mem.name = comp.get_member_name(type.self, i);
 			mem.typenName = comp.get_name(members[i]);
 			mem.offset = comp.type_struct_member_offset(type, i);
-			mem.size   = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, i));
+			mem.size = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, i));
 			mem.array = !member_type.array.empty() ? member_type.array[0] : 1;
 			mem.array_stride = !member_type.array.empty() ? comp.type_struct_member_array_stride(type, i) : 0;
 			mem.vecsize = member_type.vecsize;
-			mem.colsize = member_type.columns;			
+			mem.colsize = member_type.columns;
 			mem.matrix_stride = comp.has_decoration(i, spv::DecorationMatrixStride) ? comp.type_struct_member_matrix_stride(type, i) : 0;
 			mem.type = typeConv[member_type.basetype];
-			det.members.push_back(mem);
+			SetSimplifiedType(mem);
+			if (member_type.basetype == SPIRType::BaseType::Struct && member_type.member_types.size())
+				GetDetails(comp, member_type, mem);
+
+			ent.members.push_back(mem);
 		}
 	}
-	else if (typeConv[type.basetype] != ShaderReflectionType::UNKNOWN) 
+	else if (typeConv[type.basetype] != ShaderReflectionType::UNKNOWN)
 	{
 		ent.type = typeConv[type.basetype];
 		ent.size = typeSize[type.basetype] * ent.vecsize * ent.colsize * ent.array;
+		SetSimplifiedType(ent);
 	}
+
+}
+
+void GetDetails(CompilerGLSL &comp, Resource &res, ValDetails &det)
+{
+	det = {};
+	det.set = comp.has_decoration(res.id, spv::DecorationDescriptorSet) ? det.set = comp.get_decoration(res.id, spv::DecorationDescriptorSet) : 0;
+	det.binding = comp.has_decoration(res.id, spv::DecorationBinding) ? comp.get_decoration(res.id, spv::DecorationBinding) : 0;
+
+	det.entry.name = comp.get_name(res.id);
+	det.entry.typenName = comp.get_name(res.base_type_id);
+	SPIRType type = comp.get_type(res.type_id);
+	if (type.basetype == SPIRType::BaseType::Struct && type.member_types.size())
+	{
+		det.entry.size = static_cast<uint32_t>(comp.get_declared_struct_size(comp.get_type(res.base_type_id)));
+	}
+	GetDetails(comp, type, det.entry);
 }
 
 // ============================================================================ ShadersReflections ===
@@ -205,7 +237,7 @@ CShadersReflections::CShadersReflections(std::vector<std::string> &&programs) { 
 /// Loads shader programs.
 /// </summary>
 /// <param name="programs">The programs names from resource.</param>
-VertexAttribInfo CShadersReflections::LoadPrograms(std::vector<std::string>&& programs)
+ShaderDataInfo CShadersReflections::LoadPrograms(std::vector<std::string>&& programs)
 {
 	m_programs.resize(programs.size());
 	BAMS::CResourceManager rm;
@@ -228,6 +260,8 @@ VertexAttribInfo CShadersReflections::LoadPrograms(std::vector<std::string>&& pr
 	return vi;
 }
 
+// ============================================================================ ShadersReflections private methods ===
+
 /// <summary>
 /// Parses shader programs (with reflection from SPIRV-Cross).
 /// We get:
@@ -248,6 +282,13 @@ void CShadersReflections::_ParsePrograms()
 	};
 
 	m_enableAlpha = false;
+	vi.params_in_ubos.clear();
+	vi.params_in_push_constants.clear();
+
+	vi.total_ubos_size = 0;
+	vi.shared_ubos_size = 0;
+	vi.max_single_ubo_size = 0;
+	vi.ubo_sizes.clear();
 
 	for (auto &prg : m_programs) 
 	{		
@@ -265,9 +306,27 @@ void CShadersReflections::_ParsePrograms()
 			auto binding = compiler.get_decoration(buffer.id, spv::DecorationBinding);
 
 			ValDetails vd;
-			vd.stage = prg.stage;
 			GetDetails(compiler, buffer, vd);
-			m_ubos.push_back(vd);
+			vd.stage = prg.stage;
+			vi.params_in_ubos.push_back(vd);
+			if (vd.entry.typenName == SharedUniformBufferObject)
+			{
+				vi.shared_ubos_size += vd.entry.size;
+			}
+			else {
+				vi.total_ubos_size += vd.entry.size;
+				if (vi.max_single_ubo_size < vd.entry.size)
+					vi.max_single_ubo_size = vd.entry.size;
+
+				if (vi.ubo_sizes.size() <= vd.binding)
+				{
+					size_t i = vi.ubo_sizes.size();
+					vi.ubo_sizes.resize(vd.binding + 1);
+					for (; i < vd.binding; ++i)
+						vi.ubo_sizes[i] = 0;
+				}
+				vi.ubo_sizes[vd.binding] = vd.entry.size;
+			}
 
 			auto name = compiler.get_name(buffer.id);
 			SPIRType type = compiler.get_type(buffer.type_id);
@@ -282,9 +341,9 @@ void CShadersReflections::_ParsePrograms()
 		{
 			uint32_t size = static_cast<uint32_t>(compiler.get_declared_struct_size(compiler.get_type(pushConst.base_type_id)));
 			ValDetails vd;
-			vd.stage = prg.stage;
 			GetDetails(compiler, pushConst, vd);
-			m_push_constants.push_back(vd);
+			vd.stage = prg.stage;
+			vi.params_in_push_constants.push_back(vd);
 		}
 
 		if (prg.stage == VK_SHADER_STAGE_VERTEX_BIT)
@@ -317,6 +376,7 @@ void CShadersReflections::_ParsePrograms()
 	}
 
 	auto &strides = vi.strides;
+	strides.clear();
 	vi.size = 0;
 	for (auto &attr : vi.attribs)
 	{
@@ -372,16 +432,19 @@ void CShadersReflections::_ParsePrograms()
 
 	// push constants
 	m_layout.pushConstants.clear();
-	for (auto &pc : m_push_constants)
+	vi.push_constatns_size = 0;
+	for (auto &pc : vi.params_in_push_constants)
 	{
 		m_layout.pushConstants.push_back({
 			pc.stage,
 			0,
 			pc.entry.size });
+		vi.push_constatns_size += pc.entry.size;
 	}
+
+	
 }
 
-// ============================================================================ ShadersReflections private methods ===
 
 
 

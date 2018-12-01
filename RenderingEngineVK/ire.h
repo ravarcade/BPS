@@ -24,14 +24,15 @@ struct QueueFamilyIndices
 
 class OutputWindow
 {
-	struct UniformBufferObject
+private:
+	struct SharedUniformBufferObject
 	{
 //		glm::mat4 model;
 		glm::mat4 view;
 		glm::mat4 proj;
 	};
 
-private:
+
 	VkInstance instance;				// required to: (1) create and destroy VkSurfaceKHR, (2) select physical device matching surface
 	VkPhysicalDevice physicalDevice;
 	int wnd;
@@ -62,19 +63,17 @@ private:
 	VkSemaphore imageAvailableSemaphore;
 	VkSemaphore renderFinishedSemaphore;
 	VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-
+	VkBuffer        sharedUniformBuffer = nullptr;
+	VkDeviceMemory  sharedUniformBufferMemory = nullptr;
 	//		CShadersReflections cubeShader;
 
 	// === for demo cube ===
 	VkPipeline graphicsPipeline;
-	VkBuffer uniformBuffer;
-	VkDeviceMemory uniformBufferMemory;
 	VkDescriptorPool descriptorPool;
-	VkDescriptorSet descriptorSet;
+	VkDescriptorSet currentDescriptorSet;
 	std::vector<VkCommandBuffer> commandBuffers;
 
 	bool _IsDeviceSuitable(VkPhysicalDevice device);
-	QueueFamilyIndices _FindQueueFamilies(VkPhysicalDevice device);
 	VkFormat _FindDepthFormat();
 	VkFormat _FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
@@ -96,15 +95,19 @@ private:
 	bool _CreateSwapChain();
 	void _CleanupSwapChain();
 
+	void _CreateSharedUniform();
+	void _CleanupSharedUniform();
 
 	void _CreateDemoCube();
-	void _CleanupDemoCube();
-	void _CreateUniformBuffer();
 	void _CreateDescriptorPool();
-	void _CreateDescriptorSet();
 	void _CreateCommandBuffers();
+	VkRenderPass _CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples);
 
-	UniformBufferObject *m_ubodata = nullptr;
+	SharedUniformBufferObject *sharedUboData = nullptr;
+
+	void _LoadShaderPrograms();
+	void _CleanupShaderPrograms();
+
 public:
 	OutputWindow();
 	void Init();

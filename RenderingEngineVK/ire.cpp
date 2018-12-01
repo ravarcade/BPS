@@ -291,6 +291,7 @@ void OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _window, 
 
 	if (_CreateSwapChain())
 	{
+		_LoadShaderPrograms();
 		_CreateDemoCube();
 	}
 }
@@ -395,81 +396,8 @@ bool OutputWindow::_CreateSwapChain()
 	}
 
 	// ------------------------------------------------------------------------ create render pass
-	VkAttachmentDescription colorAttachment = {};
-	colorAttachment.format = swapChainImageFormat;
-	colorAttachment.samples = msaaSamples;
-	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	colorAttachment.finalLayout = msaaSamples == VK_SAMPLE_COUNT_1_BIT ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-	VkAttachmentDescription depthAttachment = {};
-	depthAttachment.format = _FindDepthFormat();
-	depthAttachment.samples = msaaSamples;
-	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	VkAttachmentDescription colorAttachmentResolve = {};
-	colorAttachmentResolve.format = swapChainImageFormat;
-	colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
-	colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-	colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-	colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-	VkAttachmentReference colorAttachmentRef = {};
-	colorAttachmentRef.attachment = 0;
-	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	VkAttachmentReference depthAttachmentRef = {};
-	depthAttachmentRef.attachment = 1;
-	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-	VkAttachmentReference colorAttachmentResolveRef = {};
-	colorAttachmentResolveRef.attachment = 2;
-	colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-	VkSubpassDescription subpass = {};
-	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorAttachmentRef;
-	subpass.pDepthStencilAttachment = &depthAttachmentRef;
-	subpass.pResolveAttachments = msaaSamples != VK_SAMPLE_COUNT_1_BIT ?  &colorAttachmentResolveRef : nullptr;
-
-	VkSubpassDependency dependency = {};
-	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.dstSubpass = 0;
-	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.srcAccessMask = 0;
-	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-
-
-	std::vector<VkAttachmentDescription> attachments = { colorAttachment, depthAttachment };
-	if (msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-		attachments.emplace_back(colorAttachmentResolve);
-	
-	VkRenderPassCreateInfo renderPassInfo = {};
-	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	renderPassInfo.pAttachments = attachments.data();
-	renderPassInfo.subpassCount = 1;
-	renderPassInfo.pSubpasses = &subpass;
-	renderPassInfo.dependencyCount = 1;
-	renderPassInfo.pDependencies = &dependency;
-
-
-	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &renderPass) != VK_SUCCESS)
-		throw std::runtime_error("failed to create render pass!");
+	renderPass = _CreateSimpleRenderPass(swapChainImageFormat, msaaSamples);
 
 	// ------------------------------------------------------------------------ create color resources
 	VkFormat colorFormat = swapChainImageFormat;
@@ -505,6 +433,8 @@ bool OutputWindow::_CreateSwapChain()
 		if (vkCreateFramebuffer(device, &framebufferInfo, allocator, &swapChainFramebuffers[i]) != VK_SUCCESS)
 			throw std::runtime_error("failed to create framebuffer!");
 	}
+
+	_CreateSharedUniform();
 
 	return true;
 }
@@ -861,10 +791,11 @@ VkShaderModule OutputWindow::_CreateShaderModule(const char *shaderName)
 
 void OutputWindow::Cleanup()
 {
-	_CleanupDemoCube();
-
+	_CleanupShaderPrograms();
 	// do nothing for: graphicsQueue, presentQueue, transferQueue;
 	_CleanupSwapChain();
+
+	vkDestroy(descriptorPool);
 
 	vkDestroy(renderFinishedSemaphore);
 	vkDestroy(imageAvailableSemaphore);
@@ -884,6 +815,8 @@ void OutputWindow::_CleanupSwapChain()
 	// it will call vkDestroy_something(device, val, allocator);
 	// ... and will set val = nullptr;
 	// same about vkFree
+
+	_CleanupSharedUniform();
 
 	vkDestroy(colorImageView);
 	vkDestroy(colorImage);
@@ -908,23 +841,35 @@ void OutputWindow::_CleanupSwapChain()
 	vkDestroy(swapChain);
 }
 
+void OutputWindow::_CreateSharedUniform()
+{
+	VkDeviceSize bufferSize = sizeof(SharedUniformBufferObject);
+	VkMemoryPropertyFlags memoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+
+	_CreateBuffer(
+		bufferSize,
+		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		memoryProperties,
+		sharedUniformBuffer, sharedUniformBufferMemory);
+
+	vkMapMemory(device, sharedUniformBufferMemory, 0, sizeof(bufferSize), 0, (void **)&sharedUboData);
+}
+
+void OutputWindow::_CleanupSharedUniform()
+{
+	if (sharedUboData) {
+		vkUnmapMemory(device, sharedUniformBufferMemory);
+		sharedUboData = nullptr;
+	}
+
+	vkDestroy(sharedUniformBuffer);
+	vkFree(sharedUniformBufferMemory);
+}
+
 // ============================================================================ Demo Cube ===
 
 void OutputWindow::_CreateDemoCube()
 {
-	cubeShader.SetParentOutputWindow(this);
-	cubeShader.LoadPrograms({ "vert2", "frag" });
-	auto outputNames = cubeShader.GetOutputNames();
-//	QueueFamilyIndices indices(physicalDevice, surface);
-//	cubeShader.Prepare(physicalDevice, device, allocator, indices.graphicsFamily, indices.presentFamily, indices.transferFamily);
-	// select renderPass
-	if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
-	{
-		cubeShader.SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
-	}
-	graphicsPipeline = cubeShader.CreateGraphicsPipeline();
-
-	// --------------------------------------------------------------------
 	using namespace BAMS::RENDERINENGINE;
 	VertexDescription vd;
 	vd.m_numVertices = static_cast<U32>(vertices.size());
@@ -934,44 +879,32 @@ void OutputWindow::_CreateDemoCube()
 	vd.m_indices = Stream(IDX_UINT16_1D, sizeof(indices[0]), false, (U8 *)indices.data());
 
 	auto &rp = cubeShader;
-	rp.CreateModelBuffers(static_cast<uint32_t>(vertices.size()), static_cast<uint32_t>(indices.size()), 1);
-	rp.SendVertexData(vd);
+	// we will set here:
+	// - num of vertices
+	// - num of indices
+	// - num of objects
+	rp.CreateModelBuffers(static_cast<uint32_t>(vertices.size()), static_cast<uint32_t>(indices.size()), 3);
+	uint32_t modelId = rp.SendVertexData(vd);
+	uint32_t MId = rp.GetParamId("model");
+	uint32_t baseColorId = rp.GetParamId("baseColor");
+	float colors[][4] = {
+		{ 0.1, 1, 1, 1 },
+		{ 1, 0.1, 1, 1 },
+		{ 1, 1, 0.1, 1 }
+	};
+	static auto startTime = std::chrono::high_resolution_clock::now();
 
-	//Add3DModel(0, 0);
-	//_CreateVertexBuffer();
-	//_CreateIndexBuffer();
-	_CreateUniformBuffer();
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
+	for (uint32_t i = 0; i < 3; ++i)
+	{
+		glm::mat4 model = glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(i * 2 - 2.0, 0, 0)), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
-	_CreateDescriptorPool();
-	_CreateDescriptorSet();
-	_CreateCommandBuffers();
-}
-
-void OutputWindow::_CleanupDemoCube()
-{
-	if (m_ubodata) {
-		vkUnmapMemory(device, uniformBufferMemory);
-		m_ubodata = nullptr;
+		rp.SetParam(i, baseColorId, &colors[i]);
+		rp.SetParam(i, MId, &model);
 	}
-	
-	cubeShader.Release();
-	
-	vkDestroy(descriptorPool);
 
-	vkDestroy(uniformBuffer);
-	vkFree(uniformBufferMemory);
-}
-
-void OutputWindow::_CreateUniformBuffer()
-{
-	VkDeviceSize bufferSize = sizeof(UniformBufferObject);
-	_CreateBuffer(
-		bufferSize, 
-		VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, 
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 
-		uniformBuffer, uniformBufferMemory);
-
-	vkMapMemory(device, uniformBufferMemory, 0, sizeof(bufferSize), 0, (void **)&m_ubodata);
+	_CreateCommandBuffers();
 }
 
 void OutputWindow::_CreateDescriptorPool()
@@ -1000,62 +933,6 @@ void OutputWindow::_CreateDescriptorPool()
 
 // ------------------------------------------------------------------------
 
-void OutputWindow::_CreateDescriptorSet()
-{
-	auto &layouts = cubeShader.GetDescriptorSetLayout();
-
-//	VkDescriptorSetLayout layouts[] = { descriptorSetLayout };
-	VkDescriptorSetAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = descriptorPool;
-	allocInfo.descriptorSetCount = static_cast<uint32_t>(layouts.size());
-	allocInfo.pSetLayouts = layouts.data();
-
-	if (vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
-		throw std::runtime_error("failed to allocate descriptor set!");
-	}
-
-	VkDescriptorBufferInfo bufferInfo = {};
-	bufferInfo.buffer = uniformBuffer;
-	bufferInfo.offset = 0;
-	bufferInfo.range = sizeof(UniformBufferObject);
-	/*
-	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = _textureImageView;
-	imageInfo.sampler = _textureSampler;
-	*/
-
-	/*	std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
-
-	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[0].dstSet = _descriptorSet;
-	descriptorWrites[0].dstBinding = 0;
-	descriptorWrites[0].dstArrayElement = 0;
-	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorWrites[0].descriptorCount = 1;
-	descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[1].dstSet = _descriptorSet;
-	descriptorWrites[1].dstBinding = 1;
-	descriptorWrites[1].dstArrayElement = 0;
-	descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorWrites[1].descriptorCount = 1;
-	descriptorWrites[1].pImageInfo = &imageInfo;
-	*/
-	std::array<VkWriteDescriptorSet, 1> descriptorWrites = {};
-
-	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[0].dstSet = descriptorSet;
-	descriptorWrites[0].dstBinding = 0;
-	descriptorWrites[0].dstArrayElement = 0;
-	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorWrites[0].descriptorCount = 1;
-	descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-	vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-}
 
 void OutputWindow::_CreateCommandBuffers()
 {
@@ -1070,6 +947,7 @@ void OutputWindow::_CreateCommandBuffers()
 	if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
 		throw std::runtime_error("failed to allocate command buffers!");
 	}
+	currentDescriptorSet = nullptr;
 
 	for (size_t i = 0; i < commandBuffers.size(); i++) {
 		VkCommandBufferBeginInfo beginInfo = {};
@@ -1116,9 +994,11 @@ void OutputWindow::_CreateCommandBuffers()
 
 		vkCmdSetViewport(commandBuffers[i], 0, 1, &viewport);
 		vkCmdSetScissor(commandBuffers[i], 0, 1, &scissor);
-		vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, cubeShader.GetPipelineLayout() /*pipelineLayout*/, 0, 1, &descriptorSet, 0, nullptr);
 
 		cubeShader.DrawObject(commandBuffers[i], 0);
+		cubeShader.DrawObject(commandBuffers[i], 1);
+		cubeShader.DrawObject(commandBuffers[i], 2);
+
 //		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 		//		vkCmdBindIndexBuffer(_commandBuffers[i], _indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 //		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
@@ -1155,15 +1035,7 @@ void OutputWindow::_CreateCommandBuffers()
 		}
 		*/
 //		vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-		VkClearAttachment ca = {
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			0,
-			{ 0.2f, 0.8f, 0.2f, 1.0f }};
-		VkClearRect cr = {
-			{{0, 0}, {100, 100}},
-			0,
-			1};
-		vkCmdClearAttachments(commandBuffers[i], 1, &ca, 1, &cr);
+
 		vkCmdEndRenderPass(commandBuffers[i]);
 
 		if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -1172,35 +1044,137 @@ void OutputWindow::_CreateCommandBuffers()
 	}
 }
 
+VkRenderPass OutputWindow::_CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples)
+{
+	VkAttachmentDescription colorAttachment = {};
+	colorAttachment.format = format;
+	colorAttachment.samples = samples;
+	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colorAttachment.finalLayout = msaaSamples == VK_SAMPLE_COUNT_1_BIT ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentDescription depthAttachment = {};
+	depthAttachment.format = _FindDepthFormat();
+	depthAttachment.samples = samples;
+	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentDescription colorAttachmentResolve = {};
+	colorAttachmentResolve.format = format;
+	colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+	colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+	VkAttachmentReference colorAttachmentRef = {};
+	colorAttachmentRef.attachment = 0;
+	colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference depthAttachmentRef = {};
+	depthAttachmentRef.attachment = 1;
+	depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+	VkAttachmentReference colorAttachmentResolveRef = {};
+	colorAttachmentResolveRef.attachment = 2;
+	colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.colorAttachmentCount = 1;
+	subpass.pColorAttachments = &colorAttachmentRef;
+	subpass.pDepthStencilAttachment = &depthAttachmentRef;
+	subpass.pResolveAttachments = msaaSamples != VK_SAMPLE_COUNT_1_BIT ? &colorAttachmentResolveRef : nullptr;
+
+	VkSubpassDependency dependency = {};
+	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependency.dstSubpass = 0;
+	dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependency.srcAccessMask = 0;
+	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+
+	std::vector<VkAttachmentDescription> attachments = { colorAttachment, depthAttachment };
+	if (msaaSamples != VK_SAMPLE_COUNT_1_BIT)
+		attachments.emplace_back(colorAttachmentResolve);
+
+	VkRenderPassCreateInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	renderPassInfo.pAttachments = attachments.data();
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = 1;
+	renderPassInfo.pDependencies = &dependency;
+
+	VkRenderPass ret; 
+
+	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &ret) != VK_SUCCESS)
+		throw std::runtime_error("failed to create render pass!");
+
+	return ret;
+}
+
+void OutputWindow::_LoadShaderPrograms()
+{
+	cubeShader.SetParentOutputWindow(this);				// vefore we can use "shader program" we must set "parent window"
+	cubeShader.LoadPrograms({ "vert2", "frag" });		// load & parse shader program
+
+	_CreateDescriptorPool();                            // create descriptor pool for all used shader programs
+
+
+	auto outputNames = cubeShader.GetOutputNames();		// select renderPass base on names of output attachments in fragment shader
+	if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
+	{
+		cubeShader.SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
+	}
+	graphicsPipeline = cubeShader.CreateGraphicsPipeline();
+
+	cubeShader.CreateDescriptorSets();
+	cubeShader.UpdateDescriptorSets();
+}
+
+void OutputWindow::_CleanupShaderPrograms()
+{
+	cubeShader.Release();
+}
+
 void OutputWindow::UpdateUniformBuffer()
 {
-	if (!m_ubodata)
+	if (!sharedUboData)
 		return;
 	static auto startTime = std::chrono::high_resolution_clock::now();
 
 	auto currentTime = std::chrono::high_resolution_clock::now();
 	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
+	time = fmod(time, 2.0f);
+	if (time > 1.0f)
+		time = 2.0f - time;
 //	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	//	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 //	UniformBufferObject ubo = {};
-	UniformBufferObject &ubo = *m_ubodata;
-	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	auto &ubo = *sharedUboData;
+	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f + time, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
 	ubo.proj[1][1] *= -1;
-
-	return;
-	void* data;
-	vkMapMemory(device, uniformBufferMemory, 0, sizeof(ubo), 0, &data);
-	memcpy(data, &ubo, sizeof(ubo));
-	vkUnmapMemory(device, uniformBufferMemory);
 }
 
 void OutputWindow::RecreateSwapChain()
 {
 	vkDeviceWaitIdle(device);
 
-	_CleanupDemoCube();
 	_CleanupSwapChain();
 	
 	if (_CreateSwapChain())
@@ -1225,7 +1199,7 @@ void OutputWindow::DrawFrame()
 	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 		throw std::runtime_error("failed to acquire swap chain image!");
 	}
-	if (!m_ubodata)
+	if (!sharedUboData)
 		return;
 
 	VkSubmitInfo submitInfo = {};
@@ -1391,17 +1365,17 @@ using namespace RENDERINENGINE;
 
 void ire::Add3DModel(int wnd, const RenderingModel * params)
 {
+	using namespace BAMS::RENDERINENGINE;
 	VertexDescription vd;
 	vd.m_numVertices = static_cast<U32>(vertices.size());
 	vd.m_numIndices = static_cast<U32>(indices.size());
-	vd.m_vertices = Stream(FLOAT_3D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(Vertex, pos));
-	vd.m_colors[0] = Stream(COL_UINT8_4D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(Vertex, color));
+	vd.m_vertices = Stream(FLOAT_3D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(ire::Vertex, pos));
+	vd.m_colors[0] = Stream(COL_UINT8_4D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(ire::Vertex, color));
 	vd.m_indices = Stream(IDX_UINT16_1D, sizeof(indices[0]), false, (U8 *)indices.data());
-	
+
 	auto &rp = outputWindows[wnd].cubeShader;
 	rp.CreateModelBuffers(static_cast<uint32_t>(vertices.size()), static_cast<uint32_t>(indices.size()), 1);
 	rp.SendVertexData(vd);
-//	ownd.cubeShader.;
 
 }
 

@@ -4,7 +4,13 @@
 static const unsigned VULKAN_NUM_DESCRIPTOR_SETS = 4;
 static const unsigned VULKAN_NUM_BINDINGS = 16;
 
-
+struct ObjectMemoryRequirements
+{
+	uint32_t pushConstants;
+	std::vector<uint32_t> ubos;
+	uint32_t totalUbos;
+	uint32_t maxUbos;
+};
 
 struct VertexAttribDesc {
 	enum {
@@ -36,11 +42,42 @@ struct VertexAttribDesc {
 	uint32_t offset;	// offset in binding
 };
 
-struct VertexAttribInfo {
+
+struct ValMemberDetails {
+	std::string name = "";
+	std::string typenName = "";
+	uint32_t type = 0;     // int/float
+	uint32_t vecsize = 0;  // num in row (1 - scaler, 2~4 vec2~vec4,...)
+	uint32_t colsize = 0;  // matrix columns
+	uint32_t matrix_stride = 0;
+	uint32_t array = 0;
+	uint32_t array_stride;
+	uint32_t location = 0;
+	uint32_t offset = 0;
+	uint32_t size = 0;
+	std::vector<ValMemberDetails> members;
+};
+
+struct ValDetails {
+	uint32_t set = 0;
+	uint32_t binding = 0;
+	uint32_t stage = VK_SHADER_STAGE_VERTEX_BIT;
+	ValMemberDetails entry;
+};
+
+struct ShaderDataInfo {
 	BAMS::RENDERINENGINE::VertexDescription descriptions;
 	std::vector<VertexAttribDesc> attribs;
 	std::vector<uint32_t> strides;
 	uint32_t size;
+
+	std::vector<ValDetails> params_in_ubos;
+	std::vector<ValDetails> params_in_push_constants;
+	uint32_t push_constatns_size;
+	uint32_t shared_ubos_size;
+	uint32_t total_ubos_size;
+	uint32_t max_single_ubo_size;
+	std::vector<uint32_t> ubo_sizes;
 };
 
 union VertexDescriptionInfoPack {
@@ -62,29 +99,11 @@ enum ShaderReflectionType {
 	Int8 = 5,
 	UInt8 = 6,
 	Float32 = 7,
-};
-
-struct ValMemberDetails {
-	std::string name = "";
-	std::string typenName = "";
-	uint32_t type = 0;     // int/float
-	uint32_t vecsize = 0;  // num in row (1 - scaler, 2~4 vec2~vec4,...)
-	uint32_t colsize = 0;  // matrix columns
-	uint32_t matrix_stride = 0;
-	uint32_t array = 0;
-	uint32_t array_stride;
-	uint32_t location = 0;
-	uint32_t offset = 0;
-	uint32_t size = 0;
-};
-
-struct ValDetails {
-	uint32_t set = 0;
-	uint32_t binding = 0;
-	uint32_t stage = VK_SHADER_STAGE_VERTEX_BIT;
-	ValMemberDetails entry;
-
-	std::vector<ValMemberDetails> members;
+	Vec2 = 8,
+	Vec3 = 9,
+	Vec4 = 10,
+	Mat3 = 11,
+	Mat4 = 12
 };
 
 class CShadersReflections
@@ -95,7 +114,6 @@ public:
 		::BAMS::CRawData resource;
 		std::string entryPointName;
 		VkShaderStageFlagBits stage;
-		//	VkShaderModule shaderModule;
 	};
 
 	struct ResourceLayout {
@@ -112,7 +130,7 @@ public:
 	CShadersReflections();
 	CShadersReflections(std::vector<std::string> &&programs);
 
-	VertexAttribInfo LoadPrograms(std::vector<std::string> &&programs);
+	ShaderDataInfo LoadPrograms(std::vector<std::string> &&programs);
 	void Release();
 
 	const std::vector<std::string> &GetOutputNames() { return m_outputNames; }
@@ -122,12 +140,8 @@ public:
 	const ResourceLayout &GetLayout() { return m_layout; }
 
 private:
-	VkPipelineVertexInputStateCreateInfo m_vertexInputInfo;
+	ShaderDataInfo vi;
 
-	VertexAttribInfo vi;
-
-	std::vector<ValDetails> m_ubos;
-	std::vector<ValDetails> m_push_constants;
 	std::vector<ShaderProgramInfo> m_programs;
 	ResourceLayout m_layout;
 
