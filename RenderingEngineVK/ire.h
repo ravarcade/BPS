@@ -51,7 +51,7 @@ private:
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
-	VkRenderPass renderPass;
+	VkRenderPass renderPass = nullptr;
 	VkImage depthImage;
 	VkDeviceMemory depthImageMemory;
 	VkImageView depthImageView;
@@ -98,10 +98,13 @@ private:
 	void _CreateSharedUniform();
 	void _CleanupSharedUniform();
 
+	void _CreateRenderPass();
+	void _CleanupRenderPass();
+
 	void _CreateDemoCube();
 	void _CreateDescriptorPool();
 	void _CreateCommandBuffers();
-	VkRenderPass _CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples);
+	void _CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples);
 
 	SharedUniformBufferObject *sharedUboData = nullptr;
 

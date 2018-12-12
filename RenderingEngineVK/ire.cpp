@@ -289,10 +289,13 @@ void OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _window, 
 
 	// ------------------------------------------------------------------------ 
 
+	_CreateRenderPass();
 	if (_CreateSwapChain())
 	{
+		_CreateSharedUniform(); // we need to create shared uniform before we call _LoadShadersPrograms?
 		_LoadShaderPrograms();
 		_CreateDemoCube();
+		_CreateCommandBuffers();
 	}
 }
 
@@ -395,9 +398,10 @@ bool OutputWindow::_CreateSwapChain()
 		swapChainImageViews[i] = _CreateImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 	}
 
-	// ------------------------------------------------------------------------ create render pass
+//	// ------------------------------------------------------------------------ create render pass
 
-	renderPass = _CreateSimpleRenderPass(swapChainImageFormat, msaaSamples);
+//	if (renderPass == nullptr)
+//		_CreateSimpleRenderPass(swapChainImageFormat, msaaSamples);
 
 	// ------------------------------------------------------------------------ create color resources
 	VkFormat colorFormat = swapChainImageFormat;
@@ -414,6 +418,7 @@ bool OutputWindow::_CreateSwapChain()
 
 	// ------------------------------------------------------------------------ create frame buffers
 	swapChainFramebuffers.resize(swapChainImageViews.size());
+	printf("using renderpass: %x\n", renderPass);
 
 	for (size_t i = 0; i < swapChainImageViews.size(); i++) 
 	{
@@ -433,8 +438,6 @@ bool OutputWindow::_CreateSwapChain()
 		if (vkCreateFramebuffer(device, &framebufferInfo, allocator, &swapChainFramebuffers[i]) != VK_SUCCESS)
 			throw std::runtime_error("failed to create framebuffer!");
 	}
-
-	_CreateSharedUniform();
 
 	return true;
 }
@@ -793,8 +796,9 @@ void OutputWindow::Cleanup()
 {
 	_CleanupShaderPrograms();
 	// do nothing for: graphicsQueue, presentQueue, transferQueue;
+	_CleanupSharedUniform();
 	_CleanupSwapChain();
-
+	_CleanupRenderPass();
 	vkDestroy(descriptorPool);
 
 	vkDestroy(renderFinishedSemaphore);
@@ -816,8 +820,6 @@ void OutputWindow::_CleanupSwapChain()
 	// ... and will set val = nullptr;
 	// same about vkFree
 
-	_CleanupSharedUniform();
-
 	vkDestroy(colorImageView);
 	vkDestroy(colorImage);
 	vkFree(colorImageMemory);
@@ -825,8 +827,6 @@ void OutputWindow::_CleanupSwapChain()
 	vkDestroy(depthImageView);
 	vkDestroy(depthImage);
 	vkFree(depthImageMemory);
-
-	vkDestroy(renderPass);
 
 	vkFree(commandPool, commandBuffers);
 
@@ -866,10 +866,24 @@ void OutputWindow::_CleanupSharedUniform()
 	vkFree(sharedUniformBufferMemory);
 }
 
+void OutputWindow::_CreateRenderPass()
+{
+	SwapChainSupportDetails swapChainSupport(physicalDevice, surface);
+	VkSurfaceFormatKHR surfaceFormat = ire::_ChooseSwapSurfaceFormat(swapChainSupport.formats);
+	_CreateSimpleRenderPass(surfaceFormat.format, msaaSamples);
+}
+
+void OutputWindow::_CleanupRenderPass()
+{
+	printf("destroy renderpass: %x\n", renderPass);
+	vkDestroy(renderPass);
+}
+
 // ============================================================================ Demo Cube ===
 
 void OutputWindow::_CreateDemoCube()
 {
+	// 3d model definition
 	using namespace BAMS::RENDERINENGINE;
 	VertexDescription vd;
 	vd.m_numVertices = static_cast<U32>(vertices.size());
@@ -885,6 +899,7 @@ void OutputWindow::_CreateDemoCube()
 	// - num of objects
 	rp.CreateModelBuffers(static_cast<uint32_t>(vertices.size()), static_cast<uint32_t>(indices.size()), 3);
 	uint32_t modelId = rp.SendVertexData(vd);
+
 	uint32_t MId = rp.GetParamId("model");
 	uint32_t baseColorId = rp.GetParamId("baseColor");
 	float colors[][4] = {
@@ -903,8 +918,6 @@ void OutputWindow::_CreateDemoCube()
 		rp.SetParam(i, baseColorId, &colors[i]);
 		rp.SetParam(i, MId, &model);
 	}
-
-	_CreateCommandBuffers();
 }
 
 void OutputWindow::_CreateDescriptorPool()
@@ -948,6 +961,7 @@ void OutputWindow::_CreateCommandBuffers()
 		throw std::runtime_error("failed to allocate command buffers!");
 	}
 	currentDescriptorSet = nullptr;
+	printf("create buffers: using renderpass: %x\n", renderPass);
 
 	for (size_t i = 0; i < commandBuffers.size(); i++) {
 		VkCommandBufferBeginInfo beginInfo = {};
@@ -1044,8 +1058,9 @@ void OutputWindow::_CreateCommandBuffers()
 	}
 }
 
-VkRenderPass OutputWindow::_CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples)
+void OutputWindow::_CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples)
 {
+	// create render passes
 	VkAttachmentDescription colorAttachment = {};
 	colorAttachment.format = format;
 	colorAttachment.samples = samples;
@@ -1118,12 +1133,9 @@ VkRenderPass OutputWindow::_CreateSimpleRenderPass(VkFormat format, VkSampleCoun
 	renderPassInfo.dependencyCount = 1;
 	renderPassInfo.pDependencies = &dependency;
 
-	VkRenderPass ret; 
-
-	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &ret) != VK_SUCCESS)
+	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &renderPass) != VK_SUCCESS)
 		throw std::runtime_error("failed to create render pass!");
-
-	return ret;
+	printf("renderpass: %x\n", renderPass);
 }
 
 void OutputWindow::_LoadShaderPrograms()
@@ -1179,7 +1191,8 @@ void OutputWindow::RecreateSwapChain()
 	
 	if (_CreateSwapChain())
 	{
-		_CreateDemoCube();
+//		_CreateDemoCube();
+		_CreateCommandBuffers();
 	}
 }
 
