@@ -306,12 +306,12 @@ struct MonitoredDir
 
 // ============================================================================ DirectoryChangeNotifier::InternalData ===
 
-struct DirectoryChangeNotifier::InternalData : public MemoryAllocatorStatic<>
+struct DirectoryChangeNotifier::InternalData : public Allocators::Ext<>
 {
 
 private:
 	std::mutex _monitoredDirsAccessMutex;
-	basic_array<MonitoredDir *, Allocator> _monitoredDirs;
+	basic_array<MonitoredDir *, Allocators::default> _monitoredDirs;
 	MonitoredDir::EventQueue _eventsQueue;
 	WSTR _fileName;
 	WSTR _fileNameRenameTo;
@@ -322,7 +322,7 @@ public:
 	InternalData() :
 		_fileName(1000),
 		_fileNameRenameTo(224),
-		_eventsQueue(8192) // 8kB in for first memory block for events. More block can be added later.
+		_eventsQueue()
 	{}
 
 	virtual ~InternalData()

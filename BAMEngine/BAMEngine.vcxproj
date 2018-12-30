@@ -183,8 +183,8 @@
     <ClInclude Include="..\Src\Core_Message.h" />
     <ClInclude Include="..\Src\Core_Module.h" />
     <ClInclude Include="..\Src\Core_Queue.h" />
-    <ClInclude Include="..\Src\Core_RawData.h" />
-    <ClInclude Include="..\Src\Core_ResourceManager.h" />
+    <ClInclude Include="..\Src\RawData.h" />
+    <ClInclude Include="..\Src\ResourceManager.h" />
     <ClInclude Include="..\Src\Core_Strings.h" />
     <ClInclude Include="..\Src\Core_Tools.h" />
     <ClInclude Include="..\Src\Core_Types.h" />
@@ -210,7 +210,7 @@
     <ClCompile Include="..\Src\Core_Engine.cpp" />
     <ClCompile Include="..\Src\Core_MemoryAllocator.cpp" />
     <ClCompile Include="..\Src\Core_Module.cpp" />
-    <ClCompile Include="..\Src\Core_ResourceManager.cpp" />
+    <ClCompile Include="..\Src\ResourceManager.cpp" />
     <ClCompile Include="..\Src\Core_Tools.cpp" />
     <ClCompile Include="..\Src\Core_Types.cpp" />
     <ClCompile Include="..\Src\DllInterface_IResourceManager.cpp" />

@@ -19,12 +19,12 @@ struct basic_array_base
 /***
 * Use it for simple data type or simple struct (without own memory allocation). So, if in stuct you have String object, when it will crash.
 */
-template <typename T, class Alloc = Allocators::Default, SIZE_T minReservedSize = 48>
+template <typename T, MemoryAllocator _allocator = Allocators::default, SIZE_T minReservedSize = 48>
 class basic_array : public basic_array_base<T>
 {
-	typedef basic_array<T, Alloc, minReservedSize> _T;
+	typedef basic_array<T, _allocator, minReservedSize> _T;
 	typedef basic_array_base<T> _B;
-	typedef MemoryAllocatorStatic<Alloc> _allocator;
+
 
 	void _Realocate(SIZE_T newSize)
 	{
@@ -37,7 +37,7 @@ class basic_array : public basic_array_base<T>
 			_Copy(_buf, oldBuf, _used);
 
 		if (oldBuf)
-			_allocator::deallocate(oldBuf);
+			_allocator->deallocate(oldBuf);
 	}
 
 	void _Copy(T *dst, const T *src, SIZE_T len)
@@ -58,7 +58,7 @@ class basic_array : public basic_array_base<T>
 		}
 	}
 
-	void _Allocate() { _buf = static_cast<T *>(_allocator::allocate(_reserved * sizeof(T))); }
+	void _Allocate() { _buf = static_cast<T *>(_allocator->allocate(_reserved * sizeof(T))); }
 
 	void _InitializeEntry(T * begin, T * end)
 	{
@@ -76,7 +76,7 @@ public:
 	basic_array(std::initializer_list<T> list) : _B(list.size()) { _Allocate();	_Append(list.size(), list.begin()); }
 	basic_array(_T &&src) : _B(src._reserved, src._used, src._buf) { src._reserved = 0; src._used = 0; src._buf = nullptr; }
 
-	~basic_array() { if (_buf) _allocator::deallocate(_buf); }
+	~basic_array() { if (_buf) _allocator->deallocate(_buf); }
 
 	T operator[](SIZE_T pos) const { return (pos < _used && pos >= 0) ? _buf[pos] : 0; };
 	T& operator[](SIZE_T pos) { return (pos < _used && pos >= 0) ? _buf[pos] : _buf[0]; };
@@ -130,7 +130,7 @@ public:
 		_reserved = 0;
 		if (_buf)
 		{
-			_allocator::deallocate(_buf);
+			_allocator->deallocate(_buf);
 			_buf = nullptr;
 		}
 	}
@@ -138,12 +138,11 @@ public:
 	void resize(SIZE_T newSize) { _Realocate(newSize); }
 };
 
-template <typename T, class Alloc = Allocators::Default, SIZE_T minReservedSize = 48>
+template <typename T, MemoryAllocator _allocator = Allocators::default, SIZE_T minReservedSize = 48>
 class object_array : public basic_array_base<T>
 {
-	typedef object_array<T, Alloc, minReservedSize> _T;
+	typedef object_array<T, _allocator, minReservedSize> _T;
 	typedef basic_array_base<T> _B;
-	typedef MemoryAllocatorStatic<Alloc> _allocator;
 
 	void _Realocate(SIZE_T newSize)
 	{
@@ -156,7 +155,7 @@ class object_array : public basic_array_base<T>
 			_Copy(_buf, oldBuf, _used);
 
 		if (oldBuf)
-			_allocator::deallocate(oldBuf);
+			_allocator->deallocate(oldBuf);
 	}
 
 	void _Construct(T *dst, const T *src, SIZE_T len)
@@ -188,7 +187,7 @@ class object_array : public basic_array_base<T>
 		}
 	}
 
-	void _Allocate() { _buf = static_cast<T *>(_allocator::allocate(_reserved * sizeof(T))); }
+	void _Allocate() { _buf = static_cast<T *>(_allocator->allocate(_reserved * sizeof(T))); }
 
 public:
 	object_array() { }
@@ -197,7 +196,7 @@ public:
 	object_array(std::initializer_list<T> list) : _B(list.size()) { _Allocate(); _Append(list.size(), list.begin()); }
 	object_array(_T &&src) : _B(src._reserved, src._used, src._buf) { src._reserved = 0; src._used = 0; src._buf = nullptr; }
 
-	~object_array() { if (_buf) _allocator::deallocate(_buf); }
+	~object_array() { if (_buf) _allocator->deallocate(_buf); }
 
 	T operator[](SIZE_T pos) const { return (pos < _used && pos >= 0) ? _buf[pos] : 0; };
 	T& operator[](SIZE_T pos) { return (pos < _used && pos >= 0) ? _buf[pos] : _buf[0]; };
@@ -231,7 +230,7 @@ public:
 		clear();
 
 		if (_buf)
-			_allocator::deallocate(oldBuf);
+			_allocator->deallocate(oldBuf);
 
 		_reserved = src._reserved;
 		_used = src._used;

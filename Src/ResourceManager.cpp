@@ -113,9 +113,9 @@ ResourceFactoryChain * ResourceFactoryChain::First = nullptr;
 // ============================================================================ ResourceManager::InternalData ===
 
 
-struct ResourceManager::InternalData : public MemoryAllocatorStatic<>
+struct ResourceManager::InternalData : public Allocators::Ext<>
 {
-	basic_array<ResourceBase *, Allocator> _resources;
+	basic_array<ResourceBase *, Allocators::default> _resources;
 	DirectoryChangeNotifier _monitoredDirs;
 	std::thread *_worker;
 	bool _killWorkerFlag;

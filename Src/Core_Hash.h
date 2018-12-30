@@ -105,7 +105,7 @@ inline U32 JSHash(const U8 *str, SIZE_T len, U32 hash = 1315423911)
 		++str;
 	}
 
-	return (hash & 0x7FFFFFFF);
+	return hash;
 }
 
 template<typename T, U32 x=1, typename = std::enable_if_t<has_method_ToBasicString<T>::value> >
@@ -132,6 +132,15 @@ template<>
 struct hash<PathSTR>
 {
 	U32 operator() (const PathSTR &key)
+	{
+		return JSHash(reinterpret_cast<const U8*>(key.begin()), key.size() * sizeof(*key.begin()));
+	}
+};
+
+template<>
+struct hash<STR>
+{
+	U32 operator() (const STR &key)
 	{
 		return JSHash(reinterpret_cast<const U8*>(key.begin()), key.size() * sizeof(*key.begin()));
 	}

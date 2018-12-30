@@ -52,17 +52,17 @@ public:
 	VkPipeline CreateGraphicsPipeline();
 	void CreatePipelineLayout();
 
-	void CreateModelBuffers(uint32_t numVertices, uint32_t numIndeces, uint32_t numObjects);
-	uint32_t SendVertexData(BAMS::RENDERINENGINE::VertexDescription src);
-	void SendVertexData(BAMS::RENDERINENGINE::VertexDescription src, void *dst);
+	uint32_t AddModel(const BAMS::RENDERINENGINE::VertexDescription &src);
+	uint32_t AddObject(uint32_t modeIdx);
+
 	uint32_t GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSize) { return _GetDescriptorPoolsSize(poolsSize); }
 	void CreateDescriptorSets();
 	void UpdateDescriptorSets();
-	void DrawObject(VkCommandBuffer &cb, uint32_t objectId);
+	void DrawObjects(VkCommandBuffer &cb);
 
 	uint32_t GetParamId(const char *name, const char *parentName = nullptr);
 	void SetParams(ShaderProgramParams *params);
-	void SetParam(uint32_t modelId, uint32_t paramId, void *pVal);
+	void SetParam(uint32_t objectId, uint32_t paramId, void *pVal);
 	const ShaderProgramParamsDesc * GetParams() { return &m_shaderProgramParamsDesc; }
 	
 private:
@@ -85,6 +85,9 @@ private:
 	void _BuindShaderProgramParamsDesc(const ValMemberDetails &entry, const char *parentName, uint32_t stride, uint32_t dataBufferId);
 	void _BuindShaderDataBuffers();
 
+	void _CreateNewBufferSet(uint32_t numVertices, uint32_t numIndeces);
+	void _ImportModelData(BAMS::RENDERINENGINE::VertexDescription src, void *dst);
+
 	CShadersReflections          m_reflection;
 	OutputWindow                 *vk                     = nullptr;
 
@@ -93,15 +96,13 @@ private:
 
 	VkPipelineLayout             m_pipelineLayout        = nullptr;
 	VkPipeline                   m_graphicsPipeline      = nullptr;
-	VkBuffer                     m_vertexBuffer          = nullptr;
-	VkDeviceMemory               m_vertexBufferMemory    = nullptr;
-	VkBuffer                     m_indexBuffer           = nullptr;
-	VkDeviceMemory               m_indexBufferMemory     = nullptr;
+//	VkBuffer                     m_vertexBuffer          = nullptr;
+//	VkDeviceMemory               m_vertexBufferMemory    = nullptr;
+//	VkBuffer                     m_indexBuffer           = nullptr;
+//	VkDeviceMemory               m_indexBufferMemory     = nullptr;
 	std::vector<VkBuffer>        m_uniformBuffers;
 	std::vector<VkDeviceMemory>  m_uniformBuffersMemory;
 
-	uint32_t                     m_usedVerticesCount     = 0;
-	uint32_t                     m_usedIndicesCount      = 0;
 	VkDescriptorSet              m_descriptorSet		 = nullptr;
 	std::vector<VkPipelineShaderStageCreateInfo>   m_shaderStages;
 	std::vector<VkDescriptorSetLayout>             m_descriptorSetLayout;
@@ -113,13 +114,32 @@ private:
 	ShaderProgramParamsDesc                        m_shaderProgramParamsDesc;
 	std::vector<ShaderProgramParamDesc>            m_shaderProgramParamNames;
 
-	struct DrawObjectData {
-		uint32_t setId;
-		uint32_t firstVertex;
-		uint32_t firstIndex;
-		uint32_t numTriangles;
+	struct BufferSet {
+		VkBuffer       vertexBuffer;
+		VkDeviceMemory vertexBufferMemory;
+		VkBuffer       indexBuffer;
+		VkDeviceMemory indexBufferMemory;
+		uint32_t       usedVertices;
+		uint32_t       freeVertices;
+		uint32_t       usedIndices;
+		uint32_t       freeIndices;
 	};
 
+	struct Model {
+		uint32_t bufferSetIdx;
+		uint32_t firstVertex;
+		uint32_t firstIndex;
+		uint32_t numVertex;
+		uint32_t numIndex;
+	};
+
+	struct DrawObjectData {
+		uint32_t paramsSetId;
+		uint32_t modelIdx;
+	};
+
+	std::vector<BufferSet> m_bufferSets;
+	std::vector<Model> m_models;
 	std::vector<DrawObjectData> m_drawObjectData;
 
 };

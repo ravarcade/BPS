@@ -19,9 +19,10 @@
 ///   SimpleString message;
 /// };
 /// </summary>
-template<typename T, class Alloc = Allocators::Blocks>
+template<typename T>
 struct queue {
 private:
+	IMemoryAllocator *alloc;
 	struct Entry : T {
 		template<class... Args>
 		inline Entry(IMemoryAllocator *alloc, Args &&...args) :
@@ -33,12 +34,14 @@ private:
 	};
 
 public:
-	queue(SIZE_T defaultBlockSize = 16*1024) :
-		alloc(MemoryAllocatorStatic<>::GetMemoryAllocator(), defaultBlockSize),
+	queue(SIZE_T size = 16*1024) :
 		first(nullptr),
 		last(nullptr),
-		used(0)
-	{}
+		used(0),
+		alloc(nullptr)
+	{
+		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, size);
+	}
 
 	/// <summary>
 	/// Add new entry to queue. It call object constructor with given params (and allocatora as first param).
@@ -50,8 +53,8 @@ public:
 	{
 		++used;
 		std::lock_guard<std::mutex> lck(mutex);
-		void *p = alloc.allocate(sizeof(Entry));
-		new (p) Entry(&alloc, std::forward<Args>(args)...);
+		void *p = alloc->allocate(sizeof(Entry));
+		new (p) Entry(alloc, std::forward<Args>(args)...);
 		auto e = reinterpret_cast<Entry *>(p);
 		if (last)
 			last->next = e;
@@ -91,11 +94,10 @@ public:
 	void release(Entry *entry)
 	{
 		entry->~Entry();
-		alloc.deallocate(entry);
+		alloc->deallocate(entry);
 	}
 
 private:
-	Alloc alloc;
 	Entry *first;
 	Entry *last;
 	U32 used;

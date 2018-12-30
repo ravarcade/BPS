@@ -72,6 +72,7 @@ private:
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSet currentDescriptorSet;
 	std::vector<VkCommandBuffer> commandBuffers;
+	bool recreateCommandBuffers = false;
 
 	bool _IsDeviceSuitable(VkPhysicalDevice device);
 	VkFormat _FindDepthFormat();
@@ -104,6 +105,7 @@ private:
 	void _CreateDemoCube();
 	void _CreateDescriptorPool();
 	void _CreateCommandBuffers();
+	void _RecreateCommandBuffers();
 	void _CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples);
 
 	SharedUniformBufferObject *sharedUboData = nullptr;
@@ -122,6 +124,7 @@ public:
 	void RecreateSwapChain();
 	void DrawFrame();
 	bool Exist() { return device != VK_NULL_HANDLE; }
+	void BufferRecreationNeeded() { recreateCommandBuffers = true; }
 	bool IsValid() {
 		if (window)
 		{
@@ -162,40 +165,6 @@ public:
 
 class ire {
 public:
-	struct Vertex {
-		glm::vec3 pos;
-		DWORD color;
-
-		static VkVertexInputBindingDescription GetBindingDescription() {
-			VkVertexInputBindingDescription bindingDescription = {};
-			bindingDescription.binding = 0;
-			bindingDescription.stride = sizeof(Vertex);
-			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-			return bindingDescription;
-		}
-
-		static std::array<VkVertexInputAttributeDescription, 2> GetAttributeDescriptions() {
-			std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
-
-			attributeDescriptions[0].binding = 0;
-			attributeDescriptions[0].location = 0;
-			attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-			attributeDescriptions[1].binding = 0;
-			attributeDescriptions[1].location = 1;
-			attributeDescriptions[1].format = VK_FORMAT_R8G8B8_UNORM;
-			attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-			return attributeDescriptions;
-		}
-
-		bool operator== (const Vertex& other) const {
-			return pos == other.pos && color == other.color;
-		}
-	};
-
 
 	// global:
 	VkInstance _instance = VK_NULL_HANDLE;
@@ -248,6 +217,8 @@ private:
 	OutputWindow outputWindows[MAX_WINDOWS];
 
 
+
+
 public:
 	ire() :
 		_allocator(nullptr),
@@ -258,7 +229,9 @@ public:
 	void Cleanup();
 	void Update(float dt);
 	void CreateWnd(int wnd, const void *params);
-	void Add3DModel(int wnd, const BAMS::RenderingModel *params);
+	void AddModel(int wnd, const BAMS::RenderingModel *params);	
+	uint32_t AddModel(int wnd, const char *objectName, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shaderProgram);
+	uint32_t AddObject(int wnd, uint32_t modelId);
 
 	friend OutputWindow;
 };

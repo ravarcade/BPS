@@ -13,7 +13,7 @@
 /// - minimize memory usage. In instance there is only one index to array. Only one 32-bit unsigned int.
 /// - minimize memory allocation. Assigment or copy construction will only increase refCounter. Object will be copie when it is moddified.
 /// </summary>
-template <typename T, class A = Allocators::Default, SIZE_T S = 48>
+template <typename T, MemoryAllocator A = Allocators::default, SIZE_T S = 48>
 class shared_base
 {
 protected:
@@ -160,13 +160,13 @@ public:
 };
 
 
-template <typename T, class A, SIZE_T S>
+template <typename T, MemoryAllocator A, SIZE_T S>
 typename shared_base<T, A, S>::Pool shared_base<T, A, S>::_pool;
 
-template <typename T, class A, SIZE_T S>
+template <typename T, MemoryAllocator A, SIZE_T S>
 U32 shared_base<T, A, S>::_firstFreeEntry = 0;
 
-template <typename T, class A, SIZE_T S>
+template <typename T, MemoryAllocator A, SIZE_T S>
 U32 shared_base<T, A, S>::_used = 0;
 
 

@@ -2,6 +2,8 @@
 
 using namespace BAMS;
 using namespace BAMS::RENDERINENGINE;
+const uint32_t ALWAYS_RESERVE_VERTICES = 16 * 1024; // <- 256kB for 16bytes / per vertice
+const uint32_t ALWAYS_RESERVE_INDICES = ALWAYS_RESERVE_VERTICES;
 
 void CShaderProgram::LoadPrograms(std::vector<std::string>&& programs)
 {
@@ -21,10 +23,13 @@ void CShaderProgram::Release()
 		vk->vkFree(ub);
 	m_uniformBuffersMemory.clear();
 
-	vk->vkDestroy(m_vertexBuffer);
-	vk->vkFree(m_vertexBufferMemory);
-	vk->vkDestroy(m_indexBuffer);
-	vk->vkFree(m_indexBufferMemory);
+	for (auto &set : m_bufferSets) {
+		vk->vkDestroy(set.vertexBuffer);
+		vk->vkFree(set.vertexBufferMemory);
+		vk->vkDestroy(set.indexBuffer);
+		vk->vkFree(set.indexBufferMemory);
+	}
+	m_bufferSets.clear();
 
 	for (auto &dsl : m_descriptorSetLayout) {
 		vk->vkDestroy(dsl);
@@ -409,32 +414,49 @@ void CShaderProgram::CreatePipelineLayout()
 	}
 }
 
-void CShaderProgram::CreateModelBuffers(uint32_t numVertices, uint32_t numIndeces, uint32_t numObjects)
+void CShaderProgram::_CreateNewBufferSet(uint32_t numVertices, uint32_t numIndeces)
 {
+	BufferSet set;		
+
 	vk->_CreateBuffer(
 		numVertices * m_vi.size,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_vertexBuffer,
-		m_vertexBufferMemory);
+		set.vertexBuffer,
+		set.vertexBufferMemory);
 
 	vk->_CreateBuffer(
 		numIndeces * sizeof(uint32_t),
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-		m_indexBuffer, 
-		m_indexBufferMemory);
+		set.indexBuffer, 
+		set.indexBufferMemory);
 
-	m_usedVerticesCount = 0;
-	m_usedIndicesCount = 0;
-	m_drawObjectData.reserve(numObjects);
+	set.usedVertices = 0;
+	set.usedIndices = 0;
+	set.freeVertices = numVertices;
+	set.freeIndices = numIndeces;
+
+	m_bufferSets.emplace_back(set);
 }
 
-uint32_t CShaderProgram::SendVertexData(VertexDescription src)
+uint32_t CShaderProgram::AddModel(const VertexDescription &src)
 {
-	uint32_t firstIndex = m_usedIndicesCount;
+	// we check only last BufferSet
+	BufferSet *set = m_bufferSets.size() ? &*m_bufferSets.rbegin() : nullptr;
+	if (set == nullptr || set->freeVertices < src.m_numVertices || set->freeIndices < src.m_numIndices)
+	{
+		_CreateNewBufferSet(
+			src.m_numVertices < ALWAYS_RESERVE_VERTICES ? src.m_numVertices + ALWAYS_RESERVE_VERTICES : src.m_numVertices,
+			src.m_numIndices < ALWAYS_RESERVE_INDICES ? src.m_numIndices + ALWAYS_RESERVE_INDICES : src.m_numIndices);
+		set = &*m_bufferSets.rbegin();
+	}
+	uint32_t bufferSetIdx = static_cast<uint32_t>(m_bufferSets.size()) - 1;
+
+	uint32_t indeceSize = sizeof(uint32_t);
+	uint32_t firstIndex = set->usedIndices;
 	uint32_t vboSize = src.m_numVertices * m_vi.size;
-	uint32_t iboSize = src.m_numIndices * sizeof(uint32_t);
+	uint32_t iboSize = src.m_numIndices * indeceSize;
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -446,19 +468,40 @@ uint32_t CShaderProgram::SendVertexData(VertexDescription src)
 
 	void* data;
 	vkMapMemory(vk->device, stagingBufferMemory, 0, vboSize + iboSize, 0, &data);
-	SendVertexData(src, data);
+	_ImportModelData(src, data);
 	vkUnmapMemory(vk->device, stagingBufferMemory);
 
-	vk->_CopyBuffer(stagingBuffer, m_vertexBuffer, vboSize, 0);
-	vk->_CopyBuffer(stagingBuffer, m_indexBuffer, iboSize, vboSize);
+	vk->_CopyBuffer(stagingBuffer, set->vertexBuffer, vboSize, 0, set->usedVertices * m_vi.size);
+	vk->_CopyBuffer(stagingBuffer, set->indexBuffer, iboSize, vboSize, set->usedIndices * indeceSize);
 
 	vk->vkDestroy(stagingBuffer);
 	vk->vkFree(stagingBufferMemory);
 
-	m_usedVerticesCount += src.m_numVertices;
-	m_usedIndicesCount += src.m_numIndices;
+	// add "model"
+	Model m = {
+		bufferSetIdx,
+		set->usedVertices,
+		set->usedIndices,
+		src.m_numVertices,
+		src.m_numIndices
+	};
 
-	return firstIndex; // ToDo: replace it with modelId. We may use 2 or more vertex/index buffers
+	set->usedVertices += src.m_numVertices;
+	set->usedIndices += src.m_numIndices;
+
+	m_models.push_back(m);
+
+	return static_cast<uint32_t>(m_models.size()) - 1;
+}
+
+uint32_t CShaderProgram::AddObject(uint32_t modeIdx)
+{
+	DrawObjectData dod;
+	dod.modelIdx = modeIdx;
+	dod.paramsSetId = static_cast<uint32_t>(m_drawObjectData.size());
+	m_drawObjectData.push_back(dod);
+
+	return static_cast<uint32_t>(m_drawObjectData.size()) - 1;
 }
 
 void CShaderProgram::_SendVertexStream(BAMS::RENDERINENGINE::Stream dst, BAMS::RENDERINENGINE::Stream & src, uint8_t *outBuf, std::vector<uint32_t> &bindingOffset, uint32_t numVertices)
@@ -562,7 +605,7 @@ void CShaderProgram::_BuindShaderDataBuffers()
 	}
 }
 
-void CShaderProgram::SendVertexData(VertexDescription src, void *dst)
+void CShaderProgram::_ImportModelData(VertexDescription src, void *dst)
 {
 	uint32_t vboSize = 0; 
 	uint32_t iboSize = src.m_numIndices * sizeof(uint32_t);
@@ -654,8 +697,9 @@ void CShaderProgram::UpdateDescriptorSets()
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
 
-void CShaderProgram::DrawObject(VkCommandBuffer & cb, uint32_t objectId)
+void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 {
+	/*
 	static auto startTime = std::chrono::high_resolution_clock::now();
 
 	auto currentTime = std::chrono::high_resolution_clock::now();
@@ -666,23 +710,31 @@ void CShaderProgram::DrawObject(VkCommandBuffer & cb, uint32_t objectId)
 	} pushConstantData;
 	pushConstantData.model = glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(objectId * 2 - 2.0, 0, 0)), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	pushConstantData.baseColor = glm::vec4(1, 0.5, 1, 1);
+	*/
+	uint32_t lastBufferSetIdx = -1;
+	if (vk->currentDescriptorSet != m_descriptorSet)
+	{
+		vk->currentDescriptorSet = m_descriptorSet;
+		vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &vk->currentDescriptorSet, 0, nullptr);
+	}
 
-	if (m_vertexBuffer && m_indexBuffer) {
-		if (vk->currentDescriptorSet != m_descriptorSet)
+	uint32_t objectId = 0;
+	for (auto &dod : m_drawObjectData)
+	{
+		
+		auto &m = m_models[dod.modelIdx];
+		if (m.bufferSetIdx != lastBufferSetIdx)
 		{
-			vk->currentDescriptorSet = m_descriptorSet;
-			vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &vk->currentDescriptorSet, 0, nullptr);
+			auto &bs = m_bufferSets[m.bufferSetIdx];
+			VkBuffer vertexBuffers[] = { bs.vertexBuffer };
+			VkDeviceSize offsets[] = { 0 };
+			vkCmdBindVertexBuffers(cb, 0, 1, vertexBuffers, offsets);
+			vkCmdBindIndexBuffer(cb, bs.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 		}
-		VkBuffer vertexBuffers[] = { m_vertexBuffer };
-		VkDeviceSize offsets[] = { 0 };
-		vkCmdBindVertexBuffers(cb, 0, 1, vertexBuffers, offsets);
 
-//		vkCmdPushConstants(cb, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, 80, &pushConstantData);
-		vkCmdPushConstants(cb, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, 80, m_paramsBuffer[0].data()+80 * objectId);
-//		vkCmdBindIndexBuffer(cb, m_indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-		vkCmdBindIndexBuffer(cb, m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-		vkCmdDrawIndexed(cb, 36, 1, 0, 0, 0);
+		vkCmdPushConstants(cb, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, 80, m_paramsBuffer[0].data() + 80 * objectId);
+		vkCmdDrawIndexed(cb, m.numIndex, 1, m.firstIndex, m.firstVertex, 0);
+		++objectId;
 	}
 }
 
@@ -708,13 +760,13 @@ void CShaderProgram::SetParams(ShaderProgramParams * params)
 	}
 }
 
-void CShaderProgram::SetParam(uint32_t modelId, uint32_t paramId, void * pVal)
+void CShaderProgram::SetParam(uint32_t objectId, uint32_t paramId, void * pVal)
 {
 	if (paramId < m_shaderProgramParamNames.size())
 	{
 		auto &p = m_shaderProgramParamNames[paramId];
 		auto &buf = m_paramsBuffer[p.dataBufferId];
-		uint8_t *data = buf.data() + p.stride * modelId + p.offset;
+		uint8_t *data = buf.data() + p.stride * objectId + p.offset;
 		memcpy_s(data, p.size, pVal, p.size);
 	}
 }

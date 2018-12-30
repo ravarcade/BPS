@@ -6,46 +6,48 @@
 
 using namespace BAMS;
 
-#pragma pack(push,1)
-struct Point3D { float x, y, z; };
-struct Point2D { float x, y; };
-
-struct Model 
+BAMS::RENDERINENGINE::VertexDescription *GetDemoCube()
 {
-	uint32_t noVertices;
-	uint32_t noFaces;
-	Point3D *vertices;
-	Point3D *normals;
-	Point2D *textCoord;
-	uint32_t *faces;
-};
+	using namespace BAMS::RENDERINENGINE;
 
-#pragma pack(pop)
+	// demo cube
+	struct Vertex {
+		glm::vec3 pos;
+		DWORD color;
+	};
 
-Point3D defaultBoxVertices[] = {
-	{ -1, -1, -1 },
-	{  1, -1, -1 },
-	{  1,  1, -1 },
-	{ -1,  1, -1 },
+	static const std::vector<Vertex> vertices = {
+		{ { -0.5f, -0.5f,  0.5f }, 0x0000000ff },
+		{ { 0.5f, -0.5f,  0.5f },  0x0000ff00 },
+		{ { 0.5f,  0.5f,  0.5f },  0x00ff0000},
+		{ { -0.5f,  0.5f,  0.5f }, 0x00ffffff },
 
-	{ -1, -1,  1 },
-	{  1, -1,  1 },
-	{  1,  1,  1 },
-	{ -1,  1,  1 }
-};
+		{ { -0.5f, -0.5f, -0.5f }, 0x00ff0000 },
+		{ { 0.5f, -0.5f, -0.5f },  0x00ffffff },
+		{ { 0.5f,  0.5f, -0.5f },  0x000000ff },
+		{ { -0.5f,  0.5f, -0.5f }, 0x0000ff00 }
+	};
 
-uint32_t defaultBoxFaces[] = {
-	0, 1, 2, 2, 3, 0,
-	0, 4, 5, 1, 0, 5,
-};
-
-Model defaultBox = {
-	8, 16,
-	defaultBoxVertices,
-	nullptr,
-	nullptr,
-	defaultBoxFaces
-};
+	static const std::vector<uint16_t> indices = {
+		0, 1, 2,  2, 3, 0,
+		0, 4, 5,  1, 0, 5,
+		1, 5, 6,  2, 1, 6,
+		2, 6, 7,  3, 2, 7,
+		3, 7, 4,  0, 3, 4,
+		5, 4, 6,  7, 6, 4
+	};
+	static VertexDescription vd;
+	static bool initOnce = true;
+	if (initOnce) {
+		vd.m_numVertices = static_cast<U32>(vertices.size());
+		vd.m_numIndices = static_cast<U32>(indices.size());
+		vd.m_vertices = Stream(FLOAT_3D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(Vertex, pos));
+		vd.m_colors[0] = Stream(COL_UINT8_4D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(Vertex, color));
+		vd.m_indices = Stream(IDX_UINT16_1D, sizeof(indices[0]), false, (U8 *)indices.data());
+		initOnce = false;
+	}
+	return &vd;
+}
 
 void VkDoTests()
 {
@@ -143,18 +145,29 @@ public:
 			re.CreateWnd(BACKBOXWND, nullptr);
 			re.CreateWnd(DMDWND, nullptr);
 			//			VkDoTests();
+
 			auto params = reinterpret_cast<const RenderingModel *>(msg->data);
-//			re.Add3DModel(MAINWND, params);
-//			re.Add3DModel(BACKBOXWND, params);
-//			re.Add3DModel(DMDWND, params);
+			std::set<uint32_t> wnds = { MAINWND, BACKBOXWND, DMDWND };
+			for (auto wnd : wnds) 
+			{
+				uint32_t modelId = re.AddModel(wnd, "cube", GetDemoCube(), "cubeShader");
+				re.AddObject(wnd, modelId);
+				re.AddObject(wnd, modelId);
+				re.AddObject(wnd, modelId);
+
+			}
+
+//			re.AddModel(MAINWND, params);
+//			re.AddModel(BACKBOXWND, params);
+//			re.AddModel(DMDWND, params);
 		}
 			break;
 
 		case ADD_3D_MODEL: {
 			auto params = reinterpret_cast<const RenderingModel *>(msg->data);
-//			re.Add3DModel(MAINWND, params);
-//			re.Add3DModel(BACKBOXWND, params);
-//			re.Add3DModel(DMDWND, params);
+//			re.AddModel(MAINWND, params);
+//			re.AddModel(BACKBOXWND, params);
+//			re.AddModel(DMDWND, params);
 		} break;
 
 		}

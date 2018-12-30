@@ -1,45 +1,10 @@
 #include "stdafx.h"
 
-// ============================================================================ tmp data ===
+
 using namespace BAMS;
 
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
-
-
-//const std::vector<ire::Vertex> vertices = {
-//	{ { -0.5f, -0.5f,  0.5f },{ 1.0f, 0.0f, 0.0f } },
-//	{ { 0.5f, -0.5f,  0.5f },{ 0.0f, 1.0f, 0.0f } },
-//	{ { 0.5f,  0.5f,  0.5f },{ 0.0f, 0.0f, 1.0f } },
-//	{ { -0.5f,  0.5f,  0.5f },{ 1.0f, 1.0f, 1.0f } },
-//
-//	{ { -0.5f, -0.5f, -0.5f },{ 0.0f, 0.0f, 1.0f } },
-//	{ { 0.5f, -0.5f, -0.5f },{ 1.0f, 1.0f, 1.0f } },
-//	{ { 0.5f,  0.5f, -0.5f },{ 1.0f, 0.0f, 0.0f } },
-//	{ { -0.5f,  0.5f, -0.5f },{ 0.0f, 1.0f, 0.0f } }
-//};
-
-const std::vector<ire::Vertex> vertices = {
-	{ { -0.5f, -0.5f,  0.5f }, 0x0000000ff },
-	{ { 0.5f, -0.5f,  0.5f },  0x0000ff00 },
-	{ { 0.5f,  0.5f,  0.5f },  0x00ff0000},
-	{ { -0.5f,  0.5f,  0.5f }, 0x00ffffff },
-
-	{ { -0.5f, -0.5f, -0.5f }, 0x00ff0000 },
-	{ { 0.5f, -0.5f, -0.5f },  0x00ffffff },
-	{ { 0.5f,  0.5f, -0.5f },  0x000000ff },
-	{ { -0.5f,  0.5f, -0.5f }, 0x0000ff00 }
-};
-
-const std::vector<uint16_t> indices = {
-	0, 1, 2,  2, 3, 0,
-	0, 4, 5,  1, 0, 5,
-	1, 5, 6,  2, 1, 6,
-	2, 6, 7,  3, 2, 7,
-	3, 7, 4,  0, 3, 4,
-	5, 4, 6,  7, 6, 4
-};
-
 
 // ============================================================================
 
@@ -176,7 +141,7 @@ void OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _window, 
 	window = _window;
 	allocator = _allocator;
 
-	// ------------------------------------------------------------------------ create surface
+	// ------------------------------------------------------------------------ create surface in output window
 	if (glfwCreateWindowSurface(instance, window, allocator, &surface) != VK_SUCCESS)
 		throw std::runtime_error("failed to create window surface!");
 
@@ -289,13 +254,13 @@ void OutputWindow::Prepare(VkInstance _instance, int _wnd, GLFWwindow* _window, 
 
 	// ------------------------------------------------------------------------ 
 
-	_CreateRenderPass();
+	_CreateRenderPass(); // we must call it before we create swap chain. Swap chain will use one renderpass to present image
 	if (_CreateSwapChain())
 	{
 		_CreateSharedUniform(); // we need to create shared uniform before we call _LoadShadersPrograms?
 		_LoadShaderPrograms();
 		_CreateDemoCube();
-		_CreateCommandBuffers();
+//		_CreateCommandBuffers();
 	}
 }
 
@@ -418,7 +383,6 @@ bool OutputWindow::_CreateSwapChain()
 
 	// ------------------------------------------------------------------------ create frame buffers
 	swapChainFramebuffers.resize(swapChainImageViews.size());
-	printf("using renderpass: %x\n", renderPass);
 
 	for (size_t i = 0; i < swapChainImageViews.size(); i++) 
 	{
@@ -875,7 +839,6 @@ void OutputWindow::_CreateRenderPass()
 
 void OutputWindow::_CleanupRenderPass()
 {
-	printf("destroy renderpass: %x\n", renderPass);
 	vkDestroy(renderPass);
 }
 
@@ -883,29 +846,13 @@ void OutputWindow::_CleanupRenderPass()
 
 void OutputWindow::_CreateDemoCube()
 {
-	// 3d model definition
-	using namespace BAMS::RENDERINENGINE;
-	VertexDescription vd;
-	vd.m_numVertices = static_cast<U32>(vertices.size());
-	vd.m_numIndices = static_cast<U32>(indices.size());
-	vd.m_vertices = Stream(FLOAT_3D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(ire::Vertex, pos));
-	vd.m_colors[0] = Stream(COL_UINT8_4D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(ire::Vertex, color));
-	vd.m_indices = Stream(IDX_UINT16_1D, sizeof(indices[0]), false, (U8 *)indices.data());
-
 	auto &rp = cubeShader;
-	// we will set here:
-	// - num of vertices
-	// - num of indices
-	// - num of objects
-	rp.CreateModelBuffers(static_cast<uint32_t>(vertices.size()), static_cast<uint32_t>(indices.size()), 3);
-	uint32_t modelId = rp.SendVertexData(vd);
-
 	uint32_t MId = rp.GetParamId("model");
 	uint32_t baseColorId = rp.GetParamId("baseColor");
 	float colors[][4] = {
-		{ 0.1, 1, 1, 1 },
-		{ 1, 0.1, 1, 1 },
-		{ 1, 1, 0.1, 1 }
+		{ 0.1f, 1, 1, 1 },
+		{ 1, 0.1f, 1, 1 },
+		{ 1, 1, 0.1f, 1 }
 	};
 	static auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -961,7 +908,6 @@ void OutputWindow::_CreateCommandBuffers()
 		throw std::runtime_error("failed to allocate command buffers!");
 	}
 	currentDescriptorSet = nullptr;
-	printf("create buffers: using renderpass: %x\n", renderPass);
 
 	for (size_t i = 0; i < commandBuffers.size(); i++) {
 		VkCommandBufferBeginInfo beginInfo = {};
@@ -1009,9 +955,7 @@ void OutputWindow::_CreateCommandBuffers()
 		vkCmdSetViewport(commandBuffers[i], 0, 1, &viewport);
 		vkCmdSetScissor(commandBuffers[i], 0, 1, &scissor);
 
-		cubeShader.DrawObject(commandBuffers[i], 0);
-		cubeShader.DrawObject(commandBuffers[i], 1);
-		cubeShader.DrawObject(commandBuffers[i], 2);
+		cubeShader.DrawObjects(commandBuffers[i]);
 
 //		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 		//		vkCmdBindIndexBuffer(_commandBuffers[i], _indexBuffer, 0, VK_INDEX_TYPE_UINT32);
@@ -1135,7 +1079,6 @@ void OutputWindow::_CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBit
 
 	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &renderPass) != VK_SUCCESS)
 		throw std::runtime_error("failed to create render pass!");
-	printf("renderpass: %x\n", renderPass);
 }
 
 void OutputWindow::_LoadShaderPrograms()
@@ -1196,12 +1139,28 @@ void OutputWindow::RecreateSwapChain()
 	}
 }
 
+void OutputWindow::_RecreateCommandBuffers()
+{
+	vkDeviceWaitIdle(device);
+
+	vkFree(commandPool, commandBuffers);
+	_CreateDemoCube();
+	_CreateCommandBuffers();
+	recreateCommandBuffers = false;
+}
+
 void OutputWindow::DrawFrame()
 {
 	if (!swapChain) {
 		RecreateSwapChain();
 		return;
 	}
+
+	if (recreateCommandBuffers)
+	{
+		_RecreateCommandBuffers();
+	}
+
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -1376,22 +1335,39 @@ void ire::CreateWnd(int wnd, const void *params)
 
 using namespace RENDERINENGINE;
 
-void ire::Add3DModel(int wnd, const RenderingModel * params)
+void ire::AddModel(int wnd, const RenderingModel * params)
 {
-	using namespace BAMS::RENDERINENGINE;
-	VertexDescription vd;
-	vd.m_numVertices = static_cast<U32>(vertices.size());
-	vd.m_numIndices = static_cast<U32>(indices.size());
-	vd.m_vertices = Stream(FLOAT_3D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(ire::Vertex, pos));
-	vd.m_colors[0] = Stream(COL_UINT8_4D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(ire::Vertex, color));
-	vd.m_indices = Stream(IDX_UINT16_1D, sizeof(indices[0]), false, (U8 *)indices.data());
 
-	auto &rp = outputWindows[wnd].cubeShader;
-	rp.CreateModelBuffers(static_cast<uint32_t>(vertices.size()), static_cast<uint32_t>(indices.size()), 1);
-	rp.SendVertexData(vd);
+	//using namespace BAMS::RENDERINENGINE;
+	//VertexDescription vd;
+	//vd.m_numVertices = static_cast<U32>(vertices.size());
+	//vd.m_numIndices = static_cast<U32>(indices.size());
+	//vd.m_vertices = Stream(FLOAT_3D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(Vertex, pos));
+	//vd.m_colors[0] = Stream(COL_UINT8_4D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(Vertex, color));
+	//vd.m_indices = Stream(IDX_UINT16_1D, sizeof(indices[0]), false, (U8 *)indices.data());
+
+	//auto &rp = outputWindows[wnd].cubeShader;
+	//rp.CreateModelBuffers(static_cast<uint32_t>(vertices.size()), static_cast<uint32_t>(indices.size()), 1);
+	//rp.SendVertexData(vd);
 
 }
 
+uint32_t ire::AddModel(int wnd, const char *objectName, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shaderProgram)
+{
+	OutputWindow *ow = &outputWindows[wnd];
+	CShaderProgram *rp = nullptr;
+	rp = &ow->cubeShader;
+	uint32_t modelId = rp->AddModel(*vd);
+	return modelId;
+}
+
+uint32_t ire::AddObject(int wnd, uint32_t modelId)
+{
+	auto &rp = outputWindows[wnd].cubeShader;
+	uint32_t ret = rp.AddObject(modelId);
+	outputWindows[wnd].BufferRecreationNeeded();
+	return ret;
+}
 
 // ============================================================================ ire : Rendering Engine - protected methods ===
 

@@ -86,6 +86,8 @@ extern "C" {
 
 	BAMS_EXPORT void IEngine_Update(float dt);
 
+	BAMS_EXPORT BAMS::CORE::Allocators::IMemoryAllocator *GetMemoryAllocator(uint32_t allocatorType = 0, SIZE_T size = 0);
+
 	// ================================================================================== Classes ===
 
 	class ResourceSmartPtr

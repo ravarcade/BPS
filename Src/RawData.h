@@ -6,7 +6,7 @@
 *
 */
 
-class RawData : public ResoureImpl<RawData, 0x00010001, Allocators::Default>
+class RawData : public ResoureImpl<RawData, 0x00010001, Allocators::default>
 {
 public:
 	U8 *Data;

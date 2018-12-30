@@ -150,16 +150,16 @@ public:
 /// Helper class used to make resource implementation easier.
 /// It will add ResFactory to class.
 /// </summary>
-template <typename T, U32 ResTypeId, class Alloc = Allocators::Default>
-class ResoureImpl : public ResourceImplementationInterface, public MemoryAllocatorStatic<Alloc>
+template <typename T, U32 ResTypeId, MemoryAllocator Alloc = Allocators::default>
+class ResoureImpl : public ResourceImplementationInterface, public Allocators::Ext<Alloc>
 {
 public:
-	class ResFactory : public ResourceFactoryChain, public MemoryAllocatorStatic<Alloc>
+	class ResFactory : public ResourceFactoryChain, public Allocators::Ext<Alloc>
 	{
 	public:
 		ResourceImplementationInterface *Create() { return make_new<T>(); }
 		void Destroy(void *ptr) { make_delete<T>(ptr); }
-		IMemoryAllocator *GetMemoryAllocator() { return MemoryAllocatorStatic<Alloc>::GetMemoryAllocator(); }
+		IMemoryAllocator *GetMemoryAllocator() { return Alloc; }
 		ResFactory() : ResourceFactoryChain() {
 			TypeId = ResTypeId; 
 		}
@@ -170,13 +170,13 @@ public:
 	static U32 GetTypeId() { return _resourceFactory.TypeId; }
 };
 
-template <typename T, U32 ResTypeId, class Alloc>
+template <typename T, U32 ResTypeId, MemoryAllocator Alloc>
 typename ResoureImpl<T, ResTypeId, Alloc>::ResFactory ResoureImpl<T, ResTypeId, Alloc>::_resourceFactory;
 
 
 // ============================================================================
 
-class BAMS_EXPORT ResourceManager : public MemoryAllocatorStatic<>
+class BAMS_EXPORT ResourceManager : public Allocators::Ext<>
 {
 private:
 	struct InternalData;
@@ -231,3 +231,5 @@ public:
 
 
 #define RESOURCEMANAGER_ADD_FILE 0x10001
+
+#include "RawData.h"

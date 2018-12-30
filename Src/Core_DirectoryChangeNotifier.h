@@ -6,7 +6,7 @@ struct DiskEvent
 	WString fileNameRenameTo;
 };
 
-class DirectoryChangeNotifier : public MemoryAllocatorStatic<>
+class DirectoryChangeNotifier : public Allocators::Ext<>
 {
 	struct InternalData;
 	InternalData *_data;

@@ -174,19 +174,12 @@ extern "C" {
 
 	BAMS_EXPORT void GetMemoryAllocationStats(uint64_t *Max, uint64_t *Current, uint64_t *Counter)
 	{
-		if (Max)
-			*Max = MemmoryAllocatorsPrivate::DebugStats.MaxAllocatedMemory;
-
-		if (Current)
-			*Current = MemmoryAllocatorsPrivate::DebugStats.CurrentAllocatedMemory;
-
-		if (Counter)
-			*Counter = MemmoryAllocatorsPrivate::DebugStats.TotalAllocateCommands;
+		Allocators::GetMemoryAllocationStats(Max, Current, Counter);
 	}
 
 	BAMS_EXPORT bool GetMemoryBlocks(void **current, size_t *size, size_t *counter, void **data)
 	{
-		return MemmoryAllocatorsPrivate::DebugStats.list(current, size, counter, data);
+		return Allocators::GetMemoryBlocks(current, size, counter, data);
 	}
 
 	// ========================================================================
@@ -219,31 +212,49 @@ extern "C" {
 		BAMS::CORE::IEngine::Update(dt);
 	}
 
+	BAMS_EXPORT BAMS::CORE::Allocators::IMemoryAllocator * GetMemoryAllocator(uint32_t allocatorType, SIZE_T size)
+	{
+		return BAMS::CORE::Allocators::GetMemoryAllocator(allocatorType, size);
+	}
+
 	// ========================================================================
 
 	void TestRingBuffer()
 	{
-		Allocators::Blocks _alloc(MemoryAllocatorStatic<>::GetMemoryAllocator(), 8192);
+		auto &_alloc = *Allocators::GetMemoryAllocator(IMemoryAllocator::block, 16*1024);
 
-		auto a1 = _alloc.allocate(2000);
-		auto a2 = _alloc.allocate(2000);
-		auto a3 = _alloc.allocate(2000);
-		auto a4 = _alloc.allocate(2000);
+		auto a1 = _alloc.allocate(4000);
+		auto a2 = _alloc.allocate(4000);
+		auto a3 = _alloc.allocate(4000);
+		auto a4 = _alloc.allocate(4000);
 		_alloc.deallocate(a1);
-		auto a5 = _alloc.allocate(2000);
+		auto a5 = _alloc.allocate(4000);
 		_alloc.deallocate(a2);
-		auto a6 = _alloc.allocate(2000);
+		auto a6 = _alloc.allocate(4000);
 		_alloc.deallocate(a3);
-		auto a7 = _alloc.allocate(2000);
+		auto a7 = _alloc.allocate(4000);
 		_alloc.deallocate(a7);
 		_alloc.deallocate(a5);
 		_alloc.deallocate(a4);
-		auto a8 = _alloc.allocate(2000);
+		auto a8 = _alloc.allocate(4000);
 
+	}
+
+	void testb(const STR &s)
+	{
+		printf("[%s]", s.c_str());
 	}
 
 	BAMS_EXPORT void DoTests()
 	{
+		return;
+		hashtable<STR, int> ht;
+		STR kkey("hahaha");
+		ht[kkey] = 11;
+		ht[kkey] = 22;
+		ht["hahaha"] = 33;
+		int zz = ht[kkey];
+		testb("TESTB");
 		return;
 		TestRingBuffer();
 		{

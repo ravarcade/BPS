@@ -42,15 +42,15 @@ struct simple_string : basic_string_base<T, U>
 	typedef basic_string_base<T, U> _B;
 
 	simple_string() : _B(0), _alloc(nullptr) {}
-	simple_string(IMemoryAllocator *alloc) : _B(0), _alloc(alloc) {}
+	simple_string(MemoryAllocator alloc) : _B(0), _alloc(alloc) {}
 	template<typename ST>
-	simple_string(IMemoryAllocator *alloc, const ST *src, const ST *end = nullptr) : _alloc(alloc) { _used = end ? static_cast<U>(end - src) : static_cast<U>(basic_string_base<ST, U>::length(src)); _reserved = _used + 1; _Allocate(); _CopyText(_buf, src, _used); }
+	simple_string(MemoryAllocator alloc, const ST *src, const ST *end = nullptr) : _alloc(alloc) { _used = end ? static_cast<U>(end - src) : static_cast<U>(basic_string_base<ST, U>::length(src)); _reserved = _used + 1; _Allocate(); _CopyText(_buf, src, _used); }
 	template<typename ST, typename SU>
-	simple_string(IMemoryAllocator *alloc, const basic_string_base<ST, SU> &src) : _B(static_cast<U>(src._used + 1), static_cast<U>(src._used)), _alloc(alloc) { _Allocate(); _CopyText(_buf, src._buf, _used); }
-	simple_string(IMemoryAllocator *alloc, const _T &src) : _B(static_cast<U>(src._used + 1), static_cast<U>(src._used)), _alloc(alloc) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); }
+	simple_string(MemoryAllocator alloc, const basic_string_base<ST, SU> &src) : _B(static_cast<U>(src._used + 1), static_cast<U>(src._used)), _alloc(alloc) { _Allocate(); _CopyText(_buf, src._buf, _used); }
+	simple_string(MemoryAllocator alloc, const _T &src) : _B(static_cast<U>(src._used + 1), static_cast<U>(src._used)), _alloc(alloc) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); }
 	~simple_string() { if (_buf && _alloc) { _alloc->deallocate(_buf); _buf = 0; _reserved = 0; _used = 0; } }
 
-	void set_allocator(IMemoryAllocator *alloc) { if (!_alloc) _alloc = alloc; }
+	void set_allocator(MemoryAllocator alloc) { if (!_alloc) _alloc = alloc; }
 	void resize(U32 s) 
 	{ 
 		if (s >= _reserved)
@@ -188,13 +188,12 @@ int  basic_string_base<wchar_t, U32>::nicmp(const wchar_t *string1, const wchar_
 
 // ============================================================================
 
-template <typename T, typename U = U32, class Alloc = Allocators::Default, SIZE_T minReservedSize = 48>
+template <typename T, typename U = U32, MemoryAllocator alloc = Allocators::default, SIZE_T minReservedSize = 48 >
 class basic_string : public basic_string_base<T, U>
 {
 private:
-	typedef basic_string<T, U, Alloc, minReservedSize> _T;
+	typedef basic_string<T, U, alloc, minReservedSize> _T;
 	typedef basic_string_base<T, U> _B;
-	typedef MemoryAllocatorStatic<Alloc> _allocator;
 
 	void _CopyText(char *dst, const char *src, SIZE_T srcSize) { memcpy_s(dst, srcSize, src, srcSize); }
 	void _CopyText(wchar_t *dst, const wchar_t *src, SIZE_T srcSize) { memcpy_s(dst, srcSize * sizeof(wchar_t), src, srcSize * sizeof(wchar_t)); }
@@ -247,10 +246,10 @@ private:
 
 		// oldBuf is released here, because there is chance, that we copy part from source buffer
 		if (oldBuf)
-			_allocator::deallocate(oldBuf);
+			alloc->deallocate(oldBuf);
 	}
 
-	void _Allocate() { _buf = static_cast<T *>(_allocator::allocate(_reserved * sizeof(T))); }
+	void _Allocate() { _buf = static_cast<T *>(alloc->allocate(_reserved * sizeof(T))); }
 
 public:
 	// constructors
@@ -284,7 +283,7 @@ public:
 	// 6. Reserve space constructor
 	basic_string(U reserve) : _B(reserve) { _Allocate(); }
 
-	~basic_string() { if (_buf) { _allocator::deallocate(_buf); _buf = 0; _reserved = 0; _used = 0; } }
+	~basic_string() { if (_buf) { alloc->deallocate(_buf); _buf = 0; _reserved = 0; _used = 0; } }
 
 	void resize(U32 s)
 	{
@@ -299,7 +298,7 @@ public:
 
 			// oldBuf is released here, because there is chance, that we copy part from source buffer
 			if (oldBuf)
-				_allocator::deallocate(oldBuf);
+				alloc->deallocate(oldBuf);
 		}
 		_used = s;
 	}
@@ -310,7 +309,7 @@ public:
 	basic_string& operator = (const _T& src) { _used = 0; _Append(src._used, src._buf); return *this; }
 	basic_string& operator = (_T&& src) {
 		if (_buf)
-			_allocator::deallocate(_buf);
+			alloc->deallocate(_buf);
 
 		_used = src._used;
 		_reserved = src._reserved;
@@ -399,7 +398,7 @@ public:
 			if (_used >= _reserved)
 			{
 				if (_buf)
-					_allocator::deallocate(_buf);
+					alloc->deallocate(_buf);
 				_reserved = size_needed + minReservedSize;
 				_Allocate();					
 			}
@@ -420,7 +419,7 @@ public:
 			if (_used >= _reserved)
 			{
 				if (_buf)
-					_allocator::deallocate(_buf);
+					alloc->deallocate(_buf);
 				_reserved = _used + minReservedSize;
 				_Allocate();
 			}
@@ -504,7 +503,7 @@ public:
 
 // ============================================================================
 
-template <typename T, typename U = U32, class A = Allocators::Default, SIZE_T S = 48, SIZE_T S2 = 16>
+template <typename T, typename U = U32, MemoryAllocator A = Allocators::default, SIZE_T S = 48, SIZE_T S2 = 16>
 class shared_string : public shared_base< basic_string<T, U, A, S>, A, S2>
 {
 public:
@@ -608,7 +607,7 @@ public:
 typedef shared_string<char> STR;
 typedef shared_string<char, U16> ShortSTR;
 typedef shared_string<wchar_t> WSTR;
-typedef shared_string<wchar_t, U32, Allocators::Default, 250> PathSTR;
+typedef shared_string<wchar_t, U32, Allocators::default, 250> PathSTR;
 
 typedef simple_string<wchar_t, U32> WSimpleString;
 typedef simple_string<char, U32> SimpleString;

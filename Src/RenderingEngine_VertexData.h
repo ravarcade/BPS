@@ -1,7 +1,7 @@
 
 using namespace ::BAMS::CORE;
 
-class VertexData : public ResoureImpl<VertexData, 0x00020001, Allocators::Default>
+class VertexData : public ResoureImpl<VertexData, 0x00020001, Allocators::default>
 {
 public:
 	U8 *Data;

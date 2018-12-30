@@ -7,7 +7,7 @@
 */
 
 
-template<typename T, class Alloc = Allocators::Blocks>
+template<typename T>
 struct list {
 private:
 	struct entry : T {
@@ -20,6 +20,7 @@ private:
 		entry *prev;
 	};
 
+	IMemoryAllocator *alloc;
 public:
 	struct iterator {
 	private:
@@ -39,12 +40,14 @@ public:
 		bool operator!=(iterator b) const { return e != b.e; }
 	};
 
-	list(SIZE_T defaultBlockSize = 16 * 1024) :
-		alloc(MemoryAllocatorStatic<>::GetMemoryAllocator(), defaultBlockSize),
+	list(SIZE_T blockSize) :
 		first(nullptr),
 		last(nullptr),
-		size(0)
-	{}
+		size(0),
+		alloc(nullptr)
+	{
+		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, blockSize);
+	}
 
 	~list()
 	{
@@ -59,7 +62,7 @@ public:
 			auto en = f;
 			f = f->next;
 			en->~entry();
-			alloc.deallocate(en);
+			alloc->deallocate(en);
 		}
 
 		size = 0;
@@ -69,8 +72,8 @@ public:
 	template<class... Args>
 	T *push_back(Args &&... args)
 	{
-		void *p = alloc.allocate(sizeof(entry));
-		new (p) entry(&alloc, std::forward<Args>(args)...);
+		void *p = alloc->allocate(sizeof(entry));
+		new (p) entry(alloc, std::forward<Args>(args)...);
 		auto e = reinterpret_cast<entry *>(p);
 		if (last)
 			last->next = e;
@@ -86,8 +89,8 @@ public:
 	template<class... Args>
 	iterator insert(iterator &pos, Args &&... args) // before
 	{
-		void *p = alloc.allocate(sizeof(entry));
-		new (p) entry(&alloc, std::forward<Args>(args)...);
+		void *p = alloc->allocate(sizeof(entry));
+		new (p) entry(alloc, std::forward<Args>(args)...);
 		auto e = reinterpret_cast<entry *>(p);
 		if (pos.e == nullptr) // end() interator
 		{
@@ -134,7 +137,7 @@ public:
 			last = en->prev;
 
 		en->~entry();
-		alloc.deallocate(en);
+		alloc->deallocate(en);
 	}
 
 	iterator erase(iterator &i)
@@ -145,7 +148,6 @@ public:
 	}
 
 private:
-	Alloc alloc;
 	entry *first;
 	entry *last;
 	SIZE_T size;

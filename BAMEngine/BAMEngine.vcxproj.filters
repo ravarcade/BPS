@@ -24,6 +24,9 @@
     <Filter Include="RenderingEngine">
       <UniqueIdentifier>{e7041efe-79b5-48c8-88e4-475b721f1c72}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ResourceManager">
+      <UniqueIdentifier>{1f31e7c3-b1fa-48c8-aef9-86613d3dfd50}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -86,12 +89,6 @@
     <ClInclude Include="..\Src\Core_Queue.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_RawData.h">
-      <Filter>Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\Core_ResourceManager.h">
-      <Filter>Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\Core_Strings.h">
       <Filter>Core</Filter>
     </ClInclude>
@@ -122,6 +119,12 @@
     <ClInclude Include="..\Src\RenderingEngine_VertexDescription.h">
       <Filter>RenderingEngine</Filter>
     </ClInclude>
+    <ClInclude Include="..\Src\RawData.h">
+      <Filter>ResourceManager</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\ResourceManager.h">
+      <Filter>ResourceManager</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -142,9 +145,6 @@
     <ClCompile Include="..\Src\Core_MemoryAllocator.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core_ResourceManager.cpp">
-      <Filter>Core</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\Core_Tools.cpp">
       <Filter>Core</Filter>
     </ClCompile>
@@ -162,6 +162,9 @@
     </ClCompile>
     <ClCompile Include="..\Src\RenderingEngine_Config.cpp">
       <Filter>RenderingEngine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\ResourceManager.cpp">
+      <Filter>ResourceManager</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
