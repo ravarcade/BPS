@@ -176,6 +176,7 @@
     <ClInclude Include="AttribStreamConverter.h" />
     <ClInclude Include="iglfw.h" />
     <ClInclude Include="ire.h" />
+    <ClInclude Include="OutputWindow.h" />
     <ClInclude Include="RenderingEngineVK.h" />
     <ClInclude Include="ShaderProgram.h" />
     <ClInclude Include="ShadersReflections.h" />
@@ -225,6 +226,7 @@
     </ClCompile>
     <ClCompile Include="iglfw.cpp" />
     <ClCompile Include="ire.cpp" />
+    <ClCompile Include="OutputWindow.cpp" />
     <ClCompile Include="RenderingEngineVK.cpp" />
     <ClCompile Include="ShaderProgram.cpp" />
     <ClCompile Include="ShadersReflections.cpp" />

@@ -572,19 +572,6 @@ namespace MemoryAllocatorsPrivate {
 	typedef MemoryAllocatorsPrivate::Alligned16Bytes Frame;
 }
 
-/*
-size_t Allocators::Standard::CurrentAllocatedMemory = 0;
-size_t Allocators::Standard::MaxAllocatedMemory = 0;
-size_t Allocators::Standard::TotalAllocateCommands = 0;
-
-size_t Allocators::Debug::CurrentAllocatedMemory = 0;
-size_t Allocators::Debug::MaxAllocatedMemory = 0;
-size_t Allocators::Debug::TotalAllocateCommands = 0;
-U32 Allocators::Debug::Counter = 0;
-Allocators::Debug::ExtraMemoryBlockInfo *Allocators::Debug::Last = nullptr;
-*/
-
-
 namespace Allocators {
 
 	MemoryAllocatorsPrivate::Default defMemAllocator;
@@ -610,7 +597,7 @@ namespace Allocators {
 		return  MemoryAllocatorsPrivate::DebugStats.list(current, size, counter, data);
 	}
 
-	IMemoryAllocator * GetMemoryAllocator(uint32_t allocatorType, SIZE_T size)
+	BAMS_EXPORT IMemoryAllocator * GetMemoryAllocator(uint32_t allocatorType, SIZE_T size)
 	{
 		if (size == 0)
 			size = 16 * 1024;

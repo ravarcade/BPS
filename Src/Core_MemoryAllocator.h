@@ -97,7 +97,7 @@ namespace Allocators {
 	void GetMemoryAllocationStats(uint64_t *Max, uint64_t *Current, uint64_t *Counter);
 	bool GetMemoryBlocks(void **current, size_t *size, size_t *counter, void **data);
 
-	IMemoryAllocator *GetMemoryAllocator(uint32_t allocatorType = IMemoryAllocator::default, SIZE_T size = 0);
+	BAMS_EXPORT IMemoryAllocator *GetMemoryAllocator(uint32_t allocatorType = IMemoryAllocator::default, SIZE_T size = 0);
 }
 
 typedef Allocators::IMemoryAllocator IMemoryAllocator;

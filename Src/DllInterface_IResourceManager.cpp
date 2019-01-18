@@ -247,6 +247,50 @@ extern "C" {
 
 	BAMS_EXPORT void DoTests()
 	{
+		CStringHastable<int> hti;
+		hti.find("hello");
+		*hti.add("hello") = 5;
+		printf("[%d]", hti["hello"]);
+		hti["hello"] = 7;
+		printf("[%d]", hti["hello"]);
+
+		struct st {
+			int a;
+			int b;
+			int c;
+			st() : a(0), b(1), c(2) {}
+		};
+		CStringHastable<st> hts;
+		printf("[%llx]", (uint64_t) hts.find("hello"));
+		st as;
+		as.a = 77;
+		as.b = 3;
+		*hts.add("hello") = as;
+		printf("[%llx, %d, %d, %d]", (uint64_t)hts.find("hello"), hts["hello"].a, hts["hello"].b , hts["hello"].c);
+		hts["hello"].c = 123;
+		printf("[%llx, %d, %d, %d]", (uint64_t)hts.find("hello"), hts["hello"].a, hts["hello"].b, hts["hello"].c);
+		hts["hello"] = as;
+		printf("[%llx, %d, %d, %d]", (uint64_t)hts.find("hello"), hts["hello"].a, hts["hello"].b, hts["hello"].c);
+
+
+		struct dn {
+			std::string txt;
+			int a;
+			dn() : txt("hello world"), a(1) {}
+		};
+
+		CStringHastable<dn> htd;
+		printf("[%llx]", (uint64_t)htd.find("hello"));
+		dn d;
+		d.txt = "ping";
+		*htd.add("hello") = d;
+		printf("[%llx, %d, %s]", (uint64_t)htd.find("hello"), htd["hello"].a, htd["hello"].txt.c_str());
+		htd["hello"].a = 123;
+		printf("[%llx, %d, %s]", (uint64_t)htd.find("hello"), htd["hello"].a, htd["hello"].txt.c_str());
+		htd["hello"] = d;
+		htd["hello"].txt = "boing";
+		printf("[%llx, %d, %s]", (uint64_t)htd.find("hello"), htd["hello"].a, htd["hello"].txt.c_str());
+
 		return;
 		hashtable<STR, int> ht;
 		STR kkey("hahaha");

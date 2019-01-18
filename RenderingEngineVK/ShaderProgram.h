@@ -64,7 +64,8 @@ public:
 	void SetParams(ShaderProgramParams *params);
 	void SetParam(uint32_t objectId, uint32_t paramId, void *pVal);
 	const ShaderProgramParamsDesc * GetParams() { return &m_shaderProgramParamsDesc; }
-	
+	uint32_t GetObjectCount() { return static_cast<uint32_t>(m_drawObjectData.size()); }
+
 private:
 	std::vector<VkPipelineShaderStageCreateInfo> _Compile();
 	VkPipelineVertexInputStateCreateInfo _GetVertexInputInfo();
@@ -96,10 +97,6 @@ private:
 
 	VkPipelineLayout             m_pipelineLayout        = nullptr;
 	VkPipeline                   m_graphicsPipeline      = nullptr;
-//	VkBuffer                     m_vertexBuffer          = nullptr;
-//	VkDeviceMemory               m_vertexBufferMemory    = nullptr;
-//	VkBuffer                     m_indexBuffer           = nullptr;
-//	VkDeviceMemory               m_indexBufferMemory     = nullptr;
 	std::vector<VkBuffer>        m_uniformBuffers;
 	std::vector<VkDeviceMemory>  m_uniformBuffersMemory;
 

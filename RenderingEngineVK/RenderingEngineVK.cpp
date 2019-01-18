@@ -132,7 +132,7 @@ public:
 
 	void Update(float dt) 
 	{ 
-		glfw.Update(dt);
+		glfw.Update(dt);     
 		re.Update(dt);
 	}
 
@@ -140,35 +140,20 @@ public:
 	{ 
 		switch (msg->id)
 		{
-		case CREATE_3D_WINDOW: {
-			re.CreateWnd(MAINWND, nullptr);
-			re.CreateWnd(BACKBOXWND, nullptr);
-			re.CreateWnd(DMDWND, nullptr);
-			//			VkDoTests();
-
-			auto params = reinterpret_cast<const RenderingModel *>(msg->data);
-			std::set<uint32_t> wnds = { MAINWND, BACKBOXWND, DMDWND };
-			for (auto wnd : wnds) 
-			{
-				uint32_t modelId = re.AddModel(wnd, "cube", GetDemoCube(), "cubeShader");
-				re.AddObject(wnd, modelId);
-				re.AddObject(wnd, modelId);
-				re.AddObject(wnd, modelId);
-
+		case CREATE_WINDOW:  
+			re.CreateWnd(msg->data); 
+			{ // temp
+				PADD_MODEL pas = {
+					reinterpret_cast<const PCREATE_WINDOW *>(msg->data)->wnd,
+					"cube", "cube", "cubesjader"
+				};
+				int wnd = reinterpret_cast<const PCREATE_WINDOW *>(msg->data)->wnd;
+				auto model = re.AddModel(wnd, "cube", GetDemoCube(), "cubeShader");
 			}
-
-//			re.AddModel(MAINWND, params);
-//			re.AddModel(BACKBOXWND, params);
-//			re.AddModel(DMDWND, params);
-		}
 			break;
-
-		case ADD_3D_MODEL: {
-			auto params = reinterpret_cast<const RenderingModel *>(msg->data);
-//			re.AddModel(MAINWND, params);
-//			re.AddModel(BACKBOXWND, params);
-//			re.AddModel(DMDWND, params);
-		} break;
+		case CLOSE_WINDOW:   re.CloseWnd(msg->data); break;
+		case ADD_MODEL:      re.AddModel(msg->data); break;
+		case ADD_SHADER:     re.AddShader(msg->data); break;
 
 		}
 	}

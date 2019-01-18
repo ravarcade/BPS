@@ -42,5 +42,6 @@ enum {
 #include "AttribStreamConverter.h"
 
 #include "iglfw.h"
+#include "OutputWindow.h"
 #include "ire.h"
 

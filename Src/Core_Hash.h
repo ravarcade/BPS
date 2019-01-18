@@ -145,3 +145,24 @@ struct hash<STR>
 		return JSHash(reinterpret_cast<const U8*>(key.begin()), key.size() * sizeof(*key.begin()));
 	}
 };
+
+template<>
+struct hash<const char *>
+{
+	U32 operator() (const char *key)
+	{
+		return JSHash(reinterpret_cast<const U8*>(key), strlen(key));
+	}
+};
+
+// --------------------------------------------------------------------------------------
+
+template<typename K>
+struct cmp {
+	bool operator()(const K a, const K b) { return a == b; };
+};
+
+template<>
+struct cmp<const char *> {
+	bool operator()(const char * a, const char * b) { return strcmp(a,b) == 0; };
+};

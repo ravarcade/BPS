@@ -3,6 +3,11 @@
 int iglfw::GLFW_LastErr = 0;
 const char *iglfw::GLFW_LastErrStr = nullptr;
 
+void window_close_callback(GLFWwindow* window)
+{
+	
+}
+
 void iglfw::ErrorCallback(int err, const char* err_str)
 {
 	GLFW_LastErr = err;
@@ -11,7 +16,7 @@ void iglfw::ErrorCallback(int err, const char* err_str)
 
 iglfw::iglfw()
 {
-	memset(windows, 0, sizeof(windows));
+	windows.clear();
 }
 
 void iglfw::Init()
@@ -43,20 +48,24 @@ void iglfw::Update(float dt)
 		}
 		else
 		{
+			// tell re that window should be closed
+			re.CloseWnd(wnd);
 			glfwDestroyWindow(wnd);
 			wnd = nullptr;
 		}
 	}
 }
 
-
-
 GLFWwindow* iglfw::CreateWnd(int wnd, int width, int height)
 {
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-	windows[wnd] = glfwCreateWindow(width, height, "Rendering Engine: Vulkan", nullptr, nullptr);
-	return windows[wnd];
+	auto window = glfwCreateWindow(width, height, "Rendering Engine: Vulkan", nullptr, nullptr);
+	glfwSetWindowCloseCallback(window, window_close_callback);
+
+	windows.push_back(window);
+
+	return window;
 }
 
 void iglfw::CreateVKSurface(VkInstance instance, int wnd, const VkAllocationCallbacks* allocator, VkSurfaceKHR* surface)
@@ -67,15 +76,9 @@ void iglfw::CreateVKSurface(VkInstance instance, int wnd, const VkAllocationCall
 	}
 }
 
-GLFWwindow *iglfw::GetWnd(int wnd) 
-{ 
-	return windows[wnd]; 
-}
-
-void iglfw::GetWndSize(int wnd, int *width, int *height)
+void iglfw::GetWndSize(GLFWwindow *wnd, int *width, int *height)
 {
-	glfwGetWindowSize(windows[wnd], width, height);
-//	glfwGetFramebufferSize(windows[wnd], width, height);
+	glfwGetWindowSize(wnd, width, height);
 }
 
 

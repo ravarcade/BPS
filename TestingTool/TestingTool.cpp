@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "BAMEngine.h"
+using namespace BAMS;
 
 void LoadVK()
 {
@@ -75,26 +76,25 @@ void DumpRAM()
 #include <vector>
 using std::vector;
 
-SHORT AllKeyboardStates[256] = { 0 };
+BYTE AllKeyboardStates[256] = { 0 };
 DWORD AllKeyboardRepeatTime[256];
-bool currentKeyState[256];
+BYTE currentKeyState[256];
 #pragma comment(lib, "Winmm.lib")
 
 void updateAllKeysScan()
 {
 	const DWORD rep_first = 300;
 	const DWORD rep_next = 50;
-
+	BYTE ks[256];
 	DWORD ct = timeGetTime();
+	GetKeyboardState(ks);
+
 	for (int i = 0; i < 256; ++i)
 	{
-		auto r = GetAsyncKeyState(i);
+//		auto r = ks[i];
+		auto r = GetAsyncKeyState(i) >> 8;
 		auto o = AllKeyboardStates[i];
-		if (i <= 0x20) {
-			r = r & 0x8000 ? 0x8001 : 0;
-		}
-
-		r = r << 8;
+		r = r & 0x80 ? 0x80 : 0;
 		if (r != 0 && o == 0)
 		{
 			currentKeyState[i] = true;
@@ -131,6 +131,79 @@ void wait_for_esc()
 	}
 }
 
+static PCreate3DWindow w0 = { 0, 1200, 800, 10, 10 };
+static PCreate3DWindow w1 = { 1, 500, 500, 1310, 10 };
+static PCreate3DWindow w2 = { 2, 500, 200, 1310, 610 };
+
+void testloop(BAMS::CEngine &en)
+{
+	static PRenderingModel c0 = { 0, "cubename", "cube", "cubeShader" };
+	static PRenderingModel c1 = { 1, "cubename", "cube", "cubeShader" };
+	static PRenderingModel c2 = { 2, "cubename", "cube", "cubeShader" };
+	static PClose3DWindow cw0 = { 0 };
+	static PClose3DWindow cw1 = { 1 };
+	static PClose3DWindow cw2 = { 2 };
+
+	static bool w0v = true;
+	static bool w1v = false;
+	static bool w2v = false;
+
+	for (bool isRunning = true; isRunning;)
+	{
+		//		Sleep(100);
+		BAMS::CEngine::Update(25.0f);
+		SleepEx(25, TRUE);
+		updateAllKeysScan();
+		for (uint16_t i = 0; i < sizeof(currentKeyState); ++i)
+		{
+			if (currentKeyState[i])
+			{
+				switch (i) {
+				case VK_ESCAPE:
+					isRunning = false;
+						break;
+				case VK_ADD:
+					en.SendMsg(ADD_3D_MODEL, RENDERING_ENGINE, 0, nullptr);
+					break;
+
+				case '1':
+					if (w0v)
+						en.SendMsg(CLOSE_3D_WINDOW, RENDERING_ENGINE, 0, &cw0);
+					else
+						en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, &w0);
+					w0v = !w0v;
+					break;
+				case '2':
+					if (w1v)
+						en.SendMsg(CLOSE_3D_WINDOW, RENDERING_ENGINE, 0, &cw1);
+					else
+						en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, &w1);
+					w1v = !w1v;
+					break;
+				case '3':
+					if (w2v)
+						en.SendMsg(CLOSE_3D_WINDOW, RENDERING_ENGINE, 0, &cw2);
+					else
+						en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, &w2);
+					w2v = !w2v;
+					break;
+
+				case 'Q':
+					en.SendMsg(ADD_3D_MODEL, RENDERING_ENGINE, 0, &c0);
+					break;
+				case 'W':
+					en.SendMsg(ADD_3D_MODEL, RENDERING_ENGINE, 0, &c1);
+					break;
+				case 'E':
+					en.SendMsg(ADD_3D_MODEL, RENDERING_ENGINE, 0, &c2);
+					break;
+
+				}
+			}
+		}
+	}
+}
+
 int main()
 {
 
@@ -142,7 +215,6 @@ int main()
 	LoadVK();
 	{
 		BAMS::CEngine en;
-		using namespace BAMS;
 
 		BAMS::RENDERINENGINE::VertexDescription vd;
 
@@ -151,7 +223,7 @@ int main()
 			BAMS::CResourceManager rm;
 			rm.RootDir(L"C:\\Work\\test");
 			rm.LoadSync();
-			en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, nullptr);
+			en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, &w0);
 
 			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 			rm.LoadSync();
@@ -176,7 +248,8 @@ int main()
 			name = rr.GetName();
 
 
-			wait_for_esc();
+			// loop
+			testloop(en);
 
 			rm.LoadSync();
 

@@ -65,12 +65,6 @@ private:
 		alloc->deallocate(oldData);
 	}
 
-	inline U32 getHash(const TKey &key) // remove EMPTY & USED from posible hash values
-	{
-		hash_t h = hash<TKey>()(key);
-		return h < RESERVED ? h + RESERVED : h;
-	}
-
 public:
 	hashtable(U32 _size = 256, float _tresholdLevel = 0.7f, int allocId = 0) :
 		size(_size),
@@ -89,56 +83,62 @@ public:
 		alloc->deallocate(data);
 	}
 
+	void clear() { memset(data, 0, size * sizeof(data[0])); }
+
 	TVal & operator[] (const TKey &key)
 	{
-		if (used + 1 > treshold)
-			rehash(size * 2);
-
 		hash_t h = getHash(key);
-		U32 i = h % size;
-		U32 j = size;
-		while (data[i].hash != EMPTY)
-		{
-			if (data[i].hash == h && data[i].key == key)
-			{
-				return data[i].val;
-			}
+		auto pVal = find(key, h);
+		if (pVal)
+			return *pVal;
 
-			if (data[i].hash == USED_EMPTY && j == size)
-				j = i;
-
-			i = (i + 1) % size;
-		}
-
-		// go back if we have one used and empty
-		if (j != size)
-			i = j;
-
-		// append
-		++used;
-		data[i].hash = h;
-		data[i].key = key;
-
-		return data[i].val;
+		return *add(key, h);
 	}
 
-
-	bool exist(const TKey &key)
+	inline U32 getHash(const TKey &key) // remove EMPTY & USED from posible hash values
 	{
-		hash_t h = getHash(key);
+		hash_t h = hash<TKey>()(key);
+		return h < RESERVED ? h + RESERVED : h;
+	}
+
+	TVal *add(const TKey &key) { return add(key, getHash(key)); }
+	TVal *add(const TKey &key, hash_t h)
+	{
+		++used;
+		if (used > treshold)
+			rehash(size * 2);
+
+		auto pD = data + (h % size);
+		auto e = data + size;
+		for (;;)
+		{
+			if (pD->hash < RESERVED) // == EMPTY or == USED_EMPTY
+			{
+				pD->hash = h;
+				pD->key = key;
+				return &pD->val;
+			}
+			if (++pD == e)
+				pD = data;
+		}
+	}
+
+	TVal *find(const TKey &key) { return find(key, getHash(key)); }
+	TVal *find(const TKey &key, hash_t h)
+	{
 		U32 i = h % size;
 
 		while (data[i].hash != EMPTY)
 		{
-			if (data[i].hash == h && data[i].key == key)
+			if (data[i].hash == h && cmp<TKey>()(data[i].key, key))
 			{
-				return true;
+				return &data[i].val;
 			}
 
 			i = (i + 1) % size;
 		}
 
-		return false;
+		return nullptr;
 	}
 
 	void remove(const TKey &key)
@@ -148,7 +148,7 @@ public:
 
 		while (data[i].hash != EMPTY)
 		{
-			if (data[i].hash == h && data[i].key == key)
+			if (data[i].hash == h && cmp<TKey>()(data[i].key, key))
 			{
 				U32 j = (i + 1) % size;
 				data[i].hash = data[j].hash == EMPTY ? EMPTY : USED_EMPTY; // we mark USED_EMPTY only if NEXT slot is not EMPTY... this way we will have more EMPTY slots
@@ -159,4 +159,131 @@ public:
 			i = (i + 1) % size;
 		}
 	}
+	
+	template<typename Callback>
+	void foreach(Callback &f) 
+	{
+		for (uint32_t i = 0; i < size; ++i)
+		{
+			if (data[i].hash >= RESERVED)
+				f(data[i].val);
+		}
+	}
+};
+
+
+template <typename T>
+struct CStringStructHastable
+{
+	IMemoryAllocator *alloc;
+	BAMS::CORE::hashtable<const char *, T *> ht;
+
+	CStringStructHastable()
+	{
+		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);
+	}
+
+	~CStringStructHastable()
+	{
+		delete alloc;
+	}
+
+	void clear()
+	{
+		ht.clear();                                                             // clear hashtable data
+		delete alloc;                                                           // delete allocated memory for strings (all at once)
+		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);  // create new allocator for strings (with empty buffer)
+	}
+
+	T * find(const char *s) { auto pv = ht.find(s); return pv ? *pv : nullptr; }
+
+	T * add(const char *s)
+	{
+		auto h = ht.getHash(s);
+		auto pV = ht.find(s, h);
+		if (!pV)
+		{
+			SIZE_T l = strlen(s) + 1;
+			char *newS = static_cast<char *>(alloc->allocate(l));
+			T *pT = static_cast<T *>(alloc->allocate(sizeof(T)));
+			memcpy_s(newS, l, s, l);
+			s = newS;
+			pV = ht.add(s, h);
+			*pV = pT;
+		}
+		return *pV;
+	}
+
+	template<typename Callback>
+	void foreach(Callback &f) { ht.foreach(f); }
+};
+
+template <typename T>
+class CStringHastable
+{
+	template<typename X>
+	typename std::enable_if<std::is_trivially_destructible<X>::value == false>::type
+		deleteObjects()
+	{
+		ht.foreach([&](T *o) {
+			o->~T();
+		});
+	}
+
+	template<typename X>
+	typename std::enable_if<std::is_trivially_destructible<X>::value == true>::type
+		deleteObjects()
+	{
+		// Trivially destructible objects can be reused without using the destructor.
+	}
+
+public:
+	IMemoryAllocator *alloc;
+	BAMS::CORE::hashtable<const char *, T *> ht;
+
+	CStringHastable()
+	{
+		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);
+	}
+
+	~CStringHastable()
+	{
+		deleteObjects<T>();
+		delete alloc;
+	}
+
+	void clear()
+	{
+		deleteObjects<T>();                                                     // call destructors of objects if needed
+		ht.clear();                                                             // clear hashtable data
+		delete alloc;                                                           // delete allocated memory for strings (all at once)
+		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);  // create new allocator for strings (with empty buffer)
+	}
+
+	T * find(const char *s) { auto p = ht.find(s); return p ? *p : nullptr; }
+	
+	template<class... Args>
+	T * add(const char *s, Args &&...args)
+	{
+		auto h = ht.getHash(s);
+		auto pV = ht.find(s, h);
+		if (!pV)
+		{
+			SIZE_T l = strlen(s) + 1;
+			char *newS = static_cast<char *>(alloc->allocate(l));
+			memcpy_s(newS, l, s, l);
+			s = newS;
+			pV = ht.add(s, h);
+			*pV = new (alloc->allocate(sizeof(T))) T(std::forward<Args>(args)...);
+		}
+		return *pV;
+	}
+
+	T & operator[] (const char *s)
+	{
+		return *add(s);
+	}
+
+	template<typename Callback>
+	void foreach(Callback &f) { ht.foreach(f); }
 };

@@ -190,7 +190,7 @@ VkPipelineViewportStateCreateInfo CShaderProgram::_GetViewportState()
 	static VkRect2D scissor = { { 0, 0 }, swapChainExtent };
 
 	// viewport and scisors in one structure: viewportState
-	VkPipelineViewportStateCreateInfo viewportState = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+	static VkPipelineViewportStateCreateInfo viewportState = { VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
 	viewportState.viewportCount = 1;
 	viewportState.pViewports = &viewport;
 	viewportState.scissorCount = 1;
@@ -699,6 +699,11 @@ void CShaderProgram::UpdateDescriptorSets()
 
 void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 {
+	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
+
+	vkCmdSetViewport(cb, 0, 1, &vk->viewport);
+	vkCmdSetScissor(cb, 0, 1, &vk->scissor);
+
 	/*
 	static auto startTime = std::chrono::high_resolution_clock::now();
 

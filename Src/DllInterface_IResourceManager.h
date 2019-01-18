@@ -264,12 +264,32 @@ enum { // msgDst
 
 enum { // msgId
 	// to RENDERING_ENGINE
-	CREATE_3D_WINDOW = 0x20001,
-	ADD_3D_MODEL     = 0x20002, // object name + model name + shader program
+	CREATE_WINDOW = 0x20001,
+	CLOSE_WINDOW  = 0x20002,
+	ADD_MODEL     = 0x20003, // object name + model name + shader program
+	ADD_SHADER       = 0x20004
 };
 
-struct RenderingModel {
+struct PCREATE_WINDOW {
+	uint32_t wnd;
+	uint32_t w, h;
+	uint32_t x, y;
+};
+
+struct PCLOSE_WINDOW {
+	uint32_t wnd;
+};
+
+struct PADD_MODEL {
+	uint32_t wnd;
 	const char *object;     // uniq name
 	const char *model;	    // 3d model resource name
 	const char *shader;     // shader program
+};
+
+struct PADD_SHADER {
+	uint32_t wnd;
+	const char *name;
+	uint32_t   numPrograms;
+	const char **programs;
 };

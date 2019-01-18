@@ -6,8 +6,7 @@ public:
 	static int GLFW_LastErr;
 	static const char *GLFW_LastErrStr;
 
-	GLFWwindow* windows[MAX_WINDOWS];
-
+	std::vector<GLFWwindow*> windows;
 	iglfw();
 
 	void Init();
@@ -17,9 +16,8 @@ public:
 	// --------------------------------------------------
 
 	GLFWwindow *CreateWnd(int wnd, int width, int height);
-	GLFWwindow *GetWnd(int wnd);
 	void CreateVKSurface(VkInstance instance, int wnd, const VkAllocationCallbacks* allocator, VkSurfaceKHR* surface);
-	void GetWndSize(int wnd, int *width, int *height);
+	void GetWndSize(GLFWwindow *wnd, int *width, int *height);
 
 };
 
