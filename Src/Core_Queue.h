@@ -33,6 +33,21 @@ private:
 		Entry *next;
 	};
 
+	template<typename X>
+	typename std::enable_if<std::is_trivially_destructible<X>::value == false>::type
+		deleteObjects()
+	{
+		for (; first; first = first->next)
+			first->~Entry(); // destructor is called, but memory is not released, so "next" will be valid
+	}
+
+	template<typename X>
+	typename std::enable_if<std::is_trivially_destructible<X>::value == true>::type
+		deleteObjects()
+	{
+		// Trivially destructible objects can be reused without using the destructor.
+	}
+
 public:
 	queue(SIZE_T size = 16*1024) :
 		first(nullptr),
@@ -41,6 +56,12 @@ public:
 		alloc(nullptr)
 	{
 		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, size);
+	}
+
+	~queue()
+	{
+		deleteObjects<T>();
+		delete alloc;
 	}
 
 	/// <summary>
@@ -73,11 +94,12 @@ public:
 	/// <returns>Pointer to entry or nullptr if queue is empty.</returns>
 	Entry *pop_front()
 	{
-		--used;
 		std::lock_guard<std::mutex> lck(mutex);
 		Entry *ret = first;
-		if (first)
+		if (first) {
+			--used;
 			first = first->next;
+		}
 		if (!first)
 			last = nullptr;
 

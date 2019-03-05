@@ -23,6 +23,77 @@ public:
 	virtual ResourceFactoryInterface *GetFactory() = 0;
 };
 
+class ResourceUpdateNotifier
+{
+public:
+	struct IChain {
+		IChain *next;
+		IChain *prev;
+		virtual void Notify() = 0;
+	} *first;
+
+
+	ResourceUpdateNotifier() : first(nullptr) {}
+
+	void Notify()
+	{
+		for (IChain *f = first; f; f = f->next)
+			f->Notify();
+	}
+
+	void Add(IChain *n)
+	{
+		n->next = first;
+		n->prev = nullptr;
+		if (first)
+			first->prev = n;
+		first = n;
+	}
+
+	void Remove(IChain *n)
+	{
+		if (n->next)
+			n->next->prev = n->prev;
+
+		if (first == n)
+			first = n->next;
+		else 
+			n->prev->next = n->next;
+	}
+};
+
+template<typename T>
+class ResourceUpdateNotifyReciver : public ResourceUpdateNotifier::IChain
+{
+private:
+	ResourceBase *_res;
+	U64 _param;
+	T *_owner;
+public:
+	ResourceUpdateNotifyReciver() : _res(nullptr), _param(0) {}
+	~ResourceUpdateNotifyReciver() { StopNotifyReciver(); }
+	void SetResource(ResourceBase *res, T *owner, U64 param) 
+	{ 
+		StopNotifyReciver();
+		_res = res; 
+		_owner = owner; 
+		_param = param; 
+		_res->AddNotifyReciver(this); 
+		res->AddRef();
+	}
+	
+	void StopNotifyReciver() 
+	{
+		if (_res) {
+			_res->RemoveNotifyReciver(this);
+			_res->Release();
+		}
+	}
+
+	void Notify() { if (_owner) _owner->Notify(_res, _param); }
+	ResourceBase *GetResource() { return _res; }
+};
+
 /// <summary>
 /// Interfec to resource factory.
 /// Every resource type has own resource factory.
@@ -37,9 +108,10 @@ class ResourceFactoryInterface
 public:
 	U32 TypeId;
 	virtual ~ResourceFactoryInterface() {}
-	virtual ResourceImplementationInterface *Create() = 0;
+	virtual ResourceImplementationInterface *Create(ResourceBase *res) = 0;
 	virtual void Destroy(void *ptr) = 0;
 	virtual IMemoryAllocator *GetMemoryAllocator() = 0;
+	virtual bool IsLoadable() = 0;
 };
 
 /// <summary>
@@ -54,12 +126,14 @@ protected:
 	bool _isLoaded;
 	bool _isDeleted;
 	bool _isModified;
+	bool _isLoadable;
 	time _waitWithUpdate;
 	U32 _refCounter;
 	time_t _fileTimeStamp;
 
 	ResourceImplementationInterface *_resourceImplementation;
 	const static time::duration defaultDelay;
+	ResourceUpdateNotifier _updateNotifier;
 
 public:
 	UUID UID;
@@ -75,13 +149,14 @@ public:
 		_isLoaded(false), 
 		_isDeleted(false),
 		_isModified(false),
+		_isLoadable(true),
 		_refCounter(0),
 		_resourceImplementation(nullptr),
-		Type(UNKNOWN),
-		UID(Tools::NOUID) 
+		Type(RESID_UNKNOWN),
+		UID(Tools::NOUID)
 	{};
 
-	virtual ~ResourceBase()
+	~ResourceBase()
 	{
 		if (_resourceImplementation)
 			_resourceImplementation->GetFactory()->Destroy(_resourceImplementation);
@@ -89,16 +164,19 @@ public:
 
 	void Init(CWSTR path);
 
-	void ResourceLoad(void *data, SIZE_T size) 
+	void ResourceLoad(void *data, SIZE_T size = -1) 
 	{
 		_resourceData = data;
-		_resourceSize = size;
-		_isLoaded = data && size;
+		if (size != -1)
+			_resourceSize = size;
+
+		_isLoaded = data != nullptr;
 	}
 
 	inline bool isLoaded() { return _isLoaded; }
 	inline bool isDeleted() { return _isDeleted; }
 	inline bool isModified() { return _isModified; }
+	inline bool isLoadable() { return _isLoadable; }
 
 	void *GetData() { return _resourceData; }
 	SIZE_T GetSize() { return _resourceSize; }
@@ -122,13 +200,12 @@ public:
 
 	U32 GetRefCounter() { return _refCounter; }
 
-	enum {
-		UNKNOWN = 0,
-	};
-
-	void Update() { if (_resourceImplementation) _resourceImplementation->Update(this); }
+	void Update() { if (_resourceImplementation) _resourceImplementation->Update(this); _updateNotifier.Notify(); }
 	IMemoryAllocator *GetMemoryAllocator() { return !_resourceImplementation ? nullptr : _resourceImplementation->GetFactory()->GetMemoryAllocator(); }
 
+	void AddNotifyReciver(ResourceUpdateNotifier::IChain *nr)     { _updateNotifier.Add(nr); }
+	void RemoveNotifyReciver(ResourceUpdateNotifier::IChain *nr) { _updateNotifier.Remove(nr); }
+	time_t GetFileTimestamp() { return _fileTimeStamp; }
 	friend class ResourceManager;
 };
 
@@ -145,24 +222,22 @@ public:
 	}
 };
 
-
 /// <summary>
 /// Helper class used to make resource implementation easier.
 /// It will add ResFactory to class.
 /// </summary>
-template <typename T, U32 ResTypeId, MemoryAllocator Alloc = Allocators::default>
+template <typename T, U32 ResTypeId, MemoryAllocator Alloc = Allocators::default, bool isLoadable = true>
 class ResoureImpl : public ResourceImplementationInterface, public Allocators::Ext<Alloc>
 {
 public:
 	class ResFactory : public ResourceFactoryChain, public Allocators::Ext<Alloc>
 	{
 	public:
-		ResourceImplementationInterface *Create() { return make_new<T>(); }
+		ResourceImplementationInterface *Create(ResourceBase *res) { return make_new<T>(res); }
 		void Destroy(void *ptr) { make_delete<T>(ptr); }
 		IMemoryAllocator *GetMemoryAllocator() { return Alloc; }
-		ResFactory() : ResourceFactoryChain() {
-			TypeId = ResTypeId; 
-		}
+		ResFactory() : ResourceFactoryChain()  { TypeId = ResTypeId; }
+		bool IsLoadable() { return isLoadable; }
 	};
 	ResourceFactoryInterface *GetFactory() { return &_resourceFactory; }
 
@@ -170,8 +245,8 @@ public:
 	static U32 GetTypeId() { return _resourceFactory.TypeId; }
 };
 
-template <typename T, U32 ResTypeId, MemoryAllocator Alloc>
-typename ResoureImpl<T, ResTypeId, Alloc>::ResFactory ResoureImpl<T, ResTypeId, Alloc>::_resourceFactory;
+template <typename T, U32 ResTypeId, MemoryAllocator Alloc, bool IsLoadable>
+typename ResoureImpl<T, ResTypeId, Alloc, IsLoadable>::ResFactory ResoureImpl<T, ResTypeId, Alloc, IsLoadable>::_resourceFactory;
 
 
 // ============================================================================
@@ -192,8 +267,9 @@ public:
 	static void Destroy(ResourceManager *);
 
 	void Filter(ResourceBase **resList, U32 *resCount, CSTR &patern);
-	ResourceBase *Get(const STR &resName, U32 typeId = ResourceBase::UNKNOWN);
-	ResourceBase *Get(CSTR resName, U32 typeId = ResourceBase::UNKNOWN) { return Get(STR(resName), typeId); };
+	ResourceBase *GetByFilename(const WSTR &filename, U32 typeId = RESID_UNKNOWN);
+	ResourceBase *Get(const STR &resName, U32 typeId = RESID_UNKNOWN);
+	ResourceBase *Get(CSTR resName, U32 typeId = RESID_UNKNOWN) { return Get(STR(resName), typeId); };
 	ResourceBase *Get(const UUID &resUID);
 
 	template<class T>
@@ -206,10 +282,13 @@ public:
 	void AddDir(CWSTR path);
 	void RootDir(CWSTR path);
 
-	void LoadSync();
+	void LoadSync(ResourceBase *res = nullptr);
+	void RefreshResorceFileInfo(ResourceBase *res);
 
 	void StartDirectoryMonitor();
 	void StopDirectoryMonitor();
+	void AbsolutePath(WSTR &filename);
+	void RelativePath(WSTR &filename);
 };
 
 
@@ -229,7 +308,9 @@ public:
 	ResourceManager *GetResourceManager();
 };
 
+extern ResourceManager *globalResourceManager;
 
 #define RESOURCEMANAGER_ADD_FILE 0x10001
 
 #include "RawData.h"
+#include "ResShader.h"

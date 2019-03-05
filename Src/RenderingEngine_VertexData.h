@@ -1,13 +1,13 @@
 
 using namespace ::BAMS::CORE;
 
-class VertexData : public ResoureImpl<VertexData, 0x00020001, Allocators::default>
+class VertexData : public ResoureImpl<VertexData, RESID_VERTEXDATA, Allocators::default>
 {
 public:
 	U8 *Data;
 	SIZE_T Size;
 
-	VertexData() : Data(nullptr), Size(0) {}
+	VertexData(ResourceBase *res) : Data(nullptr), Size(0) {}
 	~VertexData() { if (Data) deallocate(Data); }
 
 	void Update(ResourceBase *res)

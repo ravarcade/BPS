@@ -93,7 +93,7 @@ public:
 	void AddShader(const void *params);
 
 	void CloseWnd(GLFWwindow* window);
-	void AddShader(int wnd, const char *name, std::vector<std::string>&& programs);
+	void AddShader(int wnd, const char *shaderName);
 	ModelInfo *AddModel(int wnd, const char *objectName, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shaderProgram);
 	ModelInfo *GetModel(int wnd, const char *objectName);
 	uint32_t AddObject(int wnd, ModelInfo * model);

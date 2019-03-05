@@ -6,13 +6,13 @@
 *
 */
 
-class RawData : public ResoureImpl<RawData, 0x00010001, Allocators::default>
+class RawData : public ResoureImpl<RawData, RESID_RAWDATA, Allocators::default>
 {
 public:
 	U8 *Data;
 	SIZE_T Size;
 
-	RawData() : Data(nullptr), Size(0) {}	
+	RawData(ResourceBase *res) : Data(nullptr), Size(0) {}	
 	~RawData() { if (Data) deallocate(Data); }
 
 	void Update(ResourceBase *res)
@@ -24,11 +24,10 @@ public:
 
 	void Release(ResourceBase *res)
 	{
-		res->ResourceLoad(nullptr, 0);
+		res->ResourceLoad(nullptr);
 		if (Data)
 			res->GetMemoryAllocator()->deallocate(Data);
 		Data = nullptr;
-		Size = 0;
 	}
 
 	U8 *GetData() { return Data; }

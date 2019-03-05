@@ -41,7 +41,7 @@ public:
 
 	void SetParentOutputWindow(OutputWindow *outputWindow) { vk = outputWindow; }
 
-	void LoadPrograms(std::vector<std::string> &&programs);
+	void LoadProgram(const char *program);
 	void Release();
 
 	const std::vector<std::string> &GetOutputNames();

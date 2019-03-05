@@ -1,4 +1,5 @@
 #pragma once
+// included by BAMEngineImport.h
 
 #define NAMESPACE_CORE_BEGIN namespace BAMS { namespace CORE {
 #define NAMESPACE_CORE_END } }
@@ -37,9 +38,8 @@
 #  endif
 #endif
 
-typedef ptrdiff_t Size;
-template< class Type, Size n >
-Size COUNT_OF(Type(&)[n]) { return n; }
+template< class Type, ptrdiff_t n >
+constexpr ptrdiff_t COUNT_OF(Type const (&)[n]) noexcept { return n; }
 
 #include "..\3rdParty\tinyxml2\tinyxml2.h"
 

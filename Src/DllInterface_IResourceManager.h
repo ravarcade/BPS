@@ -6,9 +6,22 @@
 *
 */
 
+enum {
+	RESID_CORE_RESOURCES = 0x00010000,
+	RESID_UNKNOWN,
+	RESID_RAWDATA = RESID_UNKNOWN,
+
+	// resources used by rendering engine
+	RESID_RENDERING_ENGINE_RESOURCES = 0x00020000,
+	RESID_SHADER,
+	RESID_SHADER_PROGRAM,
+	RESID_VERTEXDATA,
+};
+
 extern "C" {
 	typedef void IResource;
 	typedef void IRawData;
+	typedef void IShader;
 	typedef void IResourceManager;
 	typedef void IModule;
 
@@ -34,6 +47,7 @@ extern "C" {
 	BAMS_EXPORT const wchar_t * IResource_GetPath(IResource *res);
 	BAMS_EXPORT bool IResource_IsLoaded(IResource *res);
 	BAMS_EXPORT uint32_t IResource_GetType(IResource *res);
+	BAMS_EXPORT bool IResource_IsLoadingNeeded(IResource *res);
 
 	// ResourceManager
 	BAMS_EXPORT IResourceManager *IResourceManager_Create();
@@ -41,18 +55,28 @@ extern "C" {
 	BAMS_EXPORT IResource *IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT void IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT void IResourceManager_RootDir(IResourceManager *rm, const wchar_t *path);
-	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name);
+	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name, uint32_t type = 0);
 	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource **resList, uint32_t *resCount, const char *pattern);
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name);
-	BAMS_EXPORT void IResourceManager_LoadSync(IResourceManager *rm);
+	BAMS_EXPORT void IResourceManager_LoadSync(IResourceManager *rm, IResource *res = nullptr);
+	BAMS_EXPORT void IResourceManager_RefreshResorceFileInfo(IResourceManager *rm, IResource *res);
 	BAMS_EXPORT void IResourceManager_StartDirectoryMonitor(IResourceManager *rm);
 	BAMS_EXPORT void IResourceManager_StopDirectoryMonitor(IResourceManager *rm);
 
 	// RawData
 	BAMS_EXPORT unsigned char *IRawData_GetData(IRawData *res);
 	BAMS_EXPORT size_t IRawData_GetSize(IRawData *res);
+
+	// Shader
+	BAMS_EXPORT unsigned char *IShader_GetData(IShader *res);
+	BAMS_EXPORT size_t IShader_GetSize(IShader *res);
+	BAMS_EXPORT void IShader_AddProgram(IShader *res, const wchar_t *fileName);
+	BAMS_EXPORT const wchar_t * IShader_GetProgramName(IShader *res, int type);
+	BAMS_EXPORT void IShader_Save(IShader *res);
+	BAMS_EXPORT uint32_t IShader_GetSubprogramsCount(IShader *res);
+	BAMS_EXPORT IRawData *IShader_GetSubprogram(IShader *res, uint32_t idx);
 
 	// Module
 	struct Message
@@ -122,12 +146,14 @@ extern "C" {
 		inline IResource *Get() { return val ? val->ptr : nullptr; }
 	};
 
+	class CResourceManager;
 	class CResource 
 	{
 	protected:
 		ResourceSmartPtr _res;
 
 		inline IResource *Get() { return _res.Get(); }
+		friend CResourceManager;
 
 	public:
 		CResource() {}
@@ -166,7 +192,31 @@ extern "C" {
 		size_t GetSize() { return IRawData_GetSize(static_cast<IRawData*>(Get())); }
 	};
 
-	class CResourceManager 
+	class CShader : public CResource
+	{
+	public:
+		CShader() {}
+		CShader(IShader *r) : CResource(static_cast<IResource*>(r)) {}
+		CShader(const CShader &src) : CResource(src) {}
+		CShader(CShader &&src) : CResource(std::move(src)) {}
+		virtual ~CShader() {}
+
+		CShader & operator = (const CShader &src) { _res = src._res; return *this; }
+		CShader & operator = (CShader &&src) { _res = std::move(src._res); return *this; }
+
+		unsigned char *GetData() { return IShader_GetData(static_cast<IShader*>(Get())); }
+		size_t GetSize() { return IShader_GetSize(static_cast<IShader*>(Get())); }
+
+		void AddProgram(const wchar_t *fileName) { IShader_AddProgram(static_cast<IShader*>(Get()), fileName); }
+		const wchar_t *GetSubprogramName(int type) { return IShader_GetProgramName(static_cast<IShader*>(Get()), type); }
+
+		uint32_t GetSubprogramsCount() { return IShader_GetSubprogramsCount(static_cast<IShader*>(Get())); }
+		CRawData GetSubprogram(uint32_t idx) { CRawData prg(IShader_GetSubprogram(static_cast<IShader*>(Get()), idx)); return  std::move(prg); }
+
+		void Save() { IShader_Save(static_cast<IShader*>(Get())); }
+	};
+
+	class CResourceManager
 	{
 		IResourceManager *_rm;
 
@@ -183,18 +233,22 @@ extern "C" {
 		void RootDir(const wchar_t *path) { IResourceManager_RootDir(_rm, path); }
 
 		void Filter(IResource **resList, uint32_t *resCount, const char *pattern) { IResourceManager_Filter(_rm, resList, resCount, pattern); }
-		CResource FindByName(const char *name) { CResource res(IResourceManager_FindByName(_rm, name)); return std::move(res); }
+		CResource FindByName(const char *name, uint32_t type = RESID_UNKNOWN) { CResource res(IResourceManager_FindByName(_rm, name, type)); return std::move(res); }
 		CResource FindByUID(const UUID &uid) { CResource res(IResourceManager_FindByUID(_rm, uid)); return std::move(res); }
 
 		CRawData GetRawDataByName(const char *name) { CRawData res(IResourceManager_GetRawDataByName(_rm, name)); return std::move(res); }
 		CRawData GetRawDataByUID(const UUID &uid) { CRawData res(IResourceManager_GetRawDataByUID(_rm, uid)); return std::move(res); }
 
-		void LoadSync() { IResourceManager_LoadSync(_rm); }
+		CShader GetShaderByName(const char *name) { CShader res(IResourceManager_FindByName(_rm, name, RESID_SHADER)); return std::move(res); }
+		void LoadSync() { IResourceManager_LoadSync(_rm, nullptr); }
+		void LoadSync(CResource &res) { IResourceManager_LoadSync(_rm, res.Get()); }
+		void RefreshResorceFileInfo(IResource *res) { IResourceManager_RefreshResorceFileInfo(_rm, res); }
 
 		void StartDirectoryMonitor() { IResourceManager_StartDirectoryMonitor(_rm); }
 		void StopDirectoryMonitor() { IResourceManager_StopDirectoryMonitor(_rm); }
-
 	};
+
+	
 
 	class CEngine
 	{
@@ -282,14 +336,12 @@ struct PCLOSE_WINDOW {
 
 struct PADD_MODEL {
 	uint32_t wnd;
-	const char *object;     // uniq name
-	const char *model;	    // 3d model resource name
-	const char *shader;     // shader program
+	const char *object;      // uniq name
+	const char *model;	     // 3d model resource name
+	const char *shaderName;  // shader program name
 };
 
 struct PADD_SHADER {
 	uint32_t wnd;
-	const char *name;
-	uint32_t   numPrograms;
-	const char **programs;
+	const char *shaderName;
 };

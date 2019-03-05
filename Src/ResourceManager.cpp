@@ -47,7 +47,7 @@
  - modifikowanie u¿ytego zasobu (_refCounter > 0), reload zmodifikowanego zasobu
  - zwalnianie zasobu (_refCounter = 0)
  - usuwanie zasobu nieu¿ywanego(_refCounter = 0), czyli zwalniamy go z pamiêci ale nie kasujemy z listy zasobów.
- - modifikowanie zasobu nieu¿ywanego 
+ - modifikowanie zasobu nieu¿ywanego
 */
 
 /**
@@ -138,10 +138,51 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		}
 		_resources.clear();
 	}
-	
+
+	void MakeNameUniq(ResourceBase *res)
+	{
+		bool repeat = true;
+		while (repeat)
+		{
+			repeat = false;
+			for (auto &r : _resources)
+			{
+				if (r != res && r->Name == res->Name)
+				{
+					repeat = true;
+				}
+			}
+
+			if (repeat)
+			{
+				// number at end of file name
+				auto e = res->Name.end();
+				auto f = res->Name.begin();
+				int num = 2;
+				while (f < e && std::isdigit(e[-1]))
+					--e;
+				if (e != res->Name.end())
+				{
+					auto ee = res->Name.end();
+					auto ef = e;
+					num = 0;
+					while (ef < ee)
+					{
+						num = num * 10 + (*ef) - '0';
+						++ef;
+					}
+					++num;
+				}
+				res->Name.resize(static_cast<U32>(e - f));
+				res->Name += num;
+			}
+		}
+	}
+
 	ResourceBase *AddResource(ResourceBase *res)
 	{
 		res->ResourceLoad(nullptr, 0);
+		MakeNameUniq(res);
 		_resources.push_back(res);
 		return res;
 	}
@@ -158,6 +199,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 		auto res = make_new<ResourceBase>();
 		res->Init(path);
+		MakeNameUniq(res);
 		_resources.push_back(res);
 		return res;
 	}
@@ -188,7 +230,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 		while (f != l)
 		{
-			if ((*f)->Path.startWith(filename) && ((*f)->Path.size() == filename.size() || (*f)->Path[filename.size()] == Tools::directorySeparatorChar))
+			if ((*f)->Path.startsWith(filename) && ((*f)->Path.size() == filename.size() || (*f)->Path[filename.size()] == Tools::directorySeparatorChar))
 			{
 				out = f;
 				return true;
@@ -213,7 +255,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 				// removed!? Do second check
 				if (!Tools::Exist(res->Path))
 					res->_isDeleted = true;
-					
+
 			}
 			else
 			{
@@ -278,7 +320,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 				break;
 			}
 		}
-		if (_rootDir.startWith(filename) && (_rootDir.size() == fnlen || _rootDir[fnlen] == Tools::directorySeparatorChar))
+		if (_rootDir.startsWith(filename) && (_rootDir.size() == fnlen || _rootDir[fnlen] == Tools::directorySeparatorChar))
 		{
 			_rootDir = nfn + _rootDir.substr(fnlen);
 		}
@@ -294,9 +336,9 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		AddDirToMonitor(std::move(sPath), type);
 	}
 
-	void AddDirToMonitor(PathSTR &&sPath, U32 type) 
-	{ 
-		_monitoredDirs.AddDir(std::move(sPath), type); 
+	void AddDirToMonitor(PathSTR &&sPath, U32 type)
+	{
+		_monitoredDirs.AddDir(std::move(sPath), type);
 	}
 
 	void RootDir(CWSTR path)
@@ -307,14 +349,14 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		LoadManifest();
 		ScanRootdir();
 	}
-	
+
 	void CreateResourceImplementation(ResourceBase *res)
 	{
 		// we must have resource implemented
-		if (res->_resourceImplementation == nullptr)
+		while (res->_resourceImplementation == nullptr)
 		{
 			// we must have res type set
-			if (res->Type == ResourceBase::UNKNOWN)
+			if (res->Type == RESID_UNKNOWN)
 				res->Type = RawData::GetTypeId();
 
 			// we need to find correct "create" function ...
@@ -323,35 +365,29 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 				if (f->TypeId == res->Type)
 				{
 					// ... an create it
-					res->_resourceImplementation = f->Create();
+					res->_resourceImplementation = f->Create(res);
+					res->_isLoadable = f->IsLoadable();
 					break;
 				}
 			}
+
+			// ... and if we still don't know what it is... it must be RawData.
+			if (res->_resourceImplementation == nullptr)
+				res->Type = RawData::GetTypeId();
 		}
 	}
 
 	void SetResourceType(ResourceBase *res, U32 resTypeId)
 	{
-		if (res->Type != ResourceBase::UNKNOWN)
+		if (res->Type != RESID_UNKNOWN)
 		{
 			// delete old resource
 			res->_resourceImplementation->GetFactory()->Destroy(res->_resourceImplementation);
+			res->_resourceImplementation = nullptr;
 		}
 
 		res->Type = resTypeId;
-		if (resTypeId != ResourceBase::UNKNOWN)
-		{
-			// we need to find correct "create" function ...
-			for (auto f = ResourceFactoryChain::First; f; f = f->Next)
-			{
-				if (f->TypeId == resTypeId)
-				{
-					// ... an create it
-					res->_resourceImplementation = f->Create();
-					break;
-				}
-			}
-		}
+		CreateResourceImplementation(res);
 	}
 
 	void Load(ResourceBase *res)
@@ -362,13 +398,17 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		SIZE_T size = 0;
 		BYTE *data = nullptr;
 
-		//if (res->Type == ResourceBase::UNKNOWN) 
+		//if (res->Type == RESID_UNKNOWN) 
 		//	res->_resourceImplementation->Release(res);
 
 		CreateResourceImplementation(res);
-	
-		data = Tools::LoadFile(&size, &res->_fileTimeStamp, res->Path, res->GetMemoryAllocator());
-		
+
+		if (res->_isLoadable) {
+			data = Tools::LoadFile(&size, &res->_fileTimeStamp, res->Path, res->GetMemoryAllocator());
+		}
+		else {
+			Tools::InfoFile(&size, &res->_fileTimeStamp, res->Path);
+		}
 
 		// mark resource as deleted if file not exist and can't be loaded
 		if (data == nullptr && size == 0)
@@ -377,9 +417,12 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		if (!res->_isDeleted)
 		{
 			res->ResourceLoad(data, size);
+			if (!res->_isLoadable)
+				res->_isLoaded = true;
+
 			res->_isModified = false;
 		}
-	}	
+	}
 
 	WSTR fileName, fileNameRenameTo;
 	int addcount, remcount, modcount, rencount;
@@ -443,49 +486,74 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		}
 	}
 
+	void ProcessResource(ResourceBase *res, clock::time_point &now, bool &allLoaded)
+	{
+		if (res->Type == 0)
+			TRACE("t=0\n");
 
-	bool ProcessResources()
+		if (res->_isLoaded && (res->_isDeleted || (res->_isModified && res->_waitWithUpdate > now)))
+		{
+			res->_updateNotifier.Notify();
+			res->GetImplementation()->Release(res);
+		}
+
+		if (res->_isDeleted)
+			return;
+
+		if (!res->_isLoaded && res->_refCounter && (!res->_isModified || res->_waitWithUpdate < now))
+		{
+			wprintf(L"Loading: %s\n", res->Path.c_str());
+			Load(res);
+			if (res->_isLoaded)
+			{
+				res->Update();
+			}
+		}
+
+		if (res->_refCounter && !res->_isLoaded)
+		{
+			allLoaded = false;
+		}
+	}
+
+	bool ProcessResources(ResourceBase *res = nullptr)
 	{
 		bool allLoaded = true;
 		std::lock_guard<std::mutex> lck(_fileLoadingMutex);
 		auto now = clock::now();
-		int cnt = 0;
-		for (auto &res : _resources)
+
+		if (res)
 		{
-			++cnt;
-			if (res->_isLoaded && (res->_isDeleted || (res->_isModified && res->_waitWithUpdate > now)))
+			ProcessResource(res, now, allLoaded);
+			if (!res->_isLoadable)
+				res->_isLoaded = true;
+		}
+		else
+		{
+			for (auto &res : _resources)
 			{
-				res->GetImplementation()->Release(res);
-			}
-
-			if (res->_isDeleted)
-				continue;
-
-			if (!res->_isLoaded && res->_refCounter && (!res->_isModified || res->_waitWithUpdate < now))
-			{
-				wprintf(L"Loading: %s\n", res->Path.c_str());
-				Load(res);
-				if (res->_isLoaded)
-				{
-					res->Update();
-				}
-			}
-			if (res->_refCounter && !res->_isLoaded)
-			{
-				allLoaded = false;
+				ProcessResource(res, now, allLoaded);
 			}
 		}
+
 		return allLoaded;
 	}
 
-	void LoadEverything()
+	void LoadEverything(ResourceBase *res)
 	{
-		bool allLoaded = ProcessResources();
+		if (res)
+			res->_isDeleted = false;
+		bool allLoaded = ProcessResources(res);
 		while (!_killWorkerFlag && !allLoaded)
 		{
+			allLoaded = ProcessResources(res);
 			SleepEx(100, TRUE);
-			allLoaded = ProcessResources();
 		}
+	}
+
+	void RefreshResorceFileInfo(ResourceBase *res)
+	{
+		res->_isDeleted = !Tools::InfoFile(&res->_resourceSize, &res->_fileTimeStamp, res->Path);
 	}
 
 	void StartMonitoring()
@@ -517,7 +585,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		WSTR cvt;
 		STR fn;
 
-
 		char *manifest = reinterpret_cast<char *>(Tools::LoadFile(&manifestSize, nullptr, _manifestFileName, GetMemoryAllocator()));
 		if (manifest)
 		{
@@ -528,23 +595,25 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			auto qty = root->IntAttribute("qty");
 			for (auto r = root->FirstChildElement("Resource"); r; r = r->NextSiblingElement())
 			{
-				fn = r->GetText();
+				auto fileName = r->GetText();
+				if (!fileName)
+					continue;
+				fn = fileName;
 				cvt.UTF8(fn);
-				WSTR wfn = (cvt.size() > 2 && cvt[1] == ':' && cvt[2] == Tools::directorySeparatorChar) ?  cvt : rpath + cvt;
+				WSTR wfn = (cvt.size() > 2 && cvt[1] == ':' && cvt[2] == Tools::directorySeparatorChar) ? cvt : rpath + cvt;
 
 				auto res = make_new<ResourceBase>();
 				res->Path = wfn;
 				res->Name = r->Attribute("Name");
-				SetResourceType(res, r->UnsignedAttribute("Type", ResourceBase::UNKNOWN));
+				SetResourceType(res, r->UnsignedAttribute("Type", RESID_UNKNOWN));
 				const char *uid = r->Attribute("UID");
 				Tools::String2UUID(res->UID, uid);
 				res->_fileTimeStamp = r->Int64Attribute("Update", 0);
 				res->_resourceSize = r->Int64Attribute("Size", 0);
 				_resources.push_back(res);
 			}
-		}
-		if (manifest)
 			GetMemoryAllocator()->deallocate(manifest);
+		}
 	}
 
 	void SaveManifest()
@@ -561,7 +630,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		{
 			if (res->_isDeleted)
 				continue;
-			cvt.UTF8(res->Path.startWith(rpath) ? res->Path.substr(rplen) : res->Path);
+			cvt.UTF8(res->Path.startsWith(rpath) ? res->Path.substr(rplen) : res->Path);
 			Tools::UUID2String(res->UID, uidbuf);
 			auto *entry = out.NewElement("Resource");
 			entry->SetAttribute("Name", res->Name.c_str());
@@ -581,6 +650,33 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 		Tools::SaveFile(prn.CStrSize() - 1, prn.CStr(), manifestFileName);
 		printf("-------------- xml ------------------\n%s\n-------------------------------\n", prn.CStr());
+	}
+
+	void AbsolutePath(WSTR & filename)
+	{
+		if (filename.size() > 3 &&
+			!(
+			((filename[0] >= 'a' && filename[0] <= 'z') || (filename[0] >= 'A' && filename[0] <= 'Z')) &&
+				filename[1] == ':' &&
+				(filename[2] == '\\' || filename[2] == '/')
+				)
+			)
+		{
+			if (filename[0] == '/' || filename[0] == '\\')
+				filename = _rootDir + filename;
+			else
+				filename = _rootDir + Tools::wDirectorySeparator + filename;
+		}
+
+		return Tools::NormalizePath(filename);
+	}
+
+	void RelativePath(WSTR &filename)
+	{
+		if (filename.size() > _rootDir.size() && filename.startsWith(_rootDir) && (filename[_rootDir.size()] == '\\' || filename[_rootDir.size()] == '/'))
+		{
+			filename = filename.substr(static_cast<I32>(_rootDir.size()) + 1); // +1 for directory separator
+		}
 	}
 };
 
@@ -611,13 +707,46 @@ void ResourceManager::Filter(ResourceBase ** resList, U32 * resCount, CSTR & _pa
 		*resCount = counter;
 }
 
+ResourceBase *ResourceManager::GetByFilename(const WSTR &filename, U32 typeId)
+{
+	ResourceBase *ret = nullptr;
+
+	for (ResourceBase **res = nullptr; _data->FindResourceByFilename(res, filename); )
+	{
+		if (!(*res)->_isDeleted &&
+			(typeId == RESID_UNKNOWN || (*res)->Type == RESID_UNKNOWN || (*res)->Type == typeId))
+		{
+			ret = *res;
+			break;
+		}
+	}
+
+	if (!ret)
+	{
+		ret = make_new<ResourceBase>();
+		ret->Init(filename.c_str());
+		ret->Type = typeId;
+		_data->AddResource(ret);
+	}
+
+	// if we don't have type set, when set one.
+	if (ret->Type == RESID_UNKNOWN)
+	{
+		ret->Type = typeId;
+	}
+
+	CreateResourceImplementation(ret);
+
+	return ret;
+}
+
 ResourceBase * ResourceManager::Get(const STR & resName, U32 typeId)
 {
 	ResourceBase *ret = nullptr;
 	for (auto &res : _data->_resources)
 	{
 		// if we have correct name and typeid, then we have found
-		if (res->Name == resName && res->Type == typeId && typeId != ResourceBase::UNKNOWN)
+		if (res->Name == resName && res->Type == typeId && typeId != RESID_UNKNOWN)
 		{
 			ret = res;
 			break;
@@ -628,8 +757,8 @@ ResourceBase * ResourceManager::Get(const STR & resName, U32 typeId)
 		// - we don't know type when we ask (typeId == UNKNOWN) or resource type is UNKNOWN (ret->Type == UNKNOWN)
 		// - we don't have other candidates or we don't know resource type for previous candidate
 		if (res->Name == resName &&
-			(typeId == ResourceBase::UNKNOWN || res->Type == ResourceBase::UNKNOWN) &&
-			(ret == nullptr || (ret != nullptr && ret->Type == ResourceBase::UNKNOWN)))
+			(typeId == RESID_UNKNOWN || res->Type == RESID_UNKNOWN) &&
+			(ret == nullptr || (ret != nullptr && ret->Type == RESID_UNKNOWN)))
 		{
 			ret = res; // we have another candidate
 		}
@@ -643,11 +772,10 @@ ResourceBase * ResourceManager::Get(const STR & resName, U32 typeId)
 		_data->AddResource(ret);
 	}
 
-
 	// if we don't have type set, when set one.
-	if (ret->Type == ResourceBase::UNKNOWN)
+	if (ret->Type == RESID_UNKNOWN)
 	{
-		ret->Type = typeId != ResourceBase::UNKNOWN ? typeId : RawData::GetTypeId();
+		ret->Type = typeId;
 	}
 
 	CreateResourceImplementation(ret);
@@ -681,7 +809,8 @@ ResourceBase * ResourceManager::Get(const UUID & resUID)
 
 
 // few more "one liners"
-void ResourceManager::LoadSync() { _data->LoadEverything(); }
+void ResourceManager::LoadSync(ResourceBase *res) { _data->LoadEverything(res); }
+void ResourceManager::RefreshResorceFileInfo(ResourceBase *res) { _data->RefreshResorceFileInfo(res); }
 ResourceBase *ResourceManager::Add(CWSTR path) { return _data->AddResource(path); }
 void ResourceManager::CreateResourceImplementation(ResourceBase *res) { _data->CreateResourceImplementation(res); }
 void ResourceManager::AddDir(CWSTR path) { _data->AddDirToMonitor(path, 0); }
@@ -689,6 +818,8 @@ void ResourceManager::RootDir(CWSTR path) { _data->RootDir(path); }
 void ResourceManager::StartDirectoryMonitor() { _data->StartMonitoring(); }
 void ResourceManager::StopDirectoryMonitor() { _data->StopMonitoring(); }
 
+void ResourceManager::AbsolutePath(WSTR & filename) { _data->AbsolutePath(filename); }
+void ResourceManager::RelativePath(WSTR &filename) { _data->RelativePath(filename); }
 
 // ============================================================================ ResourceManagerModule ===
 

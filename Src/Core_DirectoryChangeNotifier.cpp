@@ -164,6 +164,7 @@ struct MonitoredDir
 	DWORD bufferSize;
 	EventQueue *events;
 	bool isStopped;
+	bool isEnabled;
 	
 	MonitoredDir(PathSTR &&_path, U32 _type, EventQueue *_eventsFromOs) :
 		hDir(0),
@@ -172,7 +173,8 @@ struct MonitoredDir
 		type(_type),
 		events(_eventsFromOs),
 		bufferSize(0),
-		isStopped(true)
+		isStopped(true),
+		isEnabled(false)
 	{ 
 		memset(&pollingOverlap, 0, sizeof(pollingOverlap)); 
 	}
@@ -190,23 +192,23 @@ struct MonitoredDir
 			OPEN_EXISTING,
 			FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
 			NULL);
-
-
-		if (hDir != INVALID_HANDLE_VALUE)
+		
+		if (hDir != INVALID_HANDLE_VALUE) 
+		{
+			isEnabled = true;
 			BeginRead();
+		}
 	}
 
 	void Stop()
 	{
 		if (hDir && hDir != INVALID_HANDLE_VALUE)
 		{
-			CancelIo(hDir);
-			int cnt = 100;
-			while (!isStopped && cnt > 0)
-			{
+			isEnabled = false;
+			CancelIoEx(hDir, &pollingOverlap);
+			if (HasOverlappedIoCompleted(&pollingOverlap))
 				SleepEx(5, TRUE);
-				--cnt;
-			}
+
 			CloseHandle(hDir);
 		}
 		hDir = 0;
@@ -214,24 +216,27 @@ struct MonitoredDir
 
 	void BeginRead()
 	{
-		// begin read
-		memset(&pollingOverlap, 0, sizeof(pollingOverlap));
-		bufferSize = 0;
-		pollingOverlap.hEvent = this;
-		isStopped = false;
-		BOOL success = ::ReadDirectoryChangesW(
-			hDir,
-			&buffer,
-			sizeof(buffer),
-			TRUE, // monitor children?
-			FILE_NOTIFY_CHANGE_LAST_WRITE
-			| FILE_NOTIFY_CHANGE_CREATION
-			| FILE_NOTIFY_CHANGE_FILE_NAME
-			| FILE_NOTIFY_CHANGE_SIZE
-			| FILE_NOTIFY_CHANGE_DIR_NAME,
-			&bufferSize,
-			&pollingOverlap,
-			&NotificationCompletion);
+		if (isEnabled)
+		{
+			// begin read
+			memset(&pollingOverlap, 0, sizeof(pollingOverlap));
+			bufferSize = 0;
+			pollingOverlap.hEvent = this;
+			isStopped = false;
+			BOOL success = ::ReadDirectoryChangesW(
+				hDir,
+				&buffer,
+				sizeof(buffer),
+				TRUE, // monitor children?
+				FILE_NOTIFY_CHANGE_LAST_WRITE
+				| FILE_NOTIFY_CHANGE_CREATION
+				| FILE_NOTIFY_CHANGE_FILE_NAME
+				| FILE_NOTIFY_CHANGE_SIZE
+				| FILE_NOTIFY_CHANGE_DIR_NAME,
+				&bufferSize,
+				&pollingOverlap,
+				&NotificationCompletion);
+		}
 
 	}
 

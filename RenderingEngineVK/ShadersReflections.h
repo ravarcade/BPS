@@ -110,7 +110,7 @@ class CShadersReflections
 {
 public:
 	struct ShaderProgramInfo {
-		std::string name;
+//		std::string name;
 		::BAMS::CRawData resource;
 		std::string entryPointName;
 		VkShaderStageFlagBits stage;
@@ -128,9 +128,9 @@ public:
 	};
 
 	CShadersReflections();
-	CShadersReflections(std::vector<std::string> &&programs);
+	CShadersReflections(const char *shaderName);
 
-	ShaderDataInfo LoadPrograms(std::vector<std::string> &&programs);
+	ShaderDataInfo LoadProgram(const char *shaderName);
 	void Release();
 
 	const std::vector<std::string> &GetOutputNames() { return m_outputNames; }

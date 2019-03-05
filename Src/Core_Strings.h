@@ -22,12 +22,12 @@ struct basic_string_base
 
 	inline const basic_string_base &ToBasicString() const { return *this; }
 
-	SIZE_T size() const { return _used; }
+	U size() const { return _used; }
 
 	static SIZE_T length(const T *txt) { return strlen(txt); }
 	static T tolower(T c) { return ::tolower(c); }
-	static int ncmp(const T *string1, const T *string2, size_t count) { return strncmp(string1, string2, count); }
-	static int nicmp(const T *string1, const T *string2, size_t count) { return strnicmp(string1, string2, count); }
+	static int ncmp(const T *string1, const T *string2, SIZE_T count) { return strncmp(string1, string2, count); }
+	static int nicmp(const T *string1, const T *string2, SIZE_T count) { return strnicmp(string1, string2, count); }
 };
 
 DEFINE_HAS_METHOD(ToBasicString);
@@ -136,7 +136,7 @@ private:
 	void _CopyText(wchar_t *dst, const wchar_t *src, SIZE_T srcSize) { memcpy_s(dst, srcSize * sizeof(wchar_t), src, srcSize * sizeof(wchar_t)); }
 	void _CopyText(wchar_t *dst, const char *src, SIZE_T srcSize)
 	{
-		size_t convertedChars;
+		SIZE_T convertedChars;
 		mbstowcs_s(&convertedChars, dst, srcSize + 1, src, srcSize);
 		assert(convertedChars != srcSize);
 	}
@@ -199,7 +199,7 @@ private:
 	void _CopyText(wchar_t *dst, const wchar_t *src, SIZE_T srcSize) { memcpy_s(dst, srcSize * sizeof(wchar_t), src, srcSize * sizeof(wchar_t)); }
 	void _CopyText(wchar_t *dst, const char *src, SIZE_T srcSize)
 	{
-		size_t convertedChars;
+		SIZE_T convertedChars;
 		mbstowcs_s(&convertedChars, dst, srcSize + 1, src, srcSize);
 		assert(convertedChars != srcSize);
 	}
@@ -275,7 +275,7 @@ public:
 	}
 
 	// 4. Copy constructor
-	basic_string(const _T &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used)) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); }
+	basic_string(const _T &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used)) { if (_used) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); } else _reserved = 0; }
 
 	// 5. Move constructor
 	basic_string(_T &&src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used), src._buf) { src._used = 0; src._reserved = 0; src._buf = nullptr; }
@@ -345,10 +345,16 @@ public:
 		return _B::ncmp(str._buf, _buf, _used) == 0;
 	}
 
-	bool startWith(const basic_string_base<T, U> &str, bool caseInsesitive = false) const {
-		if (str._used >= _used)
+	bool startsWith(const basic_string_base<T, U> &str, bool caseInsesitive = false) const {
+		if (str._used > _used)
 			return false;
 		return caseInsesitive ? _B::nicmp(str._buf, _buf, str._used) == 0 : _B::ncmp(str._buf, _buf, str._used) == 0;
+	}
+
+	bool endsWith(const basic_string_base<T, U> &str, bool caseInsesitive = false) const {
+		if (str._used > _used)
+			return false;
+		return caseInsesitive ? _B::nicmp(str._buf, _buf + _used - str._used, str._used) == 0 : _B::ncmp(str._buf, _buf + _used - str._used, str._used) == 0;
 	}
 
 	basic_string_base<T, U> substr(I32 start, I32 len = 0x7fffffff)
@@ -378,6 +384,7 @@ public:
 		{
 			static const char *zero = "\0";
 			_Append(1, reinterpret_cast<const T*>(zero));
+			--_used;
 		}
 		_buf[_used] = 0;
 
@@ -566,14 +573,37 @@ public:
 		return tmp; 
 	}
 
+	template<typename V>
+	typename std::enable_if_t<std::is_integral<V>::value, shared_string &>
+		operator += (V val) { 
+		NeedUniq(); 
+		auto &v = GetValue();
+		U32 s = 1;
+		for (V a = abs(val) / 10; a >= 1; a = a / 10)
+			++s;
+		resize(static_cast<U32>(size()) + s);
+		for (auto e = v._buf + v._used; s > 0; --s)
+		{
+			--e;
+			*e = val % 10 + '0';
+			val = val / 10;
+		}
+		return *this;
+	}
+
 	// === compare
 	bool operator == (const basic_string_base<T, U> &str) const { return GetValue() == str; }
 	bool operator == (const shared_string &str) const { return _idx == str._idx ? true : GetValue() == str.GetValue(); } // no need to compare same strings
-	bool startWith(const basic_string_base<T, U> &str, bool caseInsesitive = false) const { return GetValue().startWidt(str); }
-	bool startWith(const shared_string &str, bool caseInsesitive = false) const { return GetValue().startWith(str.GetValue()); }
+	bool operator != (const basic_string_base<T, U> &str) const { return !(GetValue() == str); }
+	bool operator != (const shared_string &str) const { return _idx != str._idx && !(GetValue() == str.GetValue()); } // no need to compare same strings
+	bool startsWith(const basic_string_base<T, U> &str, bool caseInsesitive = false) const { return GetValue().startsWith(str); }
+	bool startsWith(const shared_string &str, bool caseInsesitive = false) const { return GetValue().startsWith(str.GetValue()); }
 
-	SIZE_T size() const { return GetValue().size(); }
-	void resize(U32 s) { GetValue().resize(s); }
+	bool endsWith(const basic_string_base<T, U> &str, bool caseInsesitive = false) const { return GetValue().endsWith(str); }
+	bool endsWith(const shared_string &str, bool caseInsesitive = false) const { return GetValue().endsWith(str.GetValue()); }
+
+	U size() const { return GetValue().size(); }
+	void resize(U s) { NeedUniq(); GetValue().resize(s); }
 
 	operator basic_string_base<T, U>&() { return GetValue(); }            // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
 	basic_string_base<T, U> &ToBasicString() const { return GetValue(); } // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).

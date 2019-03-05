@@ -230,7 +230,8 @@ void ire::CreateWnd(const void * params)
 	glfwSetWindowPos(window, p->x, p->y);
 
 	auto ow = outputWindows[p->wnd];
-	ow->AddShader("cubeShader", { "vert2", "frag" });
+	ow->AddShader("default");
+//	ow->AddShader("cubeShader", { "vert2", "frag" });
 	ow->Prepare(_instance, window, _allocator);
 }
 
@@ -254,9 +255,9 @@ void ire::CloseWnd(const void * params)
 
 using namespace RENDERINENGINE;
 
-void ire::AddShader(int wnd, const char *name, std::vector<std::string>&& programs)
+void ire::AddShader(int wnd, const char *shaderName)
 {
-	outputWindows[wnd]->AddShader(name, std::move(programs));
+	outputWindows[wnd]->AddShader(shaderName);
 }
 
 void ire::AddModel(const void * params)
@@ -278,8 +279,7 @@ void ire::AddShader(const void * params)
 	if (p)
 	{
 		auto ow = outputWindows[p->wnd];
-		std::vector<std::string> programs(p->programs, p->programs+p->numPrograms);
-		ow->AddShader(p->name, std::move(programs));
+		ow->AddShader(p->shaderName);
 	}
 }
 

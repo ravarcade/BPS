@@ -10,3 +10,4 @@ NAMESPACE_RENDERINENGINE_BEGIN
 #include "RenderingEngine_VertexDescription.h"
 
 NAMESPACE_RENDERINENGINE_END
+

@@ -17,6 +17,8 @@ void Tools::NormalizePath(WSTR & path)
 			x = Tools::directorySeparatorChar;
 		}
 	}
+
+	// remove ending directory separator char (if exist)
 	if (path[path.size() - 1] == Tools::directorySeparatorChar)
 		path.resize((U32)path.size() - 1);
 }
@@ -130,7 +132,31 @@ BYTE * Tools::LoadFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path, IMemor
 	*pFileSize = size.QuadPart;
 	return binBuf;
 }
+/*
+time_t Tools::GetFileTimestamp(const WSTR & fname)
+{
+	HANDLE hFile;
+	FILETIME lastWriteTime;
+	OVERLAPPED ol = { 0 };
 
+	hFile = CreateFile(fname.c_str(), GENERIC_READ,
+		FILE_SHARE_READ, //FILE_SHARE_READ | FILE_FLAG_OVERLAPPED, 
+		NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL);
+
+	if (hFile == INVALID_HANDLE_VALUE)
+		return 0;
+
+	GetFileTime(hFile, nullptr, nullptr, &lastWriteTime);
+	U64 ft = U64(lastWriteTime.dwHighDateTime) << 32 | lastWriteTime.dwLowDateTime;
+	time_t t = ft / TICKS_PER_SECOND - EPOCH_DIFFERENCE;
+
+	CloseHandle(hFile);
+	return t;
+}
+*/
 bool Tools::InfoFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path)
 {
 	HANDLE hFile;
@@ -248,6 +274,96 @@ void Tools::SearchForFiles(const WSTR &path, TSearchForFilesCallback SearchForFi
 	} while (FindNextFile(hFind, &data));
 
 	FindClose(hFind);
+}
+
+/// <summary>
+/// Execute command in windows shell.
+/// see: https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-winexec
+/// </summary>
+/// <param name="cmd">The command.</param>
+void Tools::WinExec(WSTR &cmd, CWSTR cwd)
+{
+	SECURITY_ATTRIBUTES sa = { 0 };
+	sa.nLength = sizeof(sa);
+	sa.lpSecurityDescriptor = NULL;
+	sa.bInheritHandle = TRUE;
+
+	HANDLE hStdOutRd, hStdOutWr;
+	HANDLE hStdErrRd, hStdErrWr;
+
+	if (!CreatePipe(&hStdOutRd, &hStdOutWr, &sa, 0))
+	{
+		// error handling...
+		TRACE("Tools::CmdExec: fail to create StdOut pipes\n");
+		return;
+	}
+
+	if (!CreatePipe(&hStdErrRd, &hStdErrWr, &sa, 0))
+	{
+		// error handling...
+		TRACE("Tools::CmdExec: fail to create StdErr pipes\n");
+		CloseHandle(hStdOutRd);
+		CloseHandle(hStdOutWr);
+		return;
+	}
+
+	SetHandleInformation(hStdOutRd, HANDLE_FLAG_INHERIT, 0);
+	SetHandleInformation(hStdErrRd, HANDLE_FLAG_INHERIT, 0);
+
+	STARTUPINFO si = { 0 };
+	si.cb = sizeof(si);
+	si.dwFlags = STARTF_USESTDHANDLES;
+	si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+	si.hStdOutput = hStdOutWr;
+	si.hStdError = hStdErrWr;
+
+	PROCESS_INFORMATION pi = { 0 };
+
+	if (!CreateProcessW(NULL, const_cast<wchar_t *>(cmd.c_str()), NULL, NULL, TRUE, 0, NULL, cwd, &si, &pi))
+	{
+		// error handling...
+		TRACE("Tools::CmdExec: fail to create process\n");
+	}
+	else
+	{
+		// read from hStdOutRd and hStdErrRd as needed until the process is terminated...
+		COMMTIMEOUTS timeouts = { 0, //interval timeout. 0 = not used
+						  0, // read multiplier
+						 10, // read constant (milliseconds)
+						  0, // Write multiplier
+						  0  // Write Constant
+		};
+
+
+		SetCommTimeouts(hStdOutRd, &timeouts);
+		const size_t BUFSIZE = 8000;
+		char chBuf[BUFSIZE+1];
+		DWORD dwRead;
+
+		DWORD exitCode = 0;
+		while (GetExitCodeProcess(pi.hProcess, &exitCode) && exitCode == STILL_ACTIVE)
+		{
+			ReadFile(hStdOutRd, chBuf, BUFSIZE, &dwRead, 0);
+			if (dwRead == 0) {
+				//insert code to handle timeout here
+				TRACE(".");
+			}
+			else {
+				chBuf[dwRead] = 0;
+				TRACE(chBuf);
+			}
+		}
+
+		CloseHandle(pi.hThread);
+		CloseHandle(pi.hProcess);
+	}
+
+	
+
+	CloseHandle(hStdOutRd);
+	CloseHandle(hStdOutWr);
+	CloseHandle(hStdErrRd);
+	CloseHandle(hStdErrWr);
 }
 
 UUID Tools::NOUID = { 0 };

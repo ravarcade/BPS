@@ -28,6 +28,8 @@ public:
 	static void UUID2String(const UUID &uuid, char *buf);
 	static void String2UUID(UUID &uuid, const char *buf);
 	static void SearchForFiles(const WSTR &path, TSearchForFilesCallback SearchForFilesCallback, void *ctrl);
+	static void WinExec(WSTR &cmd, CWSTR cwd = nullptr);
+//	static time_t GetFileTimestamp(const WSTR &fname);
 
 	static UUID NOUID;
 };

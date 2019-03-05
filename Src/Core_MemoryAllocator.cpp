@@ -164,6 +164,8 @@ namespace MemoryAllocatorsPrivate {
 
 		void* allocate(size_t bytes)
 		{
+			assert(bytes != 0);
+
 			++DebugStats.TotalAllocateCommands;
 			DebugStats.CurrentAllocatedMemory += bytes;
 			if (DebugStats.MaxAllocatedMemory < DebugStats.CurrentAllocatedMemory)

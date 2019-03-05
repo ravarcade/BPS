@@ -145,10 +145,10 @@ public:
 			{ // temp
 				PADD_MODEL pas = {
 					reinterpret_cast<const PCREATE_WINDOW *>(msg->data)->wnd,
-					"cube", "cube", "cubesjader"
+					"cube", "cube", "default"
 				};
 				int wnd = reinterpret_cast<const PCREATE_WINDOW *>(msg->data)->wnd;
-				auto model = re.AddModel(wnd, "cube", GetDemoCube(), "cubeShader");
+				auto model = re.AddModel(wnd, "cube", GetDemoCube(), "default");
 			}
 			break;
 		case CLOSE_WINDOW:   re.CloseWnd(msg->data); break;

@@ -88,6 +88,50 @@ extern "C" {
 		return rb->GetSize();
 	}
 
+	// =========================================================================== Shader
+
+	BAMS_EXPORT unsigned char * IShader_GetData(IShader *res)
+	{
+		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return static_cast<unsigned char *>(rb->GetData());
+	}
+
+	BAMS_EXPORT size_t IShader_GetSize(IShader *res)
+	{
+		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return rb->GetSize();
+	}
+
+	BAMS_EXPORT void IShader_AddProgram(IShader *res, const wchar_t *fileName)
+	{
+		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		rb->AddProgram(fileName);
+	}
+
+	BAMS_EXPORT const wchar_t * IShader_GetProgramName(IShader *res, int type)
+	{
+		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return rb->GetSubprogramName(type).c_str();
+	}
+
+	BAMS_EXPORT void IShader_Save(IShader *res)
+	{
+		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		rb->Save(reinterpret_cast<ResourceBase *>(res));
+	}
+
+	BAMS_EXPORT uint32_t IShader_GetSubprogramsCount(IShader *res)
+	{
+		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return rb->GetSubprogramsCount();
+	}
+
+	BAMS_EXPORT IRawData *IShader_GetSubprogram(IShader *res, uint32_t idx)
+	{
+		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return rb->GetSubprogram(idx);
+	}
+
 	// =========================================================================== ResourceManager
 
 	BAMS_EXPORT IResourceManager *IResourceManager_Create()
@@ -121,10 +165,10 @@ extern "C" {
 		resm->RootDir(path);
 	}
 
-	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name)
+	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name, uint32_t type)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->Get(name);
+		return resm->Get(name, type);
 	}
 
 	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource ** resList, uint32_t * resCount, const char * pattern)
@@ -151,10 +195,16 @@ extern "C" {
 		return resm->Get<RawData>(name);
 	}
 
-	BAMS_EXPORT void IResourceManager_LoadSync(IResourceManager *rm)
+	BAMS_EXPORT void IResourceManager_LoadSync(IResourceManager *rm, IResource *res)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->LoadSync();
+		resm->LoadSync(reinterpret_cast<ResourceBase *>(res));
+	}
+
+	BAMS_EXPORT void IResourceManager_RefreshResorceFileInfo(IResourceManager *rm, IResource *res)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		resm->RefreshResorceFileInfo(reinterpret_cast<ResourceBase *>(res));
 	}
 
 	BAMS_EXPORT void IResourceManager_StartDirectoryMonitor(IResourceManager *rm)
@@ -216,7 +266,7 @@ extern "C" {
 	{
 		return BAMS::CORE::Allocators::GetMemoryAllocator(allocatorType, size);
 	}
-
+	
 	// ========================================================================
 
 	void TestRingBuffer()
@@ -247,6 +297,18 @@ extern "C" {
 
 	BAMS_EXPORT void DoTests()
 	{
+		return;
+		{
+			WSTR t;
+			int ll = t.size();
+			TRACE(ll << "\n");
+			TRACEW(t.c_str());
+			TRACE(((int)t.size()) << "\n");
+		}
+		return;
+		STR test = "aaabb";
+		test += 123;
+		printf("str123=%s\n", test.c_str());
 		CStringHastable<int> hti;
 		hti.find("hello");
 		*hti.add("hello") = 5;

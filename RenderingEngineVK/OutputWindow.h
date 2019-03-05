@@ -139,7 +139,7 @@ public:
 	BAMS::CORE::CStringHastable<ModelInfo> models;
 	BAMS::CORE::CStringHastable<CShaderProgram> shaders;
 
-	void AddShader(const char * name, std::vector<std::string>&& programs);
+	void AddShader(const char * name);
 	ModelInfo *AddModel(const char *name, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shaderProgram);
 	ModelInfo *GetModel(const char *name);
 	//	CShaderProgram cubeShader;

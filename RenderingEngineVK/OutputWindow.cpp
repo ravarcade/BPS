@@ -763,7 +763,8 @@ void OutputWindow::_CleanupRenderPass()
 
 void OutputWindow::_CreateDemoCube()
 {
-	auto cs = shaders.find("cubeShader");
+//	auto cs = shaders.find("cubeShader");
+	auto cs = shaders.find("default");
 
 	auto &rp = *cs;
 	uint32_t MId = rp.GetParamId("model");
@@ -1136,19 +1137,19 @@ void OutputWindow::DrawFrame()
 	vkQueueWaitIdle(presentQueue);
 }
 
-void OutputWindow::AddShader(const char * name, std::vector<std::string>&& programs)
+void OutputWindow::AddShader(const char * shaderName)
 {
-	if (shaders.find(name))
+	if (shaders.find(shaderName))
 		return; // can't add second shader program with same name....
 
-	auto prg = shaders.add(name, this);
-	prg->LoadPrograms(std::move(programs));
+	auto prg = shaders.add(shaderName, this);
+	prg->LoadProgram(shaderName);
 }
 
-ModelInfo * OutputWindow::AddModel(const char *name, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shaderProgram)
+ModelInfo * OutputWindow::AddModel(const char *name, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shaderName)
 {
 	auto mi = models.find(name);
-	CShaderProgram *sh = shaders.find(shaderProgram);
+	CShaderProgram *sh = shaders.find(shaderName);
 
 	if (mi || !sh) {
 		// hmmmm, we have conflict here. We want to add second object with same name... for now we just skip that object.

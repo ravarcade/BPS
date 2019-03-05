@@ -131,18 +131,18 @@ void wait_for_esc()
 	}
 }
 
-static PCreate3DWindow w0 = { 0, 1200, 800, 10, 10 };
-static PCreate3DWindow w1 = { 1, 500, 500, 1310, 10 };
-static PCreate3DWindow w2 = { 2, 500, 200, 1310, 610 };
+static PCREATE_WINDOW w0 = { 0, 1200, 800, 10, 10 };
+static PCREATE_WINDOW w1 = { 1, 500, 500, 1310, 10 };
+static PCREATE_WINDOW w2 = { 2, 500, 200, 1310, 610 };
 
 void testloop(BAMS::CEngine &en)
 {
-	static PRenderingModel c0 = { 0, "cubename", "cube", "cubeShader" };
-	static PRenderingModel c1 = { 1, "cubename", "cube", "cubeShader" };
-	static PRenderingModel c2 = { 2, "cubename", "cube", "cubeShader" };
-	static PClose3DWindow cw0 = { 0 };
-	static PClose3DWindow cw1 = { 1 };
-	static PClose3DWindow cw2 = { 2 };
+	static PADD_MODEL c0 = { 0, "cubename", "cube", "default" };
+	static PADD_MODEL c1 = { 1, "cubename", "cube", "default" };
+	static PADD_MODEL c2 = { 2, "cubename", "cube", "default" };
+	static PCLOSE_WINDOW cw0 = { 0 };
+	static PCLOSE_WINDOW cw1 = { 1 };
+	static PCLOSE_WINDOW cw2 = { 2 };
 
 	static bool w0v = true;
 	static bool w1v = false;
@@ -163,39 +163,39 @@ void testloop(BAMS::CEngine &en)
 					isRunning = false;
 						break;
 				case VK_ADD:
-					en.SendMsg(ADD_3D_MODEL, RENDERING_ENGINE, 0, nullptr);
+					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, nullptr);
 					break;
 
 				case '1':
 					if (w0v)
-						en.SendMsg(CLOSE_3D_WINDOW, RENDERING_ENGINE, 0, &cw0);
+						en.SendMsg(CLOSE_WINDOW, RENDERING_ENGINE, 0, &cw0);
 					else
-						en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, &w0);
+						en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w0);
 					w0v = !w0v;
 					break;
 				case '2':
 					if (w1v)
-						en.SendMsg(CLOSE_3D_WINDOW, RENDERING_ENGINE, 0, &cw1);
+						en.SendMsg(CLOSE_WINDOW, RENDERING_ENGINE, 0, &cw1);
 					else
-						en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, &w1);
+						en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w1);
 					w1v = !w1v;
 					break;
 				case '3':
 					if (w2v)
-						en.SendMsg(CLOSE_3D_WINDOW, RENDERING_ENGINE, 0, &cw2);
+						en.SendMsg(CLOSE_WINDOW, RENDERING_ENGINE, 0, &cw2);
 					else
-						en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, &w2);
+						en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w2);
 					w2v = !w2v;
 					break;
 
 				case 'Q':
-					en.SendMsg(ADD_3D_MODEL, RENDERING_ENGINE, 0, &c0);
+					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &c0);
 					break;
 				case 'W':
-					en.SendMsg(ADD_3D_MODEL, RENDERING_ENGINE, 0, &c1);
+					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &c1);
 					break;
 				case 'E':
-					en.SendMsg(ADD_3D_MODEL, RENDERING_ENGINE, 0, &c2);
+					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &c2);
 					break;
 
 				}
@@ -223,10 +223,15 @@ int main()
 			BAMS::CResourceManager rm;
 			rm.RootDir(L"C:\\Work\\test");
 			rm.LoadSync();
-			en.SendMsg(CREATE_3D_WINDOW, RENDERING_ENGINE, 0, &w0);
+			en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w0);
 
 			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
-			rm.LoadSync();
+			
+			// default shader program ... not needed any more
+			auto s = rm.GetShaderByName("default");
+			s.AddProgram(L"/Shaders/default.vert.glsl");
+			s.AddProgram(L"/Shaders/default.frag.glsl");
+
 			auto r = rm.GetRawDataByName("ReadMe");
 			printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
 			rm.LoadSync();
@@ -253,8 +258,8 @@ int main()
 
 			rm.LoadSync();
 
-			BAMS::IResource *resList[10];
-			uint32_t resCount = 10;
+			BAMS::IResource *resList[100];
+			uint32_t resCount = 100;
 			rm.Filter(resList, &resCount, "*");
 			for (uint32_t i = 0; i < resCount; ++i)
 			{
@@ -269,7 +274,10 @@ int main()
 				if (rsize > 32)
 					rsize = 32;
 				printf("     ");
-				DumpHex(rdata, rsize);
+				if (!rdata && rsize > 0)
+					printf("[NO LOADING NEEDED]");
+				if (rdata)
+					DumpHex(rdata, rsize);
 				printf("\n");
 
 			}

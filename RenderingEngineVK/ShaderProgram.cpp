@@ -5,10 +5,10 @@ using namespace BAMS::RENDERINENGINE;
 const uint32_t ALWAYS_RESERVE_VERTICES = 16 * 1024; // <- 256kB for 16bytes / per vertice
 const uint32_t ALWAYS_RESERVE_INDICES = ALWAYS_RESERVE_VERTICES;
 
-void CShaderProgram::LoadPrograms(std::vector<std::string>&& programs)
+void CShaderProgram::LoadProgram(const char *program)
 {
 	// to do: add support for loading program description from manifest
-	m_vi = m_reflection.LoadPrograms(std::move(programs));
+	m_vi = m_reflection.LoadProgram(program);
 	_BuindShaderProgramParamsDesc();
 	_BuindShaderDataBuffers();
 }

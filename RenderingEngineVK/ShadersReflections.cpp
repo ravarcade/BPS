@@ -231,31 +231,33 @@ void GetDetails(CompilerGLSL &comp, Resource &res, ValDetails &det)
 // ============================================================================ ShadersReflections ===
 
 CShadersReflections::CShadersReflections() {}
-CShadersReflections::CShadersReflections(std::vector<std::string> &&programs) { LoadPrograms(std::move(programs)); }
+CShadersReflections::CShadersReflections(const char *shaderName) { LoadProgram(shaderName); }
 
 /// <summary>
-/// Loads shader programs.
+/// Loads shader program.
 /// </summary>
-/// <param name="programs">The programs names from resource.</param>
-ShaderDataInfo CShadersReflections::LoadPrograms(std::vector<std::string>&& programs)
+/// <param name="shaderName">The shader program name from resource.</param>
+ShaderDataInfo CShadersReflections::LoadProgram(const char *shaderName)
 {
-	m_programs.resize(programs.size());
 	BAMS::CResourceManager rm;
-	bool needToLoadResources = false;
+	auto shader = rm.GetShaderByName(shaderName);
+	if (!shader.IsLoaded())
+		rm.LoadSync(shader);
+	uint32_t cnt = shader.GetSubprogramsCount();
 
-	for (uint32_t i = 0; i < programs.size(); ++i)
+	m_programs.resize(cnt);
+
+	for (uint32_t i = 0; i < cnt; ++i)
 	{
 		auto &prg = m_programs[i];
-		prg.name = programs[i];
 		prg.entryPointName = "main";
-		prg.resource = rm.GetRawDataByName(prg.name.c_str());
+		prg.resource = shader.GetSubprogram(i);
 		if (!prg.resource.IsLoaded())
-			needToLoadResources = true;
+			rm.LoadSync(prg.resource);
 	}
 
-	if (needToLoadResources)
-		rm.LoadSync();
-
+	TRACE("m_programs[0]: " << m_programs[0].resource.GetName() << ", " << m_programs[0].resource.GetSize() << "\n");
+	TRACE("m_programs[1]: " << m_programs[1].resource.GetName() << ", " << m_programs[1].resource.GetSize() << "\n");
 	_ParsePrograms();
 	return vi;
 }
