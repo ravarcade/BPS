@@ -122,7 +122,7 @@ struct RE_EXPORT Stream {
 		m_normalized(false)
 	{};
 
-	bool isUsed() { return m_type != 0; }
+	bool isUsed() const { return m_type != 0; }
 };
 
 /**

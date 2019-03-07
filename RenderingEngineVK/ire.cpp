@@ -230,8 +230,9 @@ void ire::CreateWnd(const void * params)
 	glfwSetWindowPos(window, p->x, p->y);
 
 	auto ow = outputWindows[p->wnd];
-	ow->AddShader("default");
 //	ow->AddShader("cubeShader", { "vert2", "frag" });
+	ow->AddShader("default");
+	ow->AddShader("cube");
 	ow->Prepare(_instance, window, _allocator);
 }
 
@@ -254,23 +255,27 @@ void ire::CloseWnd(const void * params)
 }
 
 using namespace RENDERINENGINE;
-
-void ire::AddShader(int wnd, const char *shaderName)
-{
-	outputWindows[wnd]->AddShader(shaderName);
-}
-
-void ire::AddModel(const void * params)
+void  ire::AddModel(const void * params)
 {
 	auto p = static_cast<const PADD_MODEL *>(params);
 	if (p) 
 	{
-		auto model = re.GetModel(p->wnd, p->model);
+		auto ow = outputWindows[p->wnd];
+		auto mi = ow->AddMesh(p->name, p->mesh, p->shader);
+		if (mi)
+		{
+			mi->shader->AddObject(mi->mid);
+		}
+		ow->BufferRecreationNeeded();
+
+		/*
+		auto model = re.GetModel(p->wnd, p->model, p->shaderName);
 		if (model)
 		{
 			re.AddObject(p->wnd, model);
 		}
-	}
+		*/
+	}	
 }
 
 void ire::AddShader(const void * params)
@@ -279,17 +284,25 @@ void ire::AddShader(const void * params)
 	if (p)
 	{
 		auto ow = outputWindows[p->wnd];
-		ow->AddShader(p->shaderName);
+		ow->AddShader(p->shader);
 	}
 }
 
-ModelInfo * ire::AddModel(int wnd, const char *name, const VertexDescription *vd, const char *shaderProgram)
+/*
+
+void ire::AddShader(int wnd, const char *shaderName)
+{
+	outputWindows[wnd]->AddShader(shaderName);
+}
+
+
+ModelInfo * ire::AddModel(int wnd, const char *object, const VertexDescription *vd, const char *shader)
 {
 	auto ow = outputWindows[wnd];
 	return ow->AddModel(name, vd, shaderProgram);
 }
 
-ModelInfo *ire::GetModel(int wnd, const char *name)
+ModelInfo *ire::GetModel(int wnd, const char *mesh, const char *shader)
 {
 	auto ow = outputWindows[wnd];
 	return ow->GetModel(name);
@@ -300,7 +313,7 @@ uint32_t ire::AddObject(int wnd, ModelInfo *model)
 	outputWindows[wnd]->BufferRecreationNeeded();
 	return model->shader->AddObject(model->mid);
 }
-
+*/
 
 // ============================================================================ ire : Rendering Engine - protected methods ===
 

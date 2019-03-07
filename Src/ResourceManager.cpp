@@ -352,6 +352,16 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 	void CreateResourceImplementation(ResourceBase *res)
 	{
+		if (res->_resourceImplementation)
+		{
+			if (res->_resourceImplementation->GetFactory()->TypeId == res->Type)
+				return; // do not recreate resource if it exist and is same type
+
+			// delete existing resource
+			res->_resourceImplementation->GetFactory()->Destroy(res->_resourceImplementation);
+			res->_resourceImplementation = nullptr;
+		}
+
 		// we must have resource implemented
 		while (res->_resourceImplementation == nullptr)
 		{
@@ -379,15 +389,21 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 	void SetResourceType(ResourceBase *res, U32 resTypeId)
 	{
-		if (res->Type != RESID_UNKNOWN)
+		if (res->_resourceImplementation)
 		{
-			// delete old resource
+			if (res->Type == resTypeId)
+				return;
+
+			// delete existing resource
 			res->_resourceImplementation->GetFactory()->Destroy(res->_resourceImplementation);
 			res->_resourceImplementation = nullptr;
 		}
 
 		res->Type = resTypeId;
-		CreateResourceImplementation(res);
+
+		// create only if it is used
+		if (res->_refCounter)
+			CreateResourceImplementation(res);
 	}
 
 	void Load(ResourceBase *res)
@@ -401,6 +417,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		//if (res->Type == RESID_UNKNOWN) 
 		//	res->_resourceImplementation->Release(res);
 
+		// we are loading resource to ram, so it is in use and resource implementation must be created
 		CreateResourceImplementation(res);
 
 		if (res->_isLoadable) {

@@ -97,6 +97,8 @@ private:
 	void _CleanupShaderPrograms();
 	void _Cleanup();
 
+	BAMS::RENDERINENGINE::VertexDescription * _GetMesh(const char *mesh);
+	CShaderProgram *_GetShader(const char *shader);
 public:
 	OutputWindow();
 	~OutputWindow() { _Cleanup(); }
@@ -139,9 +141,10 @@ public:
 	BAMS::CORE::CStringHastable<ModelInfo> models;
 	BAMS::CORE::CStringHastable<CShaderProgram> shaders;
 
-	void AddShader(const char * name);
-	ModelInfo *AddModel(const char *name, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shaderProgram);
-	ModelInfo *GetModel(const char *name);
+	ModelInfo *AddMesh(const char *name, const char *mesh, const char *shader);
+	CShaderProgram *AddShader(const char * name);
+
+	// ModelInfo *GetModel(const char *name);
 	//	CShaderProgram cubeShader;
 	friend CShaderProgram;
 };

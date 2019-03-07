@@ -52,7 +52,7 @@ public:
 	VkPipeline CreateGraphicsPipeline();
 	void CreatePipelineLayout();
 
-	uint32_t AddModel(const BAMS::RENDERINENGINE::VertexDescription &src);
+	uint32_t AddMesh(const BAMS::RENDERINENGINE::VertexDescription *vd);
 	uint32_t AddObject(uint32_t modeIdx);
 
 	uint32_t GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSize) { return _GetDescriptorPoolsSize(poolsSize); }
@@ -79,7 +79,7 @@ private:
 	VkPipelineLayout _GetPipelineLayout();
 	VkRenderPass _GetRenderPass();
 	uint32_t _GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSize);
-	void _SendVertexStream(BAMS::RENDERINENGINE::Stream dst, BAMS::RENDERINENGINE::Stream &src, uint8_t *outBuf, std::vector<uint32_t> &bindingOffset, uint32_t numVertices);
+	void _SendVertexStream(BAMS::RENDERINENGINE::Stream dst, const BAMS::RENDERINENGINE::Stream &src, uint8_t *outBuf, std::vector<uint32_t> &bindingOffset, uint32_t numVertices);
 	void _CreateUniformBuffers();
 	void _BuindShaderProgramParamsDesc();
 	void _BuindShaderProgramParamsDesc(const std::vector<ValDetails> *vals, uint32_t &dataBufferId);
@@ -87,7 +87,7 @@ private:
 	void _BuindShaderDataBuffers();
 
 	void _CreateNewBufferSet(uint32_t numVertices, uint32_t numIndeces);
-	void _ImportModelData(BAMS::RENDERINENGINE::VertexDescription src, void *dst);
+	void _ImportModelData(const BAMS::RENDERINENGINE::VertexDescription *vd, void *dst);
 
 	CShadersReflections          m_reflection;
 	OutputWindow                 *vk                     = nullptr;

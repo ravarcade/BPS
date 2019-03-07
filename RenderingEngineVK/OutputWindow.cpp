@@ -763,12 +763,6 @@ void OutputWindow::_CleanupRenderPass()
 
 void OutputWindow::_CreateDemoCube()
 {
-//	auto cs = shaders.find("cubeShader");
-	auto cs = shaders.find("default");
-
-	auto &rp = *cs;
-	uint32_t MId = rp.GetParamId("model");
-	uint32_t baseColorId = rp.GetParamId("baseColor");
 	float colors[][4] = {
 		{ 0.1f, 1, 1, 1 },
 		{ 1, 0.1f, 1, 1 },
@@ -778,22 +772,31 @@ void OutputWindow::_CreateDemoCube()
 
 	auto currentTime = std::chrono::high_resolution_clock::now();
 	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
-	for (uint32_t i = 0; i < cs->GetObjectCount(); ++i)
-	{
-		int pos = ((i & 1) ? 1 : -1) * ((i+1) &0xfffe);
-		glm::mat4 model = glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0, 0)), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
-		rp.SetParam(i, baseColorId, &colors[i%3]);
-		rp.SetParam(i, MId, &model);
-	}
+	shaders.foreach([&](CShaderProgram *&sh) 
+	{
+		uint32_t MId = sh->GetParamId("model");
+		uint32_t baseColorId = sh->GetParamId("baseColor");
+		for (uint32_t i = 0; i < sh->GetObjectCount(); ++i)
+		{
+			int pos = ((i & 1) ? 1 : -1) * ((i + 1) & 0xfffe);
+			glm::mat4 model = glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0, 0)), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+			sh->SetParam(i, baseColorId, &colors[i % 3]);
+			sh->SetParam(i, MId, &model);
+		}
+
+	});
 }
 
 void OutputWindow::_CreateDescriptorPool()
 {
 	std::vector<uint32_t> pools;
 	uint32_t s = 0;
+	uint32_t numShaderPrograms = 0;
 	shaders.foreach([&](CShaderProgram *&sh) {
 		s = sh->GetDescriptorPoolsSize(pools);
+		++numShaderPrograms;
 	});
 
 	std::vector<VkDescriptorPoolSize> poolSizes(s);
@@ -809,7 +812,7 @@ void OutputWindow::_CreateDescriptorPool()
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
 	poolInfo.pPoolSizes = poolSizes.data();
-	poolInfo.maxSets = 1;
+	poolInfo.maxSets = numShaderPrograms;
 
 	if (vkCreateDescriptorPool(device, &poolInfo, allocator, &descriptorPool) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create descriptor pool!");
@@ -1137,29 +1140,56 @@ void OutputWindow::DrawFrame()
 	vkQueueWaitIdle(presentQueue);
 }
 
-void OutputWindow::AddShader(const char * shaderName)
+CShaderProgram * OutputWindow::AddShader(const char * shader)
 {
-	if (shaders.find(shaderName))
-		return; // can't add second shader program with same name....
+	auto sh = shaders.find(shader);
+	if (sh)
+		return sh; // can't add second shader program with same name....
 
-	auto prg = shaders.add(shaderName, this);
-	prg->LoadProgram(shaderName);
+	sh = shaders.add(shader, this);
+	sh->LoadProgram(shader);
+	return sh;
 }
 
-ModelInfo * OutputWindow::AddModel(const char *name, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shaderName)
+BAMS::RENDERINENGINE::VertexDescription *GetDemoCube();
+
+BAMS::RENDERINENGINE::VertexDescription *OutputWindow::_GetMesh(const char *mesh)
+{
+	return GetDemoCube();
+}
+
+CShaderProgram * OutputWindow::_GetShader(const char *shader)
+{
+	return AddShader(shader);
+}
+
+ModelInfo * OutputWindow::AddMesh(const char * name, const char * mesh, const char * shader)
 {
 	auto mi = models.find(name);
-	CShaderProgram *sh = shaders.find(shaderName);
+	if (mi)
+		return mi;
 
-	if (mi || !sh) {
-		// hmmmm, we have conflict here. We want to add second object with same name... for now we just skip that object.
+	auto vd = _GetMesh(mesh);
+	auto sh = _GetShader(shader);
+
+	// TO DO:
+	// - check if vd (mesh) is compatible with sh (shader)
+	// - check if we already use mesh (with another shader) and we can reuse same mesh (can this work in vulkan?)
+
+	if (!sh || !vd) {
+		// hmmmm... cant add model:
+		// - we have conflict here (used 'name')
+		// - ... or ... no shader
+		// - ... or ... no mesh
 		return nullptr;
 	}
 
-	return models.add(name, sh, sh->AddModel(*vd));
+	return models.add(name, sh, sh->AddMesh(vd));
 }
 
+/*
 ModelInfo * OutputWindow::GetModel(const char *name)
 {
 	return models.find(name);
 }
+*/

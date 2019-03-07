@@ -144,6 +144,15 @@ public:
 			}
 		}
 		isModified = false;
+
+		// step 2: make sure, if we have source, we need compiled program too.
+		for (U32 i = 0; i < NumSubprogramTypes; ++i)
+		{
+			if (!Subprograms[i].IsEmpty() && Subprograms[i + NumSubprogramTypes].IsEmpty())
+			{		
+				Compile(&Subprograms[i]);
+			}
+		}
 	}
 
 
@@ -245,47 +254,74 @@ public:
 	U8 *GetData() { return Data; }
 	SIZE_T GetSize() { return Size; }
 
+	void Compile(File *p)
+	{
+		auto t = FindType(p->FileName);
+		if (t < NumSubprogramTypes)
+		{
+			TRACEW(L"compile: " << p->FileName.c_str() << L"\n");
+			auto &o = Subprograms[t + NumSubprogramTypes];
+			WSTR out = o.FileName;
+			if (out.size() == 0)
+			{
+				out = p->FileName;
+				out.resize(out.size() - 4);
+				out += L"spv";
+			}
+
+			WSTR cmd = L"glslangValidator.exe -V ";
+			cmd += p->FileName + L" -o " + out;
+			if (Tools::WinExec(cmd) == 0)
+			{
+				AddProgram(out);
+			}
+			else
+			{
+				TRACEW(L"compile error\n");
+			}
+		}
+	}
+
+	void Link(File *p)
+	{
+		auto t = FindType(p->FileName);
+		if (t >= NumSubprogramTypes)
+		{
+			TRACEW(L"link: " << p->FileName.c_str() << L"\n");
+		}
+	}
+
 	void Notify(ResourceBase *res, U64 type)
 	{
 		assert(type < static_cast<U64>(COUNT_OF(Subprograms)));
-		auto &p = Subprograms[type];
+
+		// don't be depend on "type" ... find it base on res
+		File *pPrg = nullptr;
+		for (U32 i = 0; i < COUNT_OF(Subprograms); ++i)
+		{
+			if (!Subprograms[i].IsEmpty() && Subprograms[i].UpdateNotifyReciver.GetResource() == res)
+			{
+				pPrg = &Subprograms[i];
+				break;
+			}
+		}
+		assert(pPrg != nullptr);
+		if (pPrg == nullptr)
+			return;
 
 		if (res->isDeleted())
 		{
-			TRACEW(L"deleted: " << p.FileName.c_str() << L"\n");
+			TRACEW(L"deleted: " << pPrg->FileName.c_str() << L"\n");
 		}
 
-		if (p.Size != res->GetSize() || p.Timestamp != res->GetFileTimestamp())
+		if (pPrg->Size != res->GetSize() || pPrg->Timestamp != res->GetFileTimestamp())
 		{
-			p.Size = res->GetSize();
-			p.Timestamp = res->GetFileTimestamp();
+			pPrg->Size = res->GetSize();
+			pPrg->Timestamp = res->GetFileTimestamp();
 			isModified = true;
 
-			// compile or link
-			auto t = FindType(p.FileName);
-			if (t < NumSubprogramTypes)
-			{
-				TRACEW(L"compile: " << p.FileName.c_str() << L"\n");
-				auto &o = Subprograms[t + NumSubprogramTypes];
-				WSTR out = o.FileName;
-				if (out.size() == 0)
-				{
-					out = p.FileName;
-					out.resize(out.size() - 4);
-					out += L"spv";
-				}
-
-				WSTR cmd = L"glslangValidator.exe -V ";
-				cmd += p.FileName + L" -o " + out;
-				Tools::WinExec(cmd);
-				if (o.FileName.size() == 0)
-				{
-					AddProgram(out);
-				}
-			}
-			else {
-				TRACEW(L"link: " << p.FileName.c_str() << L"\n");
-			}
+			Compile(pPrg);
+			Link(pPrg);
 		}
 	}	
 };

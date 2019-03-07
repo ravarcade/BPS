@@ -140,17 +140,7 @@ public:
 	{ 
 		switch (msg->id)
 		{
-		case CREATE_WINDOW:  
-			re.CreateWnd(msg->data); 
-			{ // temp
-				PADD_MODEL pas = {
-					reinterpret_cast<const PCREATE_WINDOW *>(msg->data)->wnd,
-					"cube", "cube", "default"
-				};
-				int wnd = reinterpret_cast<const PCREATE_WINDOW *>(msg->data)->wnd;
-				auto model = re.AddModel(wnd, "cube", GetDemoCube(), "default");
-			}
-			break;
+		case CREATE_WINDOW:  re.CreateWnd(msg->data); break;
 		case CLOSE_WINDOW:   re.CloseWnd(msg->data); break;
 		case ADD_MODEL:      re.AddModel(msg->data); break;
 		case ADD_SHADER:     re.AddShader(msg->data); break;

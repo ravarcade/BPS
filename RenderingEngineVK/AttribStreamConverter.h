@@ -24,7 +24,7 @@ public:
 	CAttribStreamConverter() {}
 
 	void Convert(VkStream dst, VkStream src, uint32_t len);
-	void Convert(Stream &dst, Stream &src, uint32_t len);
+	void Convert(Stream &dst, const Stream &src, uint32_t len);
 
 	void ConvertAttribStreamDescription(Stream &out, VkStream src);
 	void ConvertAttribStreamDescription(VkStream &out, Stream src);

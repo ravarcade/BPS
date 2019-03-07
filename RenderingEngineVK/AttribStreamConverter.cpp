@@ -118,7 +118,7 @@ void CAttribStreamConverter::Convert(VkStream vkdst, VkStream vksrc, uint32_t le
 	Convert(dst, src, len);
 }
 
-void CAttribStreamConverter::Convert(Stream &dst, Stream &src, uint32_t len)
+void CAttribStreamConverter::Convert(Stream &dst, const Stream &src, uint32_t len)
 {
 	auto s = static_cast<U8*>(src.m_data);
 	auto d = static_cast<U8*>(dst.m_data);

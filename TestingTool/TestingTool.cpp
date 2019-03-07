@@ -137,7 +137,8 @@ static PCREATE_WINDOW w2 = { 2, 500, 200, 1310, 610 };
 
 void testloop(BAMS::CEngine &en)
 {
-	static PADD_MODEL c0 = { 0, "cubename", "cube", "default" };
+	static PADD_MODEL c0 = { 0, "cubename", "cube", "cube" };
+	static PADD_MODEL c02 = { 0, "cubename", "cube", "default" };
 	static PADD_MODEL c1 = { 1, "cubename", "cube", "default" };
 	static PADD_MODEL c2 = { 2, "cubename", "cube", "default" };
 	static PCLOSE_WINDOW cw0 = { 0 };
@@ -191,6 +192,11 @@ void testloop(BAMS::CEngine &en)
 				case 'Q':
 					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &c0);
 					break;
+
+				case 'A':
+					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &c02);
+					break;
+
 				case 'W':
 					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &c1);
 					break;
@@ -228,9 +234,9 @@ int main()
 			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 			
 			// default shader program ... not needed any more
-			auto s = rm.GetShaderByName("default");
-			s.AddProgram(L"/Shaders/default.vert.glsl");
-			s.AddProgram(L"/Shaders/default.frag.glsl");
+//			auto s = rm.GetShaderByName("default");
+//			s.AddProgram(L"/Shaders/default.vert.glsl");
+//			s.AddProgram(L"/Shaders/default.frag.glsl");
 
 			auto r = rm.GetRawDataByName("ReadMe");
 			printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");

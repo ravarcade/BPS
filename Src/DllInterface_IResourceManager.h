@@ -336,12 +336,12 @@ struct PCLOSE_WINDOW {
 
 struct PADD_MODEL {
 	uint32_t wnd;
-	const char *object;      // uniq name
-	const char *model;	     // 3d model resource name
-	const char *shaderName;  // shader program name
+	const char *name;    // uniq name
+	const char *mesh;	 // resource name
+	const char *shader;  // resource name
 };
 
 struct PADD_SHADER {
 	uint32_t wnd;
-	const char *shaderName;
+	const char *shader;
 };

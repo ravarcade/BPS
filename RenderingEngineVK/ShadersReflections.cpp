@@ -256,8 +256,6 @@ ShaderDataInfo CShadersReflections::LoadProgram(const char *shaderName)
 			rm.LoadSync(prg.resource);
 	}
 
-	TRACE("m_programs[0]: " << m_programs[0].resource.GetName() << ", " << m_programs[0].resource.GetSize() << "\n");
-	TRACE("m_programs[1]: " << m_programs[1].resource.GetName() << ", " << m_programs[1].resource.GetSize() << "\n");
 	_ParsePrograms();
 	return vi;
 }

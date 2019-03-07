@@ -440,23 +440,23 @@ void CShaderProgram::_CreateNewBufferSet(uint32_t numVertices, uint32_t numIndec
 	m_bufferSets.emplace_back(set);
 }
 
-uint32_t CShaderProgram::AddModel(const VertexDescription &src)
+uint32_t CShaderProgram::AddMesh(const VertexDescription *vd)
 {
 	// we check only last BufferSet
 	BufferSet *set = m_bufferSets.size() ? &*m_bufferSets.rbegin() : nullptr;
-	if (set == nullptr || set->freeVertices < src.m_numVertices || set->freeIndices < src.m_numIndices)
+	if (set == nullptr || set->freeVertices < vd->m_numVertices || set->freeIndices < vd->m_numIndices)
 	{
 		_CreateNewBufferSet(
-			src.m_numVertices < ALWAYS_RESERVE_VERTICES ? src.m_numVertices + ALWAYS_RESERVE_VERTICES : src.m_numVertices,
-			src.m_numIndices < ALWAYS_RESERVE_INDICES ? src.m_numIndices + ALWAYS_RESERVE_INDICES : src.m_numIndices);
+			vd->m_numVertices < ALWAYS_RESERVE_VERTICES ? vd->m_numVertices + ALWAYS_RESERVE_VERTICES : vd->m_numVertices,
+			vd->m_numIndices < ALWAYS_RESERVE_INDICES ? vd->m_numIndices + ALWAYS_RESERVE_INDICES : vd->m_numIndices);
 		set = &*m_bufferSets.rbegin();
 	}
 	uint32_t bufferSetIdx = static_cast<uint32_t>(m_bufferSets.size()) - 1;
 
 	uint32_t indeceSize = sizeof(uint32_t);
 	uint32_t firstIndex = set->usedIndices;
-	uint32_t vboSize = src.m_numVertices * m_vi.size;
-	uint32_t iboSize = src.m_numIndices * indeceSize;
+	uint32_t vboSize = vd->m_numVertices * m_vi.size;
+	uint32_t iboSize = vd->m_numIndices * indeceSize;
 
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
@@ -468,7 +468,7 @@ uint32_t CShaderProgram::AddModel(const VertexDescription &src)
 
 	void* data;
 	vkMapMemory(vk->device, stagingBufferMemory, 0, vboSize + iboSize, 0, &data);
-	_ImportModelData(src, data);
+	_ImportModelData(vd, data);
 	vkUnmapMemory(vk->device, stagingBufferMemory);
 
 	vk->_CopyBuffer(stagingBuffer, set->vertexBuffer, vboSize, 0, set->usedVertices * m_vi.size);
@@ -482,12 +482,12 @@ uint32_t CShaderProgram::AddModel(const VertexDescription &src)
 		bufferSetIdx,
 		set->usedVertices,
 		set->usedIndices,
-		src.m_numVertices,
-		src.m_numIndices
+		vd->m_numVertices,
+		vd->m_numIndices
 	};
 
-	set->usedVertices += src.m_numVertices;
-	set->usedIndices += src.m_numIndices;
+	set->usedVertices += vd->m_numVertices;
+	set->usedIndices += vd->m_numIndices;
 
 	m_models.push_back(m);
 
@@ -504,7 +504,7 @@ uint32_t CShaderProgram::AddObject(uint32_t modeIdx)
 	return static_cast<uint32_t>(m_drawObjectData.size()) - 1;
 }
 
-void CShaderProgram::_SendVertexStream(BAMS::RENDERINENGINE::Stream dst, BAMS::RENDERINENGINE::Stream & src, uint8_t *outBuf, std::vector<uint32_t> &bindingOffset, uint32_t numVertices)
+void CShaderProgram::_SendVertexStream(BAMS::RENDERINENGINE::Stream dst, const BAMS::RENDERINENGINE::Stream & src, uint8_t *outBuf, std::vector<uint32_t> &bindingOffset, uint32_t numVertices)
 {
 	static CAttribStreamConverter conv;
 
@@ -596,7 +596,7 @@ uint32_t MAXBUFFERCHUNKSIZE = 32 * 1024;
 
 void CShaderProgram::_BuindShaderDataBuffers()
 {
-	uint32_t maxObjects = MAXBUFFERCHUNKSIZE / (m_vi.push_constatns_size  > m_vi.max_single_ubo_size ? m_vi.push_constatns_size : m_vi.max_single_ubo_size);
+//	uint32_t maxObjects = MAXBUFFERCHUNKSIZE / (m_vi.push_constatns_size  > m_vi.max_single_ubo_size ? m_vi.push_constatns_size : m_vi.max_single_ubo_size);
 
 	m_paramsBuffer.resize(m_vi.params_in_push_constants.size() + m_vi.params_in_ubos.size());
 	for (auto &buf : m_paramsBuffer)
@@ -605,32 +605,32 @@ void CShaderProgram::_BuindShaderDataBuffers()
 	}
 }
 
-void CShaderProgram::_ImportModelData(VertexDescription src, void *dst)
+void CShaderProgram::_ImportModelData(const VertexDescription *vd, void *dst)
 {
 	uint32_t vboSize = 0; 
-	uint32_t iboSize = src.m_numIndices * sizeof(uint32_t);
+	uint32_t iboSize = vd->m_numIndices * sizeof(uint32_t);
 
 	std::vector<uint32_t> bindingOffset;
 	bindingOffset.push_back(0);
 
 	for (auto ps : m_vi.strides) {
-		vboSize += src.m_numVertices * ps;
+		vboSize += vd->m_numVertices * ps;
 		bindingOffset.push_back(vboSize);
 	}
 
-	assert(vboSize == src.m_numVertices * m_vi.size);
+	assert(vboSize == vd->m_numVertices * m_vi.size);
 
 	CAttribStreamConverter conv;
 
 	auto &d = m_vi.descriptions;
 	auto outBuf = reinterpret_cast<uint8_t *>(dst);
-#define SENDVERTEXSTREAM(x) _SendVertexStream(d.m_ ## x, src.m_ ## x, outBuf, bindingOffset, src.m_numVertices);
+#define SENDVERTEXSTREAM(x) _SendVertexStream(d.m_ ## x, vd->m_ ## x, outBuf, bindingOffset, vd->m_numVertices);
 	SENDVERTEXSTREAM(vertices);
 	SENDVERTEXSTREAM(colors[0]);
 #undef SENDVERTEXSTREAM
 
 	Stream out((U32)IDX_UINT32_1D, sizeof(uint32_t), false, reinterpret_cast<uint8_t *>(dst) + vboSize);
-	conv.Convert(out, src.m_indices, src.m_numIndices);
+	conv.Convert(out, vd->m_indices, vd->m_numIndices);
 }
 
 void CShaderProgram::CreateDescriptorSets()

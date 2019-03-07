@@ -281,8 +281,9 @@ void Tools::SearchForFiles(const WSTR &path, TSearchForFilesCallback SearchForFi
 /// see: https://docs.microsoft.com/en-us/windows/desktop/api/winbase/nf-winbase-winexec
 /// </summary>
 /// <param name="cmd">The command.</param>
-void Tools::WinExec(WSTR &cmd, CWSTR cwd)
+DWORD Tools::WinExec(WSTR &cmd, CWSTR cwd)
 {
+	DWORD exitCode = 0;
 	SECURITY_ATTRIBUTES sa = { 0 };
 	sa.nLength = sizeof(sa);
 	sa.lpSecurityDescriptor = NULL;
@@ -295,7 +296,7 @@ void Tools::WinExec(WSTR &cmd, CWSTR cwd)
 	{
 		// error handling...
 		TRACE("Tools::CmdExec: fail to create StdOut pipes\n");
-		return;
+		return -1;
 	}
 
 	if (!CreatePipe(&hStdErrRd, &hStdErrWr, &sa, 0))
@@ -304,7 +305,7 @@ void Tools::WinExec(WSTR &cmd, CWSTR cwd)
 		TRACE("Tools::CmdExec: fail to create StdErr pipes\n");
 		CloseHandle(hStdOutRd);
 		CloseHandle(hStdOutWr);
-		return;
+		return -1;
 	}
 
 	SetHandleInformation(hStdOutRd, HANDLE_FLAG_INHERIT, 0);
@@ -329,7 +330,7 @@ void Tools::WinExec(WSTR &cmd, CWSTR cwd)
 		// read from hStdOutRd and hStdErrRd as needed until the process is terminated...
 		COMMTIMEOUTS timeouts = { 0, //interval timeout. 0 = not used
 						  0, // read multiplier
-						 10, // read constant (milliseconds)
+						100, // read constant (milliseconds)
 						  0, // Write multiplier
 						  0  // Write Constant
 		};
@@ -340,7 +341,7 @@ void Tools::WinExec(WSTR &cmd, CWSTR cwd)
 		char chBuf[BUFSIZE+1];
 		DWORD dwRead;
 
-		DWORD exitCode = 0;
+
 		while (GetExitCodeProcess(pi.hProcess, &exitCode) && exitCode == STILL_ACTIVE)
 		{
 			ReadFile(hStdOutRd, chBuf, BUFSIZE, &dwRead, 0);
@@ -364,6 +365,8 @@ void Tools::WinExec(WSTR &cmd, CWSTR cwd)
 	CloseHandle(hStdOutWr);
 	CloseHandle(hStdErrRd);
 	CloseHandle(hStdErrWr);
+
+	return exitCode;
 }
 
 UUID Tools::NOUID = { 0 };
