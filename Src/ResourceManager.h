@@ -29,11 +29,17 @@ public:
 	struct IChain {
 		IChain *next;
 		IChain *prev;
+		bool isValide;
 		virtual void Notify() = 0;
 	} *first;
 
 
 	ResourceUpdateNotifier() : first(nullptr) {}
+	~ResourceUpdateNotifier()
+	{
+		for (IChain *f = first; f; f = f->next)
+			f->isValide = false;
+	}
 
 	void Notify()
 	{
@@ -48,6 +54,7 @@ public:
 		if (first)
 			first->prev = n;
 		first = n;
+		n->isValide = true;
 	}
 
 	void Remove(IChain *n)
@@ -72,7 +79,7 @@ private:
 public:
 	ResourceUpdateNotifyReciver() : _res(nullptr), _param(0) {}
 	~ResourceUpdateNotifyReciver() { StopNotifyReciver(); }
-	void SetResource(ResourceBase *res, T *owner, U64 param) 
+	void SetResource(ResourceBase *res, T *owner, U64 param = 0) 
 	{ 
 		StopNotifyReciver();
 		_res = res; 
@@ -85,7 +92,8 @@ public:
 	void StopNotifyReciver() 
 	{
 		if (_res) {
-			_res->RemoveNotifyReciver(this);
+			if (isValide)
+				_res->RemoveNotifyReciver(this);
 			_res->Release();
 		}
 	}
@@ -123,16 +131,17 @@ class ResourceBase
 protected:
 	void *_resourceData;
 	SIZE_T _resourceSize;
+	time_t _resourceTimestamp;
+	ResourceImplementationInterface *_resourceImplementation;
+	U32 _refCounter;
+
 	bool _isLoaded;
 	bool _isDeleted;
 	bool _isModified;
 	bool _isLoadable;
 	time _waitWithUpdate;
-	U32 _refCounter;
-	time_t _fileTimeStamp;
 
-	ResourceImplementationInterface *_resourceImplementation;
-	const static time::duration defaultDelay;
+	static constexpr time::duration defaultDelay = 500ms;
 	ResourceUpdateNotifier _updateNotifier;
 
 public:
@@ -158,6 +167,7 @@ public:
 
 	~ResourceBase()
 	{
+		TRACE("~" << Name.c_str() << (_resourceImplementation ? " : true\n" : " : false\n"));
 		if (_resourceImplementation)
 			_resourceImplementation->GetFactory()->Destroy(_resourceImplementation);
 	};
@@ -180,12 +190,11 @@ public:
 
 	void *GetData() { return _resourceData; }
 	SIZE_T GetSize() { return _resourceSize; }
+	time_t GetTimestamp() { return _resourceTimestamp; }
 	ResourceImplementationInterface *GetImplementation() { return _resourceImplementation; }
 
-	void AddRef()
-	{ 
-		++_refCounter; 
-	}
+	void AddRef() { ++_refCounter; }
+	U32 GetRefCounter() { return _refCounter; }
 
 	void Release() 
 	{ 
@@ -198,14 +207,12 @@ public:
 		}
 	}
 
-	U32 GetRefCounter() { return _refCounter; }
 
 	void Update() { if (_resourceImplementation) _resourceImplementation->Update(this); _updateNotifier.Notify(); }
 	IMemoryAllocator *GetMemoryAllocator() { return !_resourceImplementation ? nullptr : _resourceImplementation->GetFactory()->GetMemoryAllocator(); }
 
 	void AddNotifyReciver(ResourceUpdateNotifier::IChain *nr)     { _updateNotifier.Add(nr); }
 	void RemoveNotifyReciver(ResourceUpdateNotifier::IChain *nr) { _updateNotifier.Remove(nr); }
-	time_t GetFileTimestamp() { return _fileTimeStamp; }
 	friend class ResourceManager;
 };
 

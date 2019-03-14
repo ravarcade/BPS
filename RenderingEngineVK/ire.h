@@ -91,6 +91,7 @@ public:
 	void CloseWnd(const void *params);
 	void AddModel(const void *params);
 	void AddShader(const void *params);
+	void ReloadShader(const void * params);
 
 	void CloseWnd(GLFWwindow* window);
 

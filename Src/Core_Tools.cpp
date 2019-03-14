@@ -133,7 +133,7 @@ BYTE * Tools::LoadFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path, IMemor
 	return binBuf;
 }
 /*
-time_t Tools::GetFileTimestamp(const WSTR & fname)
+time_t Tools::GetTimestamp(const WSTR & fname)
 {
 	HANDLE hFile;
 	FILETIME lastWriteTime;

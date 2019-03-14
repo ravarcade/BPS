@@ -144,6 +144,7 @@ public:
 		case CLOSE_WINDOW:   re.CloseWnd(msg->data); break;
 		case ADD_MODEL:      re.AddModel(msg->data); break;
 		case ADD_SHADER:     re.AddShader(msg->data); break;
+		case RELOAD_SHADER:  re.ReloadShader(msg->data); break;
 
 		}
 	}

@@ -73,10 +73,12 @@ extern "C" {
 	BAMS_EXPORT unsigned char *IShader_GetData(IShader *res);
 	BAMS_EXPORT size_t IShader_GetSize(IShader *res);
 	BAMS_EXPORT void IShader_AddProgram(IShader *res, const wchar_t *fileName);
-	BAMS_EXPORT const wchar_t * IShader_GetProgramName(IShader *res, int type);
+	BAMS_EXPORT const wchar_t * IShader_GetSourceFilename(IShader *res, int type);
+	BAMS_EXPORT const wchar_t * IShader_GetBinaryFilename(IShader *res, int type);
 	BAMS_EXPORT void IShader_Save(IShader *res);
-	BAMS_EXPORT uint32_t IShader_GetSubprogramsCount(IShader *res);
-	BAMS_EXPORT IRawData *IShader_GetSubprogram(IShader *res, uint32_t idx);
+
+	BAMS_EXPORT uint32_t IShader_GetBinaryCount(IShader *res);
+	BAMS_EXPORT IRawData *IShader_GetBinary(IShader *res, uint32_t idx);
 
 	// Module
 	struct Message
@@ -85,6 +87,7 @@ extern "C" {
 		U32 targetModule;
 		U32 source;
 		void *data;
+		U32 dataLen;
 	};
 
 	typedef void ExternalModule_Initialize(const void *moduleData);
@@ -106,7 +109,8 @@ extern "C" {
 		uint32_t msgId,
 		uint32_t msgDst,
 		uint32_t msgSrc,
-		const void *data);
+		const void *data,
+		uint32_t dateLen);
 
 	BAMS_EXPORT void IEngine_Update(float dt);
 
@@ -156,7 +160,7 @@ extern "C" {
 		friend CResourceManager;
 
 	public:
-		CResource() {}
+		CResource() : _res(nullptr) {}
 		CResource(IResource *r) : _res(r) { AddRef(); }
 		CResource(const CResource &src) : _res(src._res) {}
 		CResource(CResource &&src) : _res(std::move(src._res)) {}
@@ -208,10 +212,11 @@ extern "C" {
 		size_t GetSize() { return IShader_GetSize(static_cast<IShader*>(Get())); }
 
 		void AddProgram(const wchar_t *fileName) { IShader_AddProgram(static_cast<IShader*>(Get()), fileName); }
-		const wchar_t *GetSubprogramName(int type) { return IShader_GetProgramName(static_cast<IShader*>(Get()), type); }
+		const wchar_t *GetSourceFilename(int type) { return IShader_GetSourceFilename(static_cast<IShader*>(Get()), type); }
+		const wchar_t *GetBinaryFilename(int type) { return IShader_GetBinaryFilename(static_cast<IShader*>(Get()), type); }
 
-		uint32_t GetSubprogramsCount() { return IShader_GetSubprogramsCount(static_cast<IShader*>(Get())); }
-		CRawData GetSubprogram(uint32_t idx) { CRawData prg(IShader_GetSubprogram(static_cast<IShader*>(Get()), idx)); return  std::move(prg); }
+		uint32_t GetBinaryCount() { return IShader_GetBinaryCount(static_cast<IShader*>(Get())); }
+		CRawData GetBinary(uint32_t idx) { CRawData prg(IShader_GetBinary(static_cast<IShader*>(Get()), idx)); return  std::move(prg); }
 
 		void Save() { IShader_Save(static_cast<IShader*>(Get())); }
 	};
@@ -276,9 +281,10 @@ extern "C" {
 			uint32_t msgId,
 			uint32_t msgDst,
 			uint32_t msgSrc,
-			const void *data)
+			const void *data,
+			uint32_t dataLen = 0)
 		{
-			IEngine_SendMsg( msgId, msgDst, msgSrc, data);
+			IEngine_SendMsg( msgId, msgDst, msgSrc, data, dataLen);
 		}
 
 		static void Update(float dt)
@@ -321,7 +327,8 @@ enum { // msgId
 	CREATE_WINDOW = 0x20001,
 	CLOSE_WINDOW  = 0x20002,
 	ADD_MODEL     = 0x20003, // object name + model name + shader program
-	ADD_SHADER       = 0x20004
+	ADD_SHADER    = 0x20004,
+	RELOAD_SHADER = 0x20005,
 };
 
 struct PCREATE_WINDOW {
@@ -345,3 +352,6 @@ struct PADD_SHADER {
 	uint32_t wnd;
 	const char *shader;
 };
+
+typedef struct PADD_SHADER PRELOAD_SHADER;
+

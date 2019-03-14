@@ -23,6 +23,7 @@ template<typename T>
 struct queue {
 private:
 	IMemoryAllocator *alloc;
+
 	struct Entry : T {
 		template<class... Args>
 		inline Entry(IMemoryAllocator *alloc, Args &&...args) :
@@ -53,7 +54,8 @@ public:
 		first(nullptr),
 		last(nullptr),
 		used(0),
-		alloc(nullptr)
+		alloc(nullptr),
+		queueSize(size)
 	{
 		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, size);
 	}
@@ -61,6 +63,8 @@ public:
 	~queue()
 	{
 		deleteObjects<T>();
+		used = 0;
+		last = nullptr;
 		delete alloc;
 	}
 
@@ -77,10 +81,13 @@ public:
 		void *p = alloc->allocate(sizeof(Entry));
 		new (p) Entry(alloc, std::forward<Args>(args)...);
 		auto e = reinterpret_cast<Entry *>(p);
+
+		e->next = nullptr;
+
 		if (last)
 			last->next = e;
-
 		last = e;
+
 		if (!first)
 			first = e;
 
@@ -106,6 +113,51 @@ public:
 		return ret;
 	}
 
+	template<typename TSelector, typename TCallback >
+	void filter(TSelector &test, TCallback &process)
+	{
+		if (!first && used) // do not waste time on empty queue
+			return;
+		Entry *fFirst = nullptr;
+		{	// we have segment here, because we want to release lck
+			std::lock_guard<std::mutex> lck(mutex);
+			Entry *p = first;
+			Entry *fLast = nullptr;
+			first = nullptr;
+			last = nullptr;
+			while (p)
+			{
+				if (test(p))
+				{
+					if (!fFirst)
+						fFirst = p;
+					if (fLast)
+						fLast->next = p;
+					fLast = p;
+					--used;
+				}
+				else {
+					if (!first)
+						first = p;
+					if (last)
+						last->next = p;
+					last = p;
+				}
+				auto np = p->next;
+				p->next = nullptr;
+				p = np;
+			}
+		}
+
+		// We removed all "filtered" entrys from queue/list 
+		// ... and we have all that entrys in separate queue
+		for (Entry *ent = fFirst; ent; ent = ent->next)
+		{
+			process(ent);
+			release(ent);			
+		}
+	}
+
 	U32 size() { return used; }
 
 	/// <summary>
@@ -119,9 +171,19 @@ public:
 		alloc->deallocate(entry);
 	}
 
+	void reset()
+	{
+		deleteObjects<T>();
+		used = 0;
+		last = nullptr;
+		delete alloc;
+		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, queueSize);
+	}
+
 private:
 	Entry *first;
 	Entry *last;
 	U32 used;
 	std::mutex mutex;
+	SIZE_T queueSize;
 };

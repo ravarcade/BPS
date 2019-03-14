@@ -5,6 +5,14 @@ NAMESPACE_CORE_BEGIN
 // ============================================================================ allocation & deallocacation functions ===
 // Thay can be called only from alloctar classes. So we keep it in pivate class.
 
+//#define DEBUG_MEMORY_LEAKS
+
+#ifdef DEBUG_MEMORY_LEAKS
+#define TRACE_MEMORY_LEAKS(x) TRACE(x)
+#else
+#define TRACE_MEMORY_LEAKS(x)
+#endif
+
 namespace MemoryAllocatorsPrivate {
 	using namespace Allocators;
 
@@ -182,7 +190,7 @@ namespace MemoryAllocatorsPrivate {
 				DebugStats.Last->next = ext;
 			DebugStats.Last = ext;
 
-			TRACE("++ [" << ext->counter << "]: allocate(" << ext->size << ")\n");
+			TRACE_MEMORY_LEAKS("++ [" << ext->counter << "]: allocate(" << ext->size << ")\n");
 			return ext + 1;
 		}
 
@@ -196,7 +204,7 @@ namespace MemoryAllocatorsPrivate {
 			if (DebugStats.Last == ext)
 				DebugStats.Last = ext->prev;
 
-			TRACE("-- [" << ext->counter << "]: deallocate(" << ext->size << ")\n");
+			TRACE_MEMORY_LEAKS("-- [" << ext->counter << "]: deallocate(" << ext->size << ")\n");
 			T::deallocate(ext);
 		}
 	};
@@ -304,6 +312,7 @@ namespace MemoryAllocatorsPrivate {
 			U8 *mem;
 			U32 counter;
 			size_t free;
+			size_t blockSize;
 		};
 
 		void allocNewBlock(size_t bytes)
@@ -321,7 +330,7 @@ namespace MemoryAllocatorsPrivate {
 			BlockEntry *newBlock = nullptr;
 			for (auto p = firstFree; p; p = p->next)
 			{
-				if (p->free >= bytes)
+				if (p->blockSize >= bytes)
 				{
 					newBlock = p;
 					for (auto p = newBlock->next; p; p = p->next)
@@ -337,6 +346,7 @@ namespace MemoryAllocatorsPrivate {
 
 			if (newBlock)
 			{
+				bytes = newBlock->blockSize;
 				// remove from list of free blocks
 				if (firstFree == newBlock)
 					firstFree = newBlock->next;
@@ -357,7 +367,8 @@ namespace MemoryAllocatorsPrivate {
 			newBlock->next = nullptr;
 			newBlock->prev = current;
 			newBlock->counter = 0;
-			newBlock->free = bytes - sizeof(BlockEntry);
+			newBlock->blockSize = bytes;
+			newBlock->free = newBlock->blockSize - sizeof(BlockEntry);
 			newBlock->mem = reinterpret_cast<U8*>(newBlock) + sizeof(BlockEntry);
 			current = newBlock;
 		}
@@ -365,6 +376,9 @@ namespace MemoryAllocatorsPrivate {
 
 		void deallocateBlock(BlockEntry *block)
 		{
+			// block is empty... restore orginal starting free space size
+			block->free = block->blockSize - sizeof(BlockEntry);
+
 			// remove block from list of blocks
 			if (block->prev)
 				block->prev->next = block->next;

@@ -5,6 +5,13 @@ using namespace BAMS::RENDERINENGINE;
 const uint32_t ALWAYS_RESERVE_VERTICES = 16 * 1024; // <- 256kB for 16bytes / per vertice
 const uint32_t ALWAYS_RESERVE_INDICES = ALWAYS_RESERVE_VERTICES;
 
+/// <summary>
+/// Loads the program.
+/// Will not call any vulkan function or create any vulkan object.
+/// It will only parse program.
+/// To create vk object you need to call other methods, like CreateGraphicsPipeline()
+/// </summary>
+/// <param name="program">The program.</param>
 void CShaderProgram::LoadProgram(const char *program)
 {
 	// to do: add support for loading program description from manifest
@@ -53,7 +60,8 @@ void CShaderProgram::SetRenderPassAndMsaaSamples(VkRenderPass renderPass, VkSamp
 
 VkPipeline CShaderProgram::CreateGraphicsPipeline()
 {
-	m_graphicsPipeline = nullptr;
+	vk->vkDestroy(m_graphicsPipeline); // delete graphicsPipline if it exist
+//	m_graphicsPipeline = nullptr;
 
 	auto shaderStages = _Compile();
 	auto vertexInputInfo = _GetVertexInputInfo();
@@ -385,6 +393,7 @@ void CShaderProgram::CreatePipelineLayout()
 			layoutInfo.pBindings = bindings.data();
 
 			VkDescriptorSetLayout descriptorSetLayout;
+			
 			if (vkCreateDescriptorSetLayout(vk->device, &layoutInfo, vk->allocator, &descriptorSetLayout) != VK_SUCCESS)
 				throw std::runtime_error("failed to create descriptor set layout!");
 
@@ -521,14 +530,20 @@ void CShaderProgram::_CreateUniformBuffers()
 {
 	for (auto &ubo : m_vi.params_in_ubos)
 	{
-		if (ubo.entry.name == "ubo")
+		if (ubo.entry.name == "ubo") // "ubo" is global/shared ubo and we do not create it here... only separate ones used in this shader
 			continue;
+
+		// TODO:
+		// Allocate buffers to store give number of objects, there is no reason to have all buffers same size
+		// Right now we allocate space for only one object.
+
 		VkDeviceSize bufferSize = ubo.entry.size;
 		VkBuffer ubo;
 		VkDeviceMemory ubomem;
+		uint32_t numObjects = 100;
 
 		vk->_CreateBuffer(
-			bufferSize,
+			bufferSize * numObjects,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			ubo, ubomem);
@@ -596,7 +611,12 @@ uint32_t MAXBUFFERCHUNKSIZE = 32 * 1024;
 
 void CShaderProgram::_BuindShaderDataBuffers()
 {
-//	uint32_t maxObjects = MAXBUFFERCHUNKSIZE / (m_vi.push_constatns_size  > m_vi.max_single_ubo_size ? m_vi.push_constatns_size : m_vi.max_single_ubo_size);
+	uint32_t maxPerObject = m_vi.push_constatns_size > m_vi.max_single_ubo_size ? m_vi.push_constatns_size : m_vi.max_single_ubo_size;
+	uint32_t maxObjects = MAXBUFFERCHUNKSIZE / (maxPerObject > 0 ? maxPerObject : 1);
+
+	// TODO: make memory allocation sensible... now it allocs a lot of unused memory, so:
+	// - calc all requred mem, and alloc it at once, note requirments for memory alignment
+	// - sprlit that memory to blocks (for different buffers).
 
 	m_paramsBuffer.resize(m_vi.params_in_push_constants.size() + m_vi.params_in_ubos.size());
 	for (auto &buf : m_paramsBuffer)
@@ -635,15 +655,7 @@ void CShaderProgram::_ImportModelData(const VertexDescription *vd, void *dst)
 
 void CShaderProgram::CreateDescriptorSets()
 {
-	VkDescriptorSetAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = vk->descriptorPool;
-	allocInfo.descriptorSetCount = static_cast<uint32_t>(m_descriptorSetLayout.size());
-	allocInfo.pSetLayouts = m_descriptorSetLayout.data();
-
-	if (vkAllocateDescriptorSets(vk->device, &allocInfo, &m_descriptorSet) != VK_SUCCESS) {
-		throw std::runtime_error("failed to allocate descriptor set!");
-	}
+	m_descriptorSet = vk->CreateDescriptorSets(m_descriptorSetLayout);
 }
 
 void CShaderProgram::UpdateDescriptorSets()
@@ -704,18 +716,6 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 	vkCmdSetViewport(cb, 0, 1, &vk->viewport);
 	vkCmdSetScissor(cb, 0, 1, &vk->scissor);
 
-	/*
-	static auto startTime = std::chrono::high_resolution_clock::now();
-
-	auto currentTime = std::chrono::high_resolution_clock::now();
-	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
-	static struct {
-		glm::mat4 model;
-		glm::vec4 baseColor;
-	} pushConstantData;
-	pushConstantData.model = glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(objectId * 2 - 2.0, 0, 0)), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	pushConstantData.baseColor = glm::vec4(1, 0.5, 1, 1);
-	*/
 	uint32_t lastBufferSetIdx = -1;
 	if (vk->currentDescriptorSet != m_descriptorSet)
 	{
@@ -723,10 +723,11 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 		vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &vk->currentDescriptorSet, 0, nullptr);
 	}
 
+	TRACE("[" << m_drawObjectData.size() << "]");
+
 	uint32_t objectId = 0;
 	for (auto &dod : m_drawObjectData)
-	{
-		
+	{		
 		auto &m = m_models[dod.modelIdx];
 		if (m.bufferSetIdx != lastBufferSetIdx)
 		{
@@ -737,6 +738,8 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 			vkCmdBindIndexBuffer(cb, bs.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 		}
 
+		// TODO:
+		// Replace 80 with size of push_constants
 		vkCmdPushConstants(cb, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, 80, m_paramsBuffer[0].data() + 80 * objectId);
 		vkCmdDrawIndexed(cb, m.numIndex, 1, m.firstIndex, m.firstVertex, 0);
 		++objectId;

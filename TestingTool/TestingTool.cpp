@@ -51,6 +51,13 @@ void DumpHex(BYTE *data, size_t s)
 	}
 }
 
+void MemStat()
+{
+	uint64_t Max, Current, Counter;
+	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
+	printf("==================== Max = %8d, Current = %8d, Count = %8d ====================\n", (int)Max, (int)Current, (int)Counter);
+}
+
 void DumpRAM()
 {
 	size_t size, counter;
@@ -68,9 +75,7 @@ void DumpRAM()
 		printf("\n");
 	}
 
-	uint64_t Max, Current, Counter;
-	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
-	printf("\n=========================================================\nMax = %d, Current = %d, Count = %d\n", (int)Max, (int)Current, (int)Counter);
+	MemStat();
 }
 
 #include <vector>
@@ -137,7 +142,7 @@ static PCREATE_WINDOW w2 = { 2, 500, 200, 1310, 610 };
 
 void testloop(BAMS::CEngine &en)
 {
-	static PADD_MODEL c0 = { 0, "cubename", "cube", "cube" };
+	static PADD_MODEL c0 = { 0, "realcubename", "cube", "cube" };
 	static PADD_MODEL c02 = { 0, "cubename", "cube", "default" };
 	static PADD_MODEL c1 = { 1, "cubename", "cube", "default" };
 	static PADD_MODEL c2 = { 2, "cubename", "cube", "default" };
@@ -229,7 +234,7 @@ int main()
 			BAMS::CResourceManager rm;
 			rm.RootDir(L"C:\\Work\\test");
 			rm.LoadSync();
-			en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w0);
+			en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w0, sizeof(w0));
 
 			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 			

@@ -110,8 +110,7 @@ class CShadersReflections
 {
 public:
 	struct ShaderProgramInfo {
-//		std::string name;
-		::BAMS::CRawData resource;
+		BAMS::CRawData resource;
 		std::string entryPointName;
 		VkShaderStageFlagBits stage;
 	};
@@ -151,4 +150,5 @@ private:
 
 
 	std::vector<std::string> m_outputNames;
+	BAMS::CShader m_shaderResource;
 };

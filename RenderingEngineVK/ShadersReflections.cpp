@@ -240,10 +240,10 @@ CShadersReflections::CShadersReflections(const char *shaderName) { LoadProgram(s
 ShaderDataInfo CShadersReflections::LoadProgram(const char *shaderName)
 {
 	BAMS::CResourceManager rm;
-	auto shader = rm.GetShaderByName(shaderName);
-	if (!shader.IsLoaded())
-		rm.LoadSync(shader);
-	uint32_t cnt = shader.GetSubprogramsCount();
+	m_shaderResource = rm.GetShaderByName(shaderName);
+	if (!m_shaderResource.IsLoaded())
+		rm.LoadSync(m_shaderResource);
+	uint32_t cnt = m_shaderResource.GetBinaryCount();
 
 	m_programs.resize(cnt);
 
@@ -251,7 +251,7 @@ ShaderDataInfo CShadersReflections::LoadProgram(const char *shaderName)
 	{
 		auto &prg = m_programs[i];
 		prg.entryPointName = "main";
-		prg.resource = shader.GetSubprogram(i);
+		prg.resource = m_shaderResource.GetBinary(i);
 		if (!prg.resource.IsLoaded())
 			rm.LoadSync(prg.resource);
 	}
@@ -293,6 +293,10 @@ void CShadersReflections::_ParsePrograms()
 	for (auto &prg : m_programs) 
 	{		
 		auto code = prg.resource;
+		auto bin = (uint32_t*)code.GetData();
+		auto blen = (code.GetSize() + sizeof(uint32_t) - 1) / sizeof(uint32_t);
+		if (bin == nullptr)
+			TRACE("PANIC");
 		CompilerGLSL compiler((uint32_t*)code.GetData(), (code.GetSize() + sizeof(uint32_t) - 1) / sizeof(uint32_t));
 		auto resources = compiler.get_shader_resources();
 		auto entry_points = compiler.get_entry_points_and_stages();

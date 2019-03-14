@@ -12,4 +12,5 @@ struct Message
 	U32 destination;
 	U32 source;
 	const void *data;
+	U32 dataLen;
 };

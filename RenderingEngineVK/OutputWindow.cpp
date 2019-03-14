@@ -10,7 +10,8 @@ OutputWindow::OutputWindow() :
 	instance(VK_NULL_HANDLE),
 	window(nullptr),
 	allocator(VK_NULL_HANDLE),
-	device(VK_NULL_HANDLE)
+	device(VK_NULL_HANDLE),
+	renderPass(VK_NULL_HANDLE)
 {
 }
 
@@ -158,8 +159,23 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 		_CreateSharedUniform(); // we need to create shared uniform before we call _LoadShadersPrograms?
 		_LoadShaderPrograms();
 		_CreateCommandBuffers();
-		//_CreateDemoCube();
 	}
+}
+
+VkDescriptorSet OutputWindow::CreateDescriptorSets(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts)
+{
+	VkDescriptorSet descriptorSet = nullptr;
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = static_cast<uint32_t>(descriptorSetLayouts.size());
+	allocInfo.pSetLayouts = descriptorSetLayouts.data();
+
+	if (vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
+		throw std::runtime_error("failed to allocate descriptor set!");
+	}
+	
+	return descriptorSet;
 }
 
 void OutputWindow::Close(GLFWwindow* wnd)
@@ -173,7 +189,12 @@ void OutputWindow::Close(GLFWwindow* wnd)
 		return;
 	}
 
-	glfwSetWindowShouldClose(window, GLFW_TRUE);
+	if (window) {
+		glfwSetWindowShouldClose(window, GLFW_TRUE);
+	}
+	else {
+		TRACE("HM");
+	}
 }
 
 
@@ -798,6 +819,9 @@ void OutputWindow::_CreateDescriptorPool()
 		s = sh->GetDescriptorPoolsSize(pools);
 		++numShaderPrograms;
 	});
+	for (auto &x : pools)
+		x += 5;
+	numShaderPrograms += 5;
 
 	std::vector<VkDescriptorPoolSize> poolSizes(s);
 	uint32_t idx = 0;
@@ -877,6 +901,8 @@ void OutputWindow::_CreateCommandBuffers()
 			shader->DrawObjects(commandBuffers[i]);
 			//shader->GetPipelineLayout();
 		});
+		TRACE("\n");
+
 
 
 		//		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
@@ -1008,7 +1034,7 @@ void OutputWindow::_LoadShaderPrograms()
 	_CreateDescriptorPool();                            // create descriptor pool for all used shader programs
 
 	shaders.foreach([&](CShaderProgram *&s) {
-		auto outputNames = s->GetOutputNames();		// select renderPass base on names of output attachments in fragment shader
+		auto outputNames = s->GetOutputNames();			// select renderPass base on names of output attachments in fragment shader
 		if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
 		{
 			s->SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
@@ -1147,7 +1173,36 @@ CShaderProgram * OutputWindow::AddShader(const char * shader)
 		return sh; // can't add second shader program with same name....
 
 	sh = shaders.add(shader, this);
+	sh->LoadProgram(shader); 
+
+	if (renderPass != nullptr)
+	{
+		// prepare shader to be used.
+		sh->SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
+		sh->CreateGraphicsPipeline();
+		sh->CreateDescriptorSets();
+		sh->UpdateDescriptorSets();
+	}
+	return sh;
+}
+
+CShaderProgram * OutputWindow::ReloadShader(const char * shader)
+{
+	auto sh = shaders.find(shader);
+	if (!sh)
+		return nullptr;
+
 	sh->LoadProgram(shader);
+	if (renderPass != nullptr)
+	{
+		// prepare shader to be used.
+//		sh->SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
+		sh->CreateGraphicsPipeline();
+//		sh->CreateDescriptorSets();
+//		sh->UpdateDescriptorSets();
+		
+		BufferRecreationNeeded();
+	}
 	return sh;
 }
 

@@ -10,45 +10,28 @@
 
 class ResShader : public ResoureImpl<ResShader, RESID_SHADER, Allocators::default>
 {
-	static constexpr U32 NOT_FOUND = -1;
 	static constexpr char *SubprogramTypes[] = { "Vert", "Frag", "Geom", "Ctrl", "Eval" };
 	static constexpr SIZE_T NumSubprogramTypes = COUNT_OF(SubprogramTypes);
+	static constexpr wchar_t *src[] = {
+		L".vert.glsl", nullptr,
+		L".frag.glsl", nullptr,
+		L".geom.glsl", nullptr,
+		L".tesc.glsl", nullptr,
+		L".tese.glsl", nullptr,
+		nullptr, nullptr };
 
-	U32 FindType(const WSTR &prg)
-	{
-		if (prg.endsWith(L".glsl") || prg.endsWith(L".spv"))
-		{
-			static const wchar_t *ends[] = {
-				L".vert.glsl", nullptr,
-				L".frag.glsl", nullptr,
-				L".geom.glsl", nullptr,
-				L".tesc.glsl", nullptr,
-				L".tese.glsl", nullptr,
+	static constexpr wchar_t *bin[] = {
+		L".vert.spv", nullptr,
+		L".frag.spv", nullptr,
+		L".geom.spv", nullptr,
+		L".tesc.spv", nullptr,
+		L".tese.spv", nullptr,
+		nullptr, nullptr
+	};
 
-				L".vert.spv", nullptr,
-				L".frag.spv", nullptr,
-				L".geom.spv", nullptr,
-				L".tesc.spv", nullptr,
-				L".tese.spv", nullptr,
-				nullptr, nullptr
-			};
+	// ----------------------------------------------------------------------------------
 
-			U32 type = 0;
-			for (const wchar_t **f = ends; *f; ++f)
-			{
-				for (; *f; ++f)
-				{
-					if (prg.endsWith(*f))
-						return type;
-				}
-				++type;
-			}
-		}
-
-		return NOT_FOUND;
-	}
-
-public:
+	ResourceBase *Res;
 	U8 *Data;
 	SIZE_T Size;
 
@@ -56,21 +39,122 @@ public:
 	bool isUpdateRecived;
 
 	struct File {
-		WSTR FileName;
+		WSTR Filename;
 		SIZE_T Size;
 		time_t Timestamp;
 		ResourceUpdateNotifyReciver<ResShader> UpdateNotifyReciver;
-		bool IsEmpty() { return FileName.size() == 0; }
+		bool IsEmpty() { return Filename.size() == 0; }
+
+		/// Check in loaded resources or on disk. 
+		/// Update Size & Timestamp if needed.
+		bool IsModified() 
+		{
+			auto res = GetResource();
+			if (res && res->isLoaded()) 
+			{
+				if (res->GetSize() != Size || res->GetTimestamp() != Timestamp)
+				{
+					Size = res->GetSize();
+					Timestamp = res->GetTimestamp();
+					return true;
+				}
+				return false;
+			}
+
+			if (Filename.size())
+			{
+				SIZE_T fSize = Size;
+				time_t fTimestamp = Timestamp;
+				bool fExist = Tools::InfoFile(&Size, &Timestamp, Filename);
+
+				if (!fExist)
+				{
+					Size = 0;
+					Timestamp = 0;
+					UpdateNotifyReciver.StopNotifyReciver();
+				}
+				return !fExist || fSize != Size || fTimestamp != Timestamp;
+			}
+			return false;
+		}
+
+		ResourceBase *GetResource() { return  UpdateNotifyReciver.GetResource();  }
+		void SetResource(ResourceBase *res, ResShader *owner) { UpdateNotifyReciver.SetResource(res, owner); }
+		
 	};
 
+	//	File Subprograms[NumSubprogramTypes*2];
+	File Source[NumSubprogramTypes];
+	File Binary[NumSubprogramTypes];
 
+	// ------------------------------------------------------------------------------------	
 
-	File Subprograms[NumSubprogramTypes*2];
-	ResourceBase *Res;
+	bool _ParseFilename(const WSTR &prg, U32 *pStage, bool *pIsSrc = nullptr)
+	{
+		bool isSrc = prg.endsWith(L".glsl");
+		bool isBin = isSrc ? false : prg.endsWith(L".spv"); // we don't check for ".spv" if it ends ".glsl"
+
+		if (!isSrc && !isBin)
+			return false;
+
+		if (pIsSrc)
+			*pIsSrc = isSrc;
+
+		auto ends = isSrc ? src : bin;
+
+		U32 stage = -1;
+		bool ret = false;
+		for (auto f = ends; *f && !ret; ++f)
+		{
+			for (; *f; ++f)
+			{
+				if (prg.endsWith(*f))
+				{
+					ret = true;
+					break;
+				}
+			}
+			++stage;
+		}
+		if (ret && pStage)
+			*pStage = stage;
+
+		return ret;
+	}
+
+	File * _FindFile(const WSTR &prg)
+	{
+		bool isSrc;
+		U32 stage;
+		if (_ParseFilename(prg, &stage, &isSrc))
+			return isSrc ? &Source[stage] : &Binary[stage];
+
+		return nullptr;
+	}
+
+	U32 _FindStage(const WSTR &prg)
+	{
+		U32 stage = -1;
+		_ParseFilename(prg, &stage);
+
+		return stage;
+	}
+
+public:
 	ResShader(ResourceBase *res) : Res(res), Data(nullptr), Size(0), isModified(true), isUpdateRecived(false) {}
-	~ResShader() { if (Data) deallocate(Data); }
+	~ResShader() { Release(Res); }
+	void Release(ResourceBase *res)
+	{
+		Save(res);
+		res->ResourceLoad(nullptr);
+		if (Data)
+			deallocate(Data);
 
-	U32 AddProgram(WSTR prg)
+		Data = nullptr;
+		Size = 0;
+	}
+
+	File * AddProgram(WSTR filename)
 	{
 		auto rm = globalResourceManager;
 		if (!Res->isLoaded() && !Res->isDeleted())
@@ -79,31 +163,37 @@ public:
 		}
 
 		ResourceBase *res = nullptr;
-		U32 type = FindType(prg);
-		if (type != NOT_FOUND) 
+		if (auto p = _FindFile(filename))
 		{
-			auto &p = Subprograms[type];
-			rm->AbsolutePath(prg);
-			if (p.FileName == prg)
-				return type;
-
-			isModified = true;
-			res = rm->GetByFilename(prg, RawData::GetTypeId());
-			p.FileName = prg;
-			p.UpdateNotifyReciver.SetResource(res, this, type);
-			// Timestamp = 0 will trigger compilation of source code or build of final shader program
-			p.Size = 0;
-			p.Timestamp = 0;
+			rm->AbsolutePath(filename);
+			if (p->Filename != filename)
+			{
+				isModified = true;
+				res = rm->GetByFilename(filename, RawData::GetTypeId()); // create resource (if not exist)
+				p->Filename = filename;
+				p->SetResource(res, this);
+				// Timestamp = 0 will trigger compilation of source code or build of final shader program
+				p->Size = 0;
+				p->Timestamp = 0;
+			}
+			return p;
 		}
-		return type;
+
+		return nullptr;
 	}
 
 
-	WSTR &GetSubprogramName(U32 type)
+	WSTR &GetSourceFilename(U32 stage)
 	{
-		assert(type >= NumSubprogramTypes);
-		auto &p = Subprograms[type];
-		return p.FileName;
+		assert(stage >= NumSubprogramTypes);
+		return Source[stage].Filename;
+	}
+
+
+	WSTR &GetBinaryFilename(U32 stage)
+	{
+		assert(stage >= NumSubprogramTypes);
+		return Binary[stage].Filename;
 	}
 
 	void Update(ResourceBase *res)
@@ -134,23 +224,42 @@ public:
 				cvt.UTF8(fn);
 				rm->AbsolutePath(cvt);
 
-				U32 type = AddProgram(fn);
-				if (type != NOT_FOUND)
+				if (auto p = AddProgram(fn))
 				{
-					auto &p = Subprograms[type];
-					p.Timestamp = r->Int64Attribute("Update", 0);
-					p.Size = r->Int64Attribute("Size", 0);
+					p->Timestamp = r->Int64Attribute("Update", 0);
+					p->Size = r->Int64Attribute("Size", 0);
 				}
 			}
 		}
 		isModified = false;
 
 		// step 2: make sure, if we have source, we need compiled program too.
-		for (U32 i = 0; i < NumSubprogramTypes; ++i)
+		for (U32 stage = 0; stage < NumSubprogramTypes; ++stage)
 		{
-			if (!Subprograms[i].IsEmpty() && Subprograms[i + NumSubprogramTypes].IsEmpty())
-			{		
-				Compile(&Subprograms[i]);
+			auto &src = Source[stage];
+			auto &bin = Binary[stage];
+			if (src.IsEmpty() && bin.IsEmpty())
+				continue; // nothing to do with empty source and binary at i-stage
+
+			if (!src.IsEmpty() && bin.IsEmpty())
+			{
+				Compile(&src);
+			}
+
+			if (!src.IsEmpty() && !src.IsEmpty())
+			{
+				if (src.IsModified())
+				{
+					isModified = true;
+					if (src.Timestamp == 0 && src.Size == 0)
+					{
+						Delete(&src);
+					}
+					else
+					{
+						Compile(&src);
+					}
+				}
 			}
 		}
 	}
@@ -168,15 +277,14 @@ public:
 		XMLDocument out;
 		auto *root = out.NewElement("Shader");
 		STR cvt;
-		for (auto &prg : Subprograms)
-		{
+		auto writeToXML = [&](File &prg) {
 			if (prg.IsEmpty()) // don't add to XML empty entries
-				continue;
+				return;
 
 			auto *entry = out.NewElement("Program");
 
-			// we need relative path and FileName is absolute
-			WSTR fpath = prg.FileName;
+			// we need relative path and Filename is absolute
+			WSTR fpath = prg.Filename;
 			rm->RelativePath(fpath);
 
 			// we need UTF8 (to put in XML)
@@ -186,12 +294,18 @@ public:
 			entry->SetAttribute("Size", static_cast<I64>(prg.Size));
 			entry->SetText(cvt.c_str());
 			root->InsertEndChild(entry);
-		}
+		};
+
+		for (auto &prg : Source)
+			writeToXML(prg);
+		for (auto &prg : Binary)
+			writeToXML(prg);
+
 
 		out.InsertFirstChild(root);
 		XMLPrinter prn;
 		out.Print(&prn);
- 
+
 		if (res->Path.size() == 0)
 		{
 			// build new file name
@@ -213,26 +327,36 @@ public:
 		rm->RefreshResorceFileInfo(res);
 	}
 
-	U32 GetSubprogramsCount()
+	U32 GetBinaryCount()
 	{
 		U32 cnt = 0;
-		for (U32 i = 0; i < NumSubprogramTypes; ++i)
+		for (auto &p : Binary)
+			if (!p.IsEmpty())
+				++cnt;
+
+		return cnt;
+	}
+
+	U32 GetSourceCount()
+	{
+		U32 cnt = 0;
+		for (auto &p : Binary)
 		{
-			if (!Subprograms[i + NumSubprogramTypes].IsEmpty())
+			if (!p.IsEmpty())
 				++cnt;
 		}
 
 		return cnt;
 	}
 
-	ResourceBase *GetSubprogram(U32 idx)
+	ResourceBase *GetBinary(U32 idx)
 	{
-		for (U32 i = 0; i < NumSubprogramTypes; ++i)
+		for (auto &p : Binary)
 		{
-			if (!Subprograms[i + NumSubprogramTypes].IsEmpty())
+			if (!p.IsEmpty())
 			{
 				if (idx == 0)
-					return Subprograms[i + NumSubprogramTypes].UpdateNotifyReciver.GetResource();
+					return p.UpdateNotifyReciver.GetResource();
 				--idx;
 			}
 		}
@@ -240,40 +364,44 @@ public:
 		return nullptr;
 	}
 
-	void Release(ResourceBase *res)
-	{
-		Save(res);
-		res->ResourceLoad(nullptr);
-		if (Data)
-			res->GetMemoryAllocator()->deallocate(Data);
-
-		Data = nullptr;
-		Size = 0;
-	}
-
 	U8 *GetData() { return Data; }
 	SIZE_T GetSize() { return Size; }
 
 	void Compile(File *p)
 	{
-		auto t = FindType(p->FileName);
-		if (t < NumSubprogramTypes)
+		// find matching stage;
+		U32 stage = 0;
+		File *o = nullptr;
+		for (auto &src : Source)
 		{
-			TRACEW(L"compile: " << p->FileName.c_str() << L"\n");
-			auto &o = Subprograms[t + NumSubprogramTypes];
-			WSTR out = o.FileName;
-			if (out.size() == 0)
+			if (&src == p)
 			{
-				out = p->FileName;
-				out.resize(out.size() - 4);
-				out += L"spv";
+				o = &Binary[stage];
+				break;
+			}
+			++stage;
+		}
+
+		assert(o);
+
+
+		if (o)
+		{
+			TRACEW(L"compile: " << p->Filename.c_str() << L"\n");
+			WSTR binFilename = o->Filename;
+			if (binFilename.size() == 0)
+			{
+				binFilename = p->Filename;
+				binFilename.resize(binFilename.size() - 4);
+				binFilename += L"spv";
 			}
 
 			WSTR cmd = L"glslangValidator.exe -V ";
-			cmd += p->FileName + L" -o " + out;
+			cmd += p->Filename + L" -o " + binFilename;
 			if (Tools::WinExec(cmd) == 0)
 			{
-				AddProgram(out);
+				AddProgram(binFilename);
+				Link(o);
 			}
 			else
 			{
@@ -282,46 +410,61 @@ public:
 		}
 	}
 
+	PRELOAD_SHADER reloadShaderMessageData;
 	void Link(File *p)
-	{
-		auto t = FindType(p->FileName);
-		if (t >= NumSubprogramTypes)
-		{
-			TRACEW(L"link: " << p->FileName.c_str() << L"\n");
-		}
+	{		
+		TRACEW(L"link: " << p->Filename.c_str() << L"\n");
+		reloadShaderMessageData.wnd = -1;
+		reloadShaderMessageData.shader = Res->Name.c_str();
+		CORE::Message msg = { RELOAD_SHADER, RENDERING_ENGINE, 0, &reloadShaderMessageData };
+		BAMS::CORE::IEngine::PostMsg(&msg, 500ms);
 	}
 
+	void Delete(File *p)
+	{
+		TRACEW(L"deleted: " << p->Filename.c_str() << L"\n");
+		p->Filename = "";
+	}
+
+	/// <summary>
+	/// Recive notification about source or compiled shader programs.
+	/// </summary>
+	/// <param name="res">The resource (with shader program).</param>
+	/// <param name="type">The type.</param>
 	void Notify(ResourceBase *res, U64 type)
 	{
-		assert(type < static_cast<U64>(COUNT_OF(Subprograms)));
-
-		// don't be depend on "type" ... find it base on res
-		File *pPrg = nullptr;
-		for (U32 i = 0; i < COUNT_OF(Subprograms); ++i)
-		{
-			if (!Subprograms[i].IsEmpty() && Subprograms[i].UpdateNotifyReciver.GetResource() == res)
+		bool isResModified = false;
+		auto getFile = [&](auto &files) {
+			for (auto &f : files)
 			{
-				pPrg = &Subprograms[i];
-				break;
+				if (!f.IsEmpty() && f.GetResource() == res)
+				{
+					isResModified = f.IsModified();
+					return &f;
+				}
 			}
-		}
-		assert(pPrg != nullptr);
-		if (pPrg == nullptr)
+			return (File *)nullptr;
+		};
+		auto src = getFile(Source);
+		auto bin = getFile(Binary);
+
+		assert(src || bin);
+		if (!src && !bin)
 			return;
 
-		if (res->isDeleted())
+		if (isResModified)
 		{
-			TRACEW(L"deleted: " << pPrg->FileName.c_str() << L"\n");
-		}
+			if (res->isDeleted())
+				Delete(src ? src : bin);
 
-		if (pPrg->Size != res->GetSize() || pPrg->Timestamp != res->GetFileTimestamp())
-		{
-			pPrg->Size = res->GetSize();
-			pPrg->Timestamp = res->GetFileTimestamp();
+			if (src)
+				Compile(src);
+
+			// we don't need to link after Notify, only source compilation may trigger link... hmm
+			if (bin)
+				Link(bin);
+
 			isModified = true;
-
-			Compile(pPrg);
-			Link(pPrg);
 		}
-	}	
+	}
 };

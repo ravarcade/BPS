@@ -45,7 +45,6 @@ public:
 	void Release();
 
 	const std::vector<std::string> &GetOutputNames();
-	const std::vector<VkDescriptorSetLayout> &GetDescriptorSetLayout() const { return m_descriptorSetLayout; }
 	VkPipelineLayout GetPipelineLayout() const { return m_pipelineLayout; }
 
 	void SetRenderPassAndMsaaSamples(VkRenderPass renderPass, VkSampleCountFlagBits msaaSamples);
@@ -97,12 +96,9 @@ private:
 
 	VkPipelineLayout             m_pipelineLayout        = nullptr;
 	VkPipeline                   m_graphicsPipeline      = nullptr;
-	std::vector<VkBuffer>        m_uniformBuffers;
-	std::vector<VkDeviceMemory>  m_uniformBuffersMemory;
 
-	VkDescriptorSet              m_descriptorSet		 = nullptr;
-	std::vector<VkPipelineShaderStageCreateInfo>   m_shaderStages;
 	std::vector<VkDescriptorSetLayout>             m_descriptorSetLayout;
+
 	std::vector<VkVertexInputBindingDescription>   m_bindingDescription;		// <- info about: [1] binding point, [2] data stride (in bytes), [3] input rate: per vertex or per instance
 	std::vector<VkVertexInputAttributeDescription> m_attributeDescriptions;		// <- info about: [1] location (see vert-shader program), [2] binding (bufer from where data are read), [3] format (flota/int/bool // single val/no. of elements in vector), [4] offset in buffer
 	ShaderDataInfo                                 m_vi;
@@ -110,6 +106,11 @@ private:
 
 	ShaderProgramParamsDesc                        m_shaderProgramParamsDesc;
 	std::vector<ShaderProgramParamDesc>            m_shaderProgramParamNames;
+
+
+	VkDescriptorSet              m_descriptorSet = nullptr;
+	std::vector<VkBuffer>        m_uniformBuffers;
+	std::vector<VkDeviceMemory>  m_uniformBuffersMemory;
 
 	struct BufferSet {
 		VkBuffer       vertexBuffer;

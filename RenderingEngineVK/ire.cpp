@@ -230,10 +230,12 @@ void ire::CreateWnd(const void * params)
 	glfwSetWindowPos(window, p->x, p->y);
 
 	auto ow = outputWindows[p->wnd];
-//	ow->AddShader("cubeShader", { "vert2", "frag" });
+
 	ow->AddShader("default");
-	ow->AddShader("cube");
+
 	ow->Prepare(_instance, window, _allocator);
+
+	ow->AddShader("cube");
 }
 
 void ire::CloseWnd(GLFWwindow* window)
@@ -261,20 +263,15 @@ void  ire::AddModel(const void * params)
 	if (p) 
 	{
 		auto ow = outputWindows[p->wnd];
-		auto mi = ow->AddMesh(p->name, p->mesh, p->shader);
-		if (mi)
-		{
-			mi->shader->AddObject(mi->mid);
+		if (ow->Exist()) {
+			auto mi = ow->AddMesh(p->name, p->mesh, p->shader);
+			if (mi)
+			{
+				mi->shader->AddObject(mi->mid);
+				ow->BufferRecreationNeeded();
+				TRACE(p->shader); TRACE("\n");
+			}
 		}
-		ow->BufferRecreationNeeded();
-
-		/*
-		auto model = re.GetModel(p->wnd, p->model, p->shaderName);
-		if (model)
-		{
-			re.AddObject(p->wnd, model);
-		}
-		*/
 	}	
 }
 
@@ -288,6 +285,17 @@ void ire::AddShader(const void * params)
 	}
 }
 
+void ire::ReloadShader(const void *params)
+{
+	auto p = static_cast<const PRELOAD_SHADER *>(params);
+	for (auto &ow : outputWindows)
+	{
+		if (ow && ow->Exist())
+		{
+			ow->ReloadShader(p->shader);			
+		}
+	}
+}
 /*
 
 void ire::AddShader(int wnd, const char *shaderName)

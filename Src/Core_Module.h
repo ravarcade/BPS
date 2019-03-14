@@ -26,7 +26,7 @@ public:
 		// 0x200-0x2ff - rendering module
 	};
 };
-
+/*
 template<U32 id>
 class IModuleId : IModule
 {
@@ -35,6 +35,7 @@ protected:
 public:
 	U32 GetModuleId() { return __moduleId; }
 };
+*/
 
 struct IEngine
 {
@@ -51,6 +52,7 @@ struct IEngine
 	static IModule *GetModule(U32 moduleId);
 
 	static void SendMsg(Message *msg);
+	static void PostMsg(Message *msg, time::duration delay = 0ms);
 
 	static void RegisterExternalModule(
 		uint32_t moduleId,

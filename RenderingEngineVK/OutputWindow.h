@@ -11,7 +11,7 @@ class OutputWindow
 private:
 	struct SharedUniformBufferObject
 	{
-		//		glm::mat4 model;
+		//		glm::mat4 model; // is push constant now
 		glm::mat4 view;
 		glm::mat4 proj;
 	};
@@ -104,6 +104,7 @@ public:
 	~OutputWindow() { _Cleanup(); }
 	void Init();
 	void Prepare(VkInstance _instance, GLFWwindow* _window, const VkAllocationCallbacks* _allocator);
+	VkDescriptorSet CreateDescriptorSets(std::vector<VkDescriptorSetLayout> &descriptorSetLayouts);
 	void Close(GLFWwindow *wnd = nullptr);
 
 	void UpdateUniformBuffer();
@@ -141,8 +142,10 @@ public:
 	BAMS::CORE::CStringHastable<ModelInfo> models;
 	BAMS::CORE::CStringHastable<CShaderProgram> shaders;
 
+
 	ModelInfo *AddMesh(const char *name, const char *mesh, const char *shader);
 	CShaderProgram *AddShader(const char * name);
+	CShaderProgram *ReloadShader(const char *name);
 
 	// ModelInfo *GetModel(const char *name);
 	//	CShaderProgram cubeShader;

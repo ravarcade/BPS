@@ -61,7 +61,6 @@ using tinyxml2::XMLDocument;
 const wchar_t *MANIFESTFILENAME = L"resource_manifest.xml";
 
 // ============================================================================ ResourceBase ===
-const time::duration ResourceBase::defaultDelay = 500ms;
 
 void ResourceBase::Init(CWSTR path)
 {
@@ -259,7 +258,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			}
 			else
 			{
-				if (res->_fileTimeStamp != resTime ||
+				if (res->_resourceTimestamp != resTime ||
 					res->_resourceSize != resSize)
 				{
 					// modified
@@ -421,10 +420,10 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		CreateResourceImplementation(res);
 
 		if (res->_isLoadable) {
-			data = Tools::LoadFile(&size, &res->_fileTimeStamp, res->Path, res->GetMemoryAllocator());
+			data = Tools::LoadFile(&size, &res->_resourceTimestamp, res->Path, res->GetMemoryAllocator());
 		}
 		else {
-			Tools::InfoFile(&size, &res->_fileTimeStamp, res->Path);
+			Tools::InfoFile(&size, &res->_resourceTimestamp, res->Path);
 		}
 
 		// mark resource as deleted if file not exist and can't be loaded
@@ -570,7 +569,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 	void RefreshResorceFileInfo(ResourceBase *res)
 	{
-		res->_isDeleted = !Tools::InfoFile(&res->_resourceSize, &res->_fileTimeStamp, res->Path);
+		res->_isDeleted = !Tools::InfoFile(&res->_resourceSize, &res->_resourceTimestamp, res->Path);
 	}
 
 	void StartMonitoring()
@@ -625,7 +624,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 				SetResourceType(res, r->UnsignedAttribute("Type", RESID_UNKNOWN));
 				const char *uid = r->Attribute("UID");
 				Tools::String2UUID(res->UID, uid);
-				res->_fileTimeStamp = r->Int64Attribute("Update", 0);
+				res->_resourceTimestamp = r->Int64Attribute("Update", 0);
 				res->_resourceSize = r->Int64Attribute("Size", 0);
 				_resources.push_back(res);
 			}
@@ -652,7 +651,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			auto *entry = out.NewElement("Resource");
 			entry->SetAttribute("Name", res->Name.c_str());
 			entry->SetAttribute("Type", res->Type);
-			entry->SetAttribute("Update", res->_fileTimeStamp);
+			entry->SetAttribute("Update", res->_resourceTimestamp);
 			entry->SetAttribute("UID", uidbuf);
 			entry->SetAttribute("Size", (I64)res->_resourceSize);
 			entry->SetText(cvt.c_str());

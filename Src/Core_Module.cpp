@@ -85,8 +85,29 @@ public:
 
 basic_array<IEngine::ExternalModule> externalModules;
 
+struct QMessage {
+	Message msg;
+	time triggerTime;
+
+	QMessage(IMemoryAllocator *alloc, Message *m, time::duration delay) :
+		msg(*m), 
+		triggerTime(clock::now() + delay)
+	{}
+};
+
+queue<QMessage> messageQueue;
+
 void IEngine::Update(float dT)
 {
+	auto now = clock::now();
+
+	messageQueue.filter([&](QMessage *m) { // selector
+		return now > m->triggerTime;
+	}, [&](QMessage *m) { // process
+		SendMsg(&m->msg);
+	});
+	
+
 	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
 		f->Update(dT);
 }
@@ -102,6 +123,7 @@ void IEngine::Finalize()
 	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
 		f->Finalize();
 	externalModules.reset();
+	messageQueue.reset();
 	ModuleRegistrationBase::first = nullptr;
 }
 
@@ -119,6 +141,11 @@ void IEngine::SendMsg(Message *msg)
 	for (auto f = ModuleRegistrationBase::first; f; f = f->next)
 		if (msg->destination == 0 || msg->destination == f->GetModuleId())
 			f->SendMsg(msg);
+}
+
+void IEngine::PostMsg(Message *msg, time::duration delay)
+{
+	messageQueue.push_back(msg, delay);
 }
 
 void IEngine::RegisterExternalModule(

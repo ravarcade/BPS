@@ -108,11 +108,18 @@ extern "C" {
 		rb->AddProgram(fileName);
 	}
 
-	BAMS_EXPORT const wchar_t * IShader_GetProgramName(IShader *res, int type)
+	BAMS_EXPORT const wchar_t * IShader_GetSourceFilename(IShader *res, int type)
 	{
 		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetSubprogramName(type).c_str();
+		return rb->GetSourceFilename(type).c_str();
 	}
+
+	BAMS_EXPORT const wchar_t * IShader_GetBinaryFilename(IShader *res, int type)
+	{
+		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return rb->GetBinaryFilename(type).c_str();
+	}
+
 
 	BAMS_EXPORT void IShader_Save(IShader *res)
 	{
@@ -120,16 +127,16 @@ extern "C" {
 		rb->Save(reinterpret_cast<ResourceBase *>(res));
 	}
 
-	BAMS_EXPORT uint32_t IShader_GetSubprogramsCount(IShader *res)
+	BAMS_EXPORT uint32_t IShader_GetBinaryCount(IShader *res)
 	{
 		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetSubprogramsCount();
+		return rb->GetBinaryCount();
 	}
 
-	BAMS_EXPORT IRawData *IShader_GetSubprogram(IShader *res, uint32_t idx)
+	BAMS_EXPORT IRawData *IShader_GetBinary(IShader *res, uint32_t idx)
 	{
 		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetSubprogram(idx);
+		return rb->GetBinary(idx);
 	}
 
 	// =========================================================================== ResourceManager
@@ -251,9 +258,10 @@ extern "C" {
 		uint32_t msgId,
 		uint32_t msgDst,
 		uint32_t msgSrc,
-		const void *data)
+		const void *data,
+		uint32_t dataLen = 0)
 	{
-		CORE::Message msg = { msgId, msgDst, msgSrc, data };
+		CORE::Message msg = { msgId, msgDst, msgSrc, data, dataLen };
 		BAMS::CORE::IEngine::SendMsg(&msg);
 	}
 
