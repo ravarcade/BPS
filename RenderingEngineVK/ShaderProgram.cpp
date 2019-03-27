@@ -17,6 +17,7 @@ void CShaderProgram::LoadProgram(const char *program)
 	// to do: add support for loading program description from manifest
 	m_vi = m_reflection.LoadProgram(program);
 	_BuindShaderProgramParamsDesc();
+	_BuildShaderProperties();
 	_BuindShaderDataBuffers();
 }
 
@@ -449,8 +450,24 @@ void CShaderProgram::_CreateNewBufferSet(uint32_t numVertices, uint32_t numIndec
 	m_bufferSets.emplace_back(set);
 }
 
-uint32_t CShaderProgram::AddMesh(const VertexDescription *vd)
+BAMS::RENDERINENGINE::VertexDescription *GetDemoCube();
+
+
+BAMS::RENDERINENGINE::VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
 {
+	// TODO: Load mesh from resources
+	return GetDemoCube();
+}
+
+uint32_t CShaderProgram::AddMesh(const char *name)
+{
+	if (auto pMeshId = m_meshNames.find(name))
+		return *pMeshId;
+
+	const VertexDescription *vd = _GetMeshVertexDescription(name);
+	if (!vd)
+		return -1;
+
 	// we check only last BufferSet
 	BufferSet *set = m_bufferSets.size() ? &*m_bufferSets.rbegin() : nullptr;
 	if (set == nullptr || set->freeVertices < vd->m_numVertices || set->freeIndices < vd->m_numIndices)
@@ -477,7 +494,7 @@ uint32_t CShaderProgram::AddMesh(const VertexDescription *vd)
 
 	void* data;
 	vkMapMemory(vk->device, stagingBufferMemory, 0, vboSize + iboSize, 0, &data);
-	_ImportModelData(vd, data);
+	_ImportMeshData(vd, data);
 	vkUnmapMemory(vk->device, stagingBufferMemory);
 
 	vk->_CopyBuffer(stagingBuffer, set->vertexBuffer, vboSize, 0, set->usedVertices * m_vi.size);
@@ -486,8 +503,8 @@ uint32_t CShaderProgram::AddMesh(const VertexDescription *vd)
 	vk->vkDestroy(stagingBuffer);
 	vk->vkFree(stagingBufferMemory);
 
-	// add "model"
-	Model m = {
+	// add "mesh"
+	Mesh m = {
 		bufferSetIdx,
 		set->usedVertices,
 		set->usedIndices,
@@ -498,19 +515,22 @@ uint32_t CShaderProgram::AddMesh(const VertexDescription *vd)
 	set->usedVertices += vd->m_numVertices;
 	set->usedIndices += vd->m_numIndices;
 
-	m_models.push_back(m);
+	uint32_t meshId = static_cast<uint32_t>(m_meshes.size());
+	m_meshes.push_back(m);
 
-	return static_cast<uint32_t>(m_models.size()) - 1;
+	m_meshNames.add(name, meshId);
+
+	return meshId;
 }
 
-uint32_t CShaderProgram::AddObject(uint32_t modeIdx)
+uint32_t CShaderProgram::AddObject(uint32_t meshIdx)
 {
 	DrawObjectData dod;
-	dod.modelIdx = modeIdx;
+	dod.meshIdx = meshIdx;
 	dod.paramsSetId = static_cast<uint32_t>(m_drawObjectData.size());
 	m_drawObjectData.push_back(dod);
 
-	return static_cast<uint32_t>(m_drawObjectData.size()) - 1;
+	return dod.paramsSetId;
 }
 
 void CShaderProgram::_SendVertexStream(BAMS::RENDERINENGINE::Stream dst, const BAMS::RENDERINENGINE::Stream & src, uint8_t *outBuf, std::vector<uint32_t> &bindingOffset, uint32_t numVertices)
@@ -535,7 +555,7 @@ void CShaderProgram::_CreateUniformBuffers()
 
 		// TODO:
 		// Allocate buffers to store give number of objects, there is no reason to have all buffers same size
-		// Right now we allocate space for only one object.
+		// Right now we allocate space for only one object in UBO. All is passed with push_constants.
 
 		VkDeviceSize bufferSize = ubo.entry.size;
 		VkBuffer ubo;
@@ -553,13 +573,67 @@ void CShaderProgram::_CreateUniformBuffers()
 	}
 }
 
+void CShaderProgram::_BuildShaderProperties()
+{
+	m_properties.clear();
+	// add all parents for lev 0
+	uint32_t paramIdx = -1;
+	for (auto &p : m_shaderProgramParamNames)
+	{
+		++paramIdx;
+		if (strcmp(p.parent, "ubo") == 0)
+			continue;
+
+		uint32_t parentId = -1;
+		if (p.parent)
+		{
+			bool isParentMissing = true;
+			for (auto &e : m_properties)
+			{
+				++parentId;
+				if (strcmp(e.name, p.parent) == 0)
+				{
+					isParentMissing = false;
+					break;
+				}
+			}
+			if (isParentMissing)
+			{
+				// add parent
+				parentId = m_properties.size();
+				m_properties.add(p.parent);
+			}
+		}
+
+		// add entry
+		auto pr = m_properties.add();
+		pr->name = p.name;
+		pr->parent = parentId;
+		pr->idx = paramIdx;
+		ShaderReflectionType2Property(p.type, pr);
+	}
+}
+
 void CShaderProgram::_BuindShaderProgramParamsDesc()
 {
 	m_shaderProgramParamNames.clear();
+
 	uint32_t dataBufferId = 0;
 	_BuindShaderProgramParamsDesc(&m_vi.params_in_push_constants, dataBufferId);
 	_BuindShaderProgramParamsDesc(&m_vi.params_in_ubos, dataBufferId);
 	m_shaderProgramParamsDesc = { static_cast<uint32_t>(m_shaderProgramParamNames.size()), m_shaderProgramParamNames.data() };
+	if (m_vi.params_in_push_constants.size() && m_shaderProgramParamNames.size())
+	{
+		m_pushConstantsStride   = m_shaderProgramParamNames[0].stride;
+		m_pushConstantsBufferId = m_shaderProgramParamNames[0].dataBufferId;
+		m_pushConstantsStages   = m_vi.params_in_push_constants[0].stage;
+	}
+	else
+	{
+		m_pushConstantsStride   = 0;
+		m_pushConstantsBufferId = 0;
+		m_pushConstantsStages   = 0;
+	}
 }
 
 void CShaderProgram::_BuindShaderProgramParamsDesc(const std::vector<ValDetails>* vals, uint32_t &dataBufferId)
@@ -615,7 +689,7 @@ void CShaderProgram::_BuindShaderDataBuffers()
 	uint32_t maxObjects = MAXBUFFERCHUNKSIZE / (maxPerObject > 0 ? maxPerObject : 1);
 
 	// TODO: make memory allocation sensible... now it allocs a lot of unused memory, so:
-	// - calc all requred mem, and alloc it at once, note requirments for memory alignment
+	// - calc all requred mem, and alloc it at once, dont forget about requirments for memory alignment
 	// - sprlit that memory to blocks (for different buffers).
 
 	m_paramsBuffer.resize(m_vi.params_in_push_constants.size() + m_vi.params_in_ubos.size());
@@ -625,7 +699,7 @@ void CShaderProgram::_BuindShaderDataBuffers()
 	}
 }
 
-void CShaderProgram::_ImportModelData(const VertexDescription *vd, void *dst)
+void CShaderProgram::_ImportMeshData(const VertexDescription *vd, void *dst)
 {
 	uint32_t vboSize = 0; 
 	uint32_t iboSize = vd->m_numIndices * sizeof(uint32_t);
@@ -725,10 +799,10 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 
 	TRACE("[" << m_drawObjectData.size() << "]");
 
-	uint32_t objectId = 0;
+	uint8_t *pushConstantsData = m_pushConstantsStride ? m_paramsBuffer[m_pushConstantsBufferId].data() : nullptr;
 	for (auto &dod : m_drawObjectData)
-	{		
-		auto &m = m_models[dod.modelIdx];
+	{
+		auto &m = m_meshes[dod.meshIdx];
 		if (m.bufferSetIdx != lastBufferSetIdx)
 		{
 			auto &bs = m_bufferSets[m.bufferSetIdx];
@@ -739,10 +813,12 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 		}
 
 		// TODO:
-		// Replace 80 with size of push_constants
-		vkCmdPushConstants(cb, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, 80, m_paramsBuffer[0].data() + 80 * objectId);
+		if (pushConstantsData)
+		{
+			vkCmdPushConstants(cb, m_pipelineLayout, m_pushConstantsStages, 0, m_pushConstantsStride, pushConstantsData);
+			pushConstantsData += m_pushConstantsStride;
+		}
 		vkCmdDrawIndexed(cb, m.numIndex, 1, m.firstIndex, m.firstVertex, 0);
-		++objectId;
 	}
 }
 
@@ -763,7 +839,7 @@ void CShaderProgram::SetParams(ShaderProgramParams * params)
 {
 	ShaderProgramParam *p = params->pParams;
 	for (uint32_t cnt = params->count; cnt; --cnt) {
-		SetParam(p->modelId, p->paramId, p->pVal);
+		SetParam(p->objectId, p->paramId, p->pVal);
 		++p;
 	}
 }

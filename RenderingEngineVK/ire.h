@@ -89,18 +89,20 @@ public:
 
 	void CreateWnd(const void *params);
 	void CloseWnd(const void *params);
-	void AddModel(const void *params);
+	void AddMesh(const void *params);
 	void AddShader(const void *params);
 	void ReloadShader(const void * params);
+	void GetShaderParams(const void * params);
+	void GetObjectParams(const void * params);
 
 	void CloseWnd(GLFWwindow* window);
 
 
 	// bellow shoud not be used
 //	void AddShader(int wnd, const char *shader);
-//	ModelInfo *AddModel(int wnd, const char *object, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shader);
-//	ModelInfo *GetModel(int wnd, const char *mesh, const char *shader);
-//	uint32_t AddObject(int wnd, ModelInfo * model);
+//	DrawObjectInfo *AddMesh(int wnd, const char *object, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shader);
+//	DrawObjectInfo *GetModel(int wnd, const char *mesh, const char *shader);
+//	uint32_t AddObject(int wnd, DrawObjectInfo * model);
 
 
 	friend OutputWindow;

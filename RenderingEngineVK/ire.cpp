@@ -2,6 +2,7 @@
 
 
 using namespace BAMS;
+using namespace RENDERINENGINE;
 
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
@@ -256,72 +257,49 @@ void ire::CloseWnd(const void * params)
 	ow->Close();
 }
 
-using namespace RENDERINENGINE;
-void  ire::AddModel(const void * params)
+#define CASTMSGPARAMS(x) \
+auto p = static_cast<const x *>(params);\
+if (!p || p->wnd >= COUNT_OF(outputWindows)) return; \
+auto ow = outputWindows[p->wnd]; \
+if (!ow || !ow->Exist())  return;
+
+
+void  ire::AddMesh(const void * params)
 {
-	auto p = static_cast<const PADD_MODEL *>(params);
-	if (p) 
+	CASTMSGPARAMS(PADD_MESH);
+	auto oi = ow->AddObject(p->name, p->mesh, p->shader);
+	if (oi)
 	{
-		auto ow = outputWindows[p->wnd];
-		if (ow->Exist()) {
-			auto mi = ow->AddMesh(p->name, p->mesh, p->shader);
-			if (mi)
-			{
-				mi->shader->AddObject(mi->mid);
-				ow->BufferRecreationNeeded();
-				TRACE(p->shader); TRACE("\n");
-			}
-		}
-	}	
+		if (p->pProperties)
+			*p->pProperties = oi->GetProperties();
+		if (p->pId)
+			*p->pId = oi->oid;
+	}
 }
 
 void ire::AddShader(const void * params)
 {
-	auto p = static_cast<const PADD_SHADER *>(params);
-	if (p)
-	{
-		auto ow = outputWindows[p->wnd];
-		ow->AddShader(p->shader);
-	}
+	CASTMSGPARAMS(PADD_SHADER);
+	ow->AddShader(p->shader);
 }
 
 void ire::ReloadShader(const void *params)
 {
-	auto p = static_cast<const PRELOAD_SHADER *>(params);
-	for (auto &ow : outputWindows)
-	{
-		if (ow && ow->Exist())
-		{
-			ow->ReloadShader(p->shader);			
-		}
-	}
+	CASTMSGPARAMS(PRELOAD_SHADER);
+	ow->ReloadShader(p->shader);			
 }
-/*
 
-void ire::AddShader(int wnd, const char *shaderName)
+void ire::GetShaderParams(const void * params)
 {
-	outputWindows[wnd]->AddShader(shaderName);
+	CASTMSGPARAMS(PGET_SHADER_PARAMS);
+	ow->GetShaderParams(p->name, p->pProperties);
 }
 
-
-ModelInfo * ire::AddModel(int wnd, const char *object, const VertexDescription *vd, const char *shader)
+void ire::GetObjectParams(const void * params)
 {
-	auto ow = outputWindows[wnd];
-	return ow->AddModel(name, vd, shaderProgram);
+	CASTMSGPARAMS(PGET_OBJECT_PARAMS);
+	ow->GetObjectParams(p->name, p->pProperties);
 }
-
-ModelInfo *ire::GetModel(int wnd, const char *mesh, const char *shader)
-{
-	auto ow = outputWindows[wnd];
-	return ow->GetModel(name);
-}
-
-uint32_t ire::AddObject(int wnd, ModelInfo *model)
-{
-	outputWindows[wnd]->BufferRecreationNeeded();
-	return model->shader->AddObject(model->mid);
-}
-*/
 
 // ============================================================================ ire : Rendering Engine - protected methods ===
 

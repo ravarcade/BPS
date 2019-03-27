@@ -3,6 +3,10 @@
 
 #include "stdafx.h"
 #include "BAMEngine.h"
+#include <chrono>
+#include "../3rdParty/glm/glm.hpp"
+#include "../3rdParty/glm/gtc/matrix_transform.hpp"
+
 using namespace BAMS;
 
 void LoadVK()
@@ -136,16 +140,119 @@ void wait_for_esc()
 	}
 }
 
-static PCREATE_WINDOW w0 = { 0, 1200, 800, 10, 10 };
-static PCREATE_WINDOW w1 = { 1, 500, 500, 1310, 10 };
-static PCREATE_WINDOW w2 = { 2, 500, 200, 1310, 610 };
+BAMS::CORE::Properties *GetShaderParams(BAMS::CEngine &en, uint32_t wnd, const char *shaderName)
+{
+	BAMS::CORE::Properties *prop;
+	PGET_SHADER_PARAMS p = { wnd, shaderName, &prop };
+	en.SendMsg(GET_SHADER_PARAMS, RENDERING_ENGINE, 0, &p);
+
+	return prop;
+}
+
+BAMS::CORE::Properties * GetObjectParams(BAMS::CEngine &en, uint32_t wnd, const char *objectName)
+{
+	BAMS::CORE::Properties *prop;
+	PGET_OBJECT_PARAMS p = { wnd, objectName, &prop };
+	en.SendMsg(GET_OBJECT_PARAMS, RENDERING_ENGINE, 0, &p);
+
+	return prop;
+}
+
+
+static PCREATE_WINDOW w0 = { 0, 1200, 800, 10, 20 };
+static PCREATE_WINDOW w1 = { 1, 500, 500, 1310, 20 };
+static PCREATE_WINDOW w2 = { 2, 500, 200, 1310, 620 };
+
+using BAMS::CORE::MProperties;
+using BAMS::CORE::Properties;
+std::vector<MProperties> onWnd[3];
+bool wndState[3] = { true, false, false };
+
+uint32_t propIdxModel = -1;
+uint32_t propIdxBaseColor = -1;
+
+void SetPorpIdx(Properties *pprop)
+{
+	static bool once = true;
+	if (once) {
+		once = false;
+		for (uint32_t i = 0; i<pprop->count; ++i)
+		{
+			auto &p = pprop->properties[i];
+			if (strcmp(p.name, "model") == 0)
+				propIdxModel = i;
+			if (strcmp(p.name, "baseColor") == 0)
+				propIdxBaseColor = i;
+		}
+	}
+}
+
+void SetObjParams(Properties *pprop, int num)
+{
+	static float colors[][4] = {
+		{ 0.1f, 1, 1, 1 },
+		{ 1, 0.1f, 1, 1 },
+		{ 1, 1, 0.1f, 1 }
+	};
+	auto &b = pprop->properties[propIdxBaseColor];
+	auto &m = pprop->properties[propIdxModel];
+	memcpy_s(b.val, 4 * sizeof(float), colors[num % 3], 4 * sizeof(float));
+
+
+	static auto startTime = std::chrono::high_resolution_clock::now();
+
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
+
+	uint32_t i = num;
+	int pos = ((i & 1) ? 1 : -1) * ((i + 1) & 0xfffe);
+	glm::mat4 model = glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0, 0)), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	
+	memcpy_s(m.val, 16 * sizeof(float), &model[0][0], 16 * sizeof(float));
+
+}
+
+void AddToWnd(BAMS::CEngine &en, int wnd, int i)
+{
+	static PADD_MESH c0 = { 0, "realcubename", "cube", "cube" };
+	static PADD_MESH c1 = { 0, "cubename", "cube", "default" };
+	uint32_t oid = -1;
+	Properties *pprop = nullptr;
+	PADD_MESH *obj = i == 0 ? &c0 : &c1;
+	obj->wnd = wnd;
+	obj->pProperties = &pprop;
+	obj->pId = &oid;
+	en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, obj);
+	if (pprop) {
+		SetPorpIdx(pprop);
+		SetObjParams(pprop, (int)onWnd[wnd].size());
+		onWnd[wnd].push_back(*pprop);
+	}
+}
+
+void TogleWnd(BAMS::CEngine &en, int wnd)
+{
+	static PCLOSE_WINDOW cw = { 0 };
+	static PCREATE_WINDOW *wn[3] = { &w0, &w1, &w2 };
+	cw.wnd = wnd;
+	if (wndState[wnd])
+	{
+		en.SendMsg(CLOSE_WINDOW, RENDERING_ENGINE, 0, &cw);
+		onWnd[wnd].clear();
+	}
+	else
+	{
+		en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, wn[wnd]);
+	}
+	wndState[wnd] = !wndState[wnd];
+}
 
 void testloop(BAMS::CEngine &en)
 {
-	static PADD_MODEL c0 = { 0, "realcubename", "cube", "cube" };
-	static PADD_MODEL c02 = { 0, "cubename", "cube", "default" };
-	static PADD_MODEL c1 = { 1, "cubename", "cube", "default" };
-	static PADD_MODEL c2 = { 2, "cubename", "cube", "default" };
+	static PADD_MESH c0 = { 0, "realcubename", "cube", "cube" };
+	static PADD_MESH c02 = { 0, "cubename", "cube", "default" };
+	static PADD_MESH c1 = { 1, "cubename", "cube", "default" };
+	static PADD_MESH c2 = { 2, "cubename", "cube", "default" };
 	static PCLOSE_WINDOW cw0 = { 0 };
 	static PCLOSE_WINDOW cw1 = { 1 };
 	static PCLOSE_WINDOW cw2 = { 2 };
@@ -169,46 +276,21 @@ void testloop(BAMS::CEngine &en)
 					isRunning = false;
 						break;
 				case VK_ADD:
-					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, nullptr);
+					en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, nullptr);
 					break;
 
 				case '1':
-					if (w0v)
-						en.SendMsg(CLOSE_WINDOW, RENDERING_ENGINE, 0, &cw0);
-					else
-						en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w0);
-					w0v = !w0v;
-					break;
 				case '2':
-					if (w1v)
-						en.SendMsg(CLOSE_WINDOW, RENDERING_ENGINE, 0, &cw1);
-					else
-						en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w1);
-					w1v = !w1v;
-					break;
 				case '3':
-					if (w2v)
-						en.SendMsg(CLOSE_WINDOW, RENDERING_ENGINE, 0, &cw2);
-					else
-						en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w2);
-					w2v = !w2v;
+					TogleWnd(en, i - '1');
 					break;
 
-				case 'Q':
-					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &c0);
-					break;
-
-				case 'A':
-					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &c02);
-					break;
-
-				case 'W':
-					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &c1);
-					break;
-				case 'E':
-					en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &c2);
-					break;
-
+				case 'Q': AddToWnd(en, 0, 0);	break;
+				case 'A': AddToWnd(en, 0, 1);	break;
+				case 'W': AddToWnd(en, 1, 0);	break;
+				case 'S': AddToWnd(en, 1, 1);	break;
+				case 'E': AddToWnd(en, 2, 0);	break;
+				case 'D': AddToWnd(en, 2, 1);	break;
 				}
 			}
 		}
@@ -295,6 +377,8 @@ int main()
 	}
 
 	BAMS::Finalize();
+	for (auto &w : onWnd)
+		w.clear();
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
 
 	DumpRAM();

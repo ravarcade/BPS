@@ -167,7 +167,6 @@ public:
 
 	~ResourceBase()
 	{
-		TRACE("~" << Name.c_str() << (_resourceImplementation ? " : true\n" : " : false\n"));
 		if (_resourceImplementation)
 			_resourceImplementation->GetFactory()->Destroy(_resourceImplementation);
 	};

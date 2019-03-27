@@ -324,11 +324,13 @@ enum { // msgDst
 
 enum { // msgId
 	// to RENDERING_ENGINE
-	CREATE_WINDOW = 0x20001,
-	CLOSE_WINDOW  = 0x20002,
-	ADD_MODEL     = 0x20003, // object name + model name + shader program
-	ADD_SHADER    = 0x20004,
-	RELOAD_SHADER = 0x20005,
+	CREATE_WINDOW       = 0x20001,
+	CLOSE_WINDOW        = 0x20002,
+	ADD_MESH            = 0x20003, // mesh_name_in_shader + mesh_name_as_resource + shader_program
+	ADD_SHADER          = 0x20004,
+	RELOAD_SHADER       = 0x20005,
+	GET_SHADER_PARAMS   = 0x20006,
+	GET_OBJECT_PARAMS   = 0x20007,
 };
 
 struct PCREATE_WINDOW {
@@ -341,11 +343,13 @@ struct PCLOSE_WINDOW {
 	uint32_t wnd;
 };
 
-struct PADD_MODEL {
+struct PADD_MESH {
 	uint32_t wnd;
 	const char *name;    // uniq name
 	const char *mesh;	 // resource name
 	const char *shader;  // resource name
+	BAMS::CORE::Properties **pProperties;
+	uint32_t *pId;
 };
 
 struct PADD_SHADER {
@@ -353,5 +357,23 @@ struct PADD_SHADER {
 	const char *shader;
 };
 
+struct SHADER_PARAM_ENTRY {
+	uint32_t parent;
+	uint32_t type;
+	uint32_t count;
+	const char *name;
+};
+
+struct PGET_SHADER_PARAMS {
+	uint32_t wnd;
+	const char *name;
+	BAMS::CORE::Properties **pProperties;
+};
+
 typedef struct PADD_SHADER PRELOAD_SHADER;
+struct PGET_OBJECT_PARAMS {
+	uint32_t wnd;
+	const char *name;
+	BAMS::CORE::Properties **pProperties;
+};
 

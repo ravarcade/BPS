@@ -400,8 +400,7 @@ public:
 			cmd += p->Filename + L" -o " + binFilename;
 			if (Tools::WinExec(cmd) == 0)
 			{
-				AddProgram(binFilename);
-				Link(o);
+				AddProgram(binFilename);				
 			}
 			else
 			{

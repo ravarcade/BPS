@@ -712,7 +712,7 @@ void OutputWindow::_Cleanup()
 		vkDestroy(surface);
 	}
 	shaders.clear();
-	models.clear();
+	objects.clear();
 }
 
 void OutputWindow::_CleanupSwapChain()
@@ -778,36 +778,6 @@ void OutputWindow::_CreateRenderPass()
 void OutputWindow::_CleanupRenderPass()
 {
 	vkDestroy(renderPass);
-}
-
-// ============================================================================ Demo Cube ===
-
-void OutputWindow::_CreateDemoCube()
-{
-	float colors[][4] = {
-		{ 0.1f, 1, 1, 1 },
-		{ 1, 0.1f, 1, 1 },
-		{ 1, 1, 0.1f, 1 }
-	};
-	static auto startTime = std::chrono::high_resolution_clock::now();
-
-	auto currentTime = std::chrono::high_resolution_clock::now();
-	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
-
-	shaders.foreach([&](CShaderProgram *&sh) 
-	{
-		uint32_t MId = sh->GetParamId("model");
-		uint32_t baseColorId = sh->GetParamId("baseColor");
-		for (uint32_t i = 0; i < sh->GetObjectCount(); ++i)
-		{
-			int pos = ((i & 1) ? 1 : -1) * ((i + 1) & 0xfffe);
-			glm::mat4 model = glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0, 0)), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-
-			sh->SetParam(i, baseColorId, &colors[i % 3]);
-			sh->SetParam(i, MId, &model);
-		}
-
-	});
 }
 
 void OutputWindow::_CreateDescriptorPool()
@@ -1082,7 +1052,6 @@ void OutputWindow::RecreateSwapChain()
 
 	if (_CreateSwapChain())
 	{
-		//		_CreateDemoCube();
 		_CreateCommandBuffers();
 	}
 }
@@ -1092,7 +1061,6 @@ void OutputWindow::_RecreateCommandBuffers()
 	vkDeviceWaitIdle(device);
 
 	vkFree(commandPool, commandBuffers);
-	_CreateDemoCube();
 	_CreateCommandBuffers();
 	recreateCommandBuffers = false;
 }
@@ -1206,11 +1174,19 @@ CShaderProgram * OutputWindow::ReloadShader(const char * shader)
 	return sh;
 }
 
-BAMS::RENDERINENGINE::VertexDescription *GetDemoCube();
-
-BAMS::RENDERINENGINE::VertexDescription *OutputWindow::_GetMesh(const char *mesh)
+void OutputWindow::GetShaderParams(const char *shader, BAMS::CORE::Properties **props)
 {
-	return GetDemoCube();
+	auto sh = shaders.find(shader);
+	if (!sh) return;
+	*props = sh->GetProperties();
+}
+
+
+void OutputWindow::GetObjectParams(const char *objectName, BAMS::CORE::Properties **props)
+{
+	auto oi = objects.find(objectName);
+	if (!oi) return;
+	*props = oi->GetProperties();
 }
 
 CShaderProgram * OutputWindow::_GetShader(const char *shader)
@@ -1218,33 +1194,41 @@ CShaderProgram * OutputWindow::_GetShader(const char *shader)
 	return AddShader(shader);
 }
 
-ModelInfo * OutputWindow::AddMesh(const char * name, const char * mesh, const char * shader)
+ObjectInfo * OutputWindow::_GetObject(const char * name)
 {
-	auto mi = models.find(name);
-	if (mi)
-		return mi;
-
-	auto vd = _GetMesh(mesh);
-	auto sh = _GetShader(shader);
-
-	// TO DO:
-	// - check if vd (mesh) is compatible with sh (shader)
-	// - check if we already use mesh (with another shader) and we can reuse same mesh (can this work in vulkan?)
-
-	if (!sh || !vd) {
-		// hmmmm... cant add model:
-		// - we have conflict here (used 'name')
-		// - ... or ... no shader
-		// - ... or ... no mesh
-		return nullptr;
-	}
-
-	return models.add(name, sh, sh->AddMesh(vd));
+	return objects.find(name);
 }
 
-/*
-ModelInfo * OutputWindow::GetModel(const char *name)
+uint32_t OutputWindow::AddMesh(const char * mesh, const char * shader)
 {
-	return models.find(name);
+	auto sh = _GetShader(shader);
+	if (!sh)
+		return -1;
+
+	return sh->AddMesh(mesh);
+}
+
+ObjectInfo * OutputWindow::AddObject(const char * name, const char * mesh, const char * shader)
+{
+	auto sh = _GetShader(shader);
+	if (!sh)
+		return nullptr;
+
+	auto mid = sh->AddMesh(mesh);
+	if (mid == -1)
+		return nullptr;
+
+	auto oid = sh->AddObject(mid);
+	auto ret = objects.add(name, sh, mid, oid);
+	ret->oid = oid;
+	BufferRecreationNeeded();
+	return ret;
+}
+
+
+/*
+DrawObjectInfo * OutputWindow::GetModel(const char *name)
+{
+	return meshes.find(name);
 }
 */

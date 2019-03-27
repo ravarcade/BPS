@@ -29,3 +29,4 @@ typedef std::chrono::steady_clock::time_point time;
 #include "Core_Queue.h"
 #include "Core_Hashtable.h"
 #include "Core_List.h"
+#include "Core_Properties.h"

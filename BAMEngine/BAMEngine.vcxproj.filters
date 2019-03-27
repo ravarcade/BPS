@@ -128,6 +128,9 @@
     <ClInclude Include="..\Src\ResShader.h">
       <Filter>ResourceManager</Filter>
     </ClInclude>
+    <ClInclude Include="..\Src\Core_Properties.h">
+      <Filter>Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

@@ -106,6 +106,51 @@ enum ShaderReflectionType {
 	Mat4 = 12
 };
 
+inline void ShaderReflectionType2Property(uint32_t type, BAMS::CORE::Property *p)
+{
+	using BAMS::CORE::Property;
+
+	uint32_t toType[] = {
+		uint32_t(Property::PT_UNKNOWN),
+		Property::PT_I32,
+		Property::PT_U32,
+		Property::PT_I16,
+		Property::PT_U16,
+		Property::PT_I8,
+		Property::PT_U8,
+		Property::PT_F32,
+
+		Property::PT_F32,	// Vec2,3,4
+		Property::PT_F32,
+		Property::PT_F32,
+
+		Property::PT_F32, // Mat3, 4
+		Property::PT_F32
+	};
+
+	uint32_t toCount[] = {
+		0,
+		1, // i32
+		1, // u32
+		1, // i16
+		1, // u16
+		1, // i8
+		1, // u8
+		1, // f32
+
+		2, // vec2
+		3, // vec3
+		4, // vec4
+
+		9, // mat3
+		16, // mat4
+	};
+
+	assert(type >= 0 && type < ARRAYSIZE(toType));
+	p->type = toType[type];
+	p->count = toCount[type];
+}
+
 class CShadersReflections
 {
 public:
@@ -143,12 +188,9 @@ private:
 
 	std::vector<ShaderProgramInfo> m_programs;
 	ResourceLayout m_layout;
-
-	bool m_enableAlpha;
-
-	void _ParsePrograms();
-
-
 	std::vector<std::string> m_outputNames;
 	BAMS::CShader m_shaderResource;
+
+	bool m_enableAlpha;
+	void _ParsePrograms();
 };

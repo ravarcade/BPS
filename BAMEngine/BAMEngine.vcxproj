@@ -182,6 +182,7 @@
     <ClInclude Include="..\Src\Core_MemoryAllocator.h" />
     <ClInclude Include="..\Src\Core_Message.h" />
     <ClInclude Include="..\Src\Core_Module.h" />
+    <ClInclude Include="..\Src\Core_Properties.h" />
     <ClInclude Include="..\Src\Core_Queue.h" />
     <ClInclude Include="..\Src\RawData.h" />
     <ClInclude Include="..\Src\ResourceManager.h" />

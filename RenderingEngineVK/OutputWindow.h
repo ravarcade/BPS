@@ -1,9 +1,10 @@
 
-struct ModelInfo {
+struct ObjectInfo {
 	CShaderProgram *shader;
 	uint32_t mid;
-	ModelInfo() {}
-	ModelInfo(CShaderProgram *sh, uint32_t id) : shader(sh), mid(id) {}
+	uint32_t oid;
+	ObjectInfo(CShaderProgram *_shader, uint32_t _mid, uint32_t _oid) : shader(_shader), mid(_mid), oid(_oid) {}
+	BAMS::CORE::Properties *GetProperties() { return shader->GetProperties(oid); }
 };
 
 class OutputWindow
@@ -85,7 +86,6 @@ private:
 	void _CreateRenderPass();
 	void _CleanupRenderPass();
 
-	void _CreateDemoCube();
 	void _CreateDescriptorPool();
 	void _CreateCommandBuffers();
 	void _RecreateCommandBuffers();
@@ -97,8 +97,9 @@ private:
 	void _CleanupShaderPrograms();
 	void _Cleanup();
 
-	BAMS::RENDERINENGINE::VertexDescription * _GetMesh(const char *mesh);
 	CShaderProgram *_GetShader(const char *shader);
+	ObjectInfo *_GetObject(const char *name);
+
 public:
 	OutputWindow();
 	~OutputWindow() { _Cleanup(); }
@@ -139,15 +140,17 @@ public:
 	void vkFree(VkCommandPool &v1, std::vector<VkCommandBuffer> &v2) { if (v1 && v2.size()) { vkFreeCommandBuffers(device, v1, static_cast<uint32_t>(v2.size()), v2.data()); v2.clear(); } }
 	void vkFree(VkDescriptorPool &v1, std::vector<VkDescriptorSet> &v2) { if (v1 && v2.size()) { vkFreeDescriptorSets(device, v1, static_cast<uint32_t>(v2.size()), v2.data()); v2.clear(); } }
 
-	BAMS::CORE::CStringHastable<ModelInfo> models;
 	BAMS::CORE::CStringHastable<CShaderProgram> shaders;
+	BAMS::CORE::CStringHastable<ObjectInfo> objects;
 
+	uint32_t AddMesh(const char *mesh, const char *shader);
+	ObjectInfo * AddObject(const char * name, const char * mesh, const char * shader);
+	CShaderProgram *AddShader(const char * shader);
+	CShaderProgram *ReloadShader(const char *shader);
+	void GetShaderParams(const char *shader, BAMS::CORE::Properties **params);
+	void GetObjectParams(const char * objectName, BAMS::CORE::Properties ** props);
 
-	ModelInfo *AddMesh(const char *name, const char *mesh, const char *shader);
-	CShaderProgram *AddShader(const char * name);
-	CShaderProgram *ReloadShader(const char *name);
-
-	// ModelInfo *GetModel(const char *name);
+	// DrawObjectInfo *GetModel(const char *name);
 	//	CShaderProgram cubeShader;
 	friend CShaderProgram;
 };
