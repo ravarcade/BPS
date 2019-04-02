@@ -131,6 +131,9 @@
     <ClInclude Include="..\Src\Core_Properties.h">
       <Filter>Core</Filter>
     </ClInclude>
+    <ClInclude Include="..\Src\ResMesh.h">
+      <Filter>ResourceManager</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -170,6 +173,12 @@
       <Filter>RenderingEngine</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\ResourceManager.cpp">
+      <Filter>ResourceManager</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\ResShader.cpp">
+      <Filter>ResourceManager</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\ResMesh.cpp">
       <Filter>ResourceManager</Filter>
     </ClCompile>
   </ItemGroup>

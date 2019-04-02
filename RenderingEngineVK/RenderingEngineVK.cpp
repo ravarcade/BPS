@@ -157,11 +157,10 @@ public:
 RenderingModule RM;
 
 extern "C" {
-	REVK_EXPORT void RenderingEngine_RegisterModule()
+	REVK_EXPORT void RegisterModule()
 	{
 		printf("HELLO REVK\n");
 		RM.Register();
 		
 	}
-
 }

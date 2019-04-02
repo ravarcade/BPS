@@ -16,18 +16,20 @@ struct basic_string_base
 	U _reserved;
 	U _used;
 	basic_string_base() {}
-	basic_string_base(U reserved, U used = 0, T* buf = nullptr) : _reserved(reserved), _used(used), _buf(buf) {}
-	basic_string_base(U used, T *buf) : _buf(buf), _used(used), _reserved(used) {}
+	basic_string_base(T* buf, U used, U reserved) : _buf(buf), _reserved(reserved), _used(used) {}
+	basic_string_base(T *buf, U used) : _buf(buf), _used(used), _reserved(used) {}
+	basic_string_base(T* buf) : _buf(buf) { _used = buf ? static_cast<U>(length(buf)) : 0; _reserved = _used; }
 	basic_string_base(basic_string_base &src) : _buf(src._buf), _used(src._used), _reserved(src._reserved) {} // copy contructor
 
 	inline const basic_string_base &ToBasicString() const { return *this; }
 
 	U size() const { return _used; }
+	T operator[](SIZE_T pos) const { assert(pos >= 0 && pos < _reserved); return _buf[pos]; };
 
 	static SIZE_T length(const T *txt) { return strlen(txt); }
 	static T tolower(T c) { return ::tolower(c); }
 	static int ncmp(const T *string1, const T *string2, SIZE_T count) { return strncmp(string1, string2, count); }
-	static int nicmp(const T *string1, const T *string2, SIZE_T count) { return strnicmp(string1, string2, count); }
+	static int nicmp(const T *string1, const T *string2, SIZE_T count) { return _strnicmp(string1, string2, count); }
 };
 
 DEFINE_HAS_METHOD(ToBasicString);
@@ -46,8 +48,10 @@ struct simple_string : basic_string_base<T, U>
 	template<typename ST>
 	simple_string(MemoryAllocator alloc, const ST *src, const ST *end = nullptr) : _alloc(alloc) { _used = end ? static_cast<U>(end - src) : static_cast<U>(basic_string_base<ST, U>::length(src)); _reserved = _used + 1; _Allocate(); _CopyText(_buf, src, _used); }
 	template<typename ST, typename SU>
-	simple_string(MemoryAllocator alloc, const basic_string_base<ST, SU> &src) : _B(static_cast<U>(src._used + 1), static_cast<U>(src._used)), _alloc(alloc) { _Allocate(); _CopyText(_buf, src._buf, _used); }
-	simple_string(MemoryAllocator alloc, const _T &src) : _B(static_cast<U>(src._used + 1), static_cast<U>(src._used)), _alloc(alloc) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); }
+	simple_string(MemoryAllocator alloc, const basic_string_base<ST, SU> &src) : _B(nullptr, static_cast<U>(src._used), static_cast<U>(src._used + 1)), _alloc(alloc) { _Allocate(); _CopyText(_buf, src._buf, _used); }
+	simple_string(MemoryAllocator alloc, const _T &src) : 
+		_B(nullptr, static_cast<U>(src._used), static_cast<U>(src._used + 1)),
+		_alloc(alloc) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); }
 	~simple_string() { if (_buf && _alloc) { _alloc->deallocate(_buf); _buf = 0; _reserved = 0; _used = 0; } }
 
 	void set_allocator(MemoryAllocator alloc) { if (!_alloc) _alloc = alloc; }
@@ -268,20 +272,20 @@ public:
 
 	// 3. From basic_string_base
 	template<typename ST, typename SU>
-	basic_string(const basic_string_base<ST, SU> &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used))
+	basic_string(const basic_string_base<ST, SU> &src) : _B(nullptr, static_cast<U>(src._used), static_cast<U>(src._reserved))
 	{
 		_Allocate();
 		_CopyText(_buf, src._buf, _used);
 	}
 
 	// 4. Copy constructor
-	basic_string(const _T &src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used)) { if (_used) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); } else _reserved = 0; }
+	basic_string(const _T &src) : _B(nullptr, static_cast<U>(src._used), static_cast<U>(src._reserved)) { if (_used) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); } else _reserved = 0; }
 
 	// 5. Move constructor
 	basic_string(_T &&src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used), src._buf) { src._used = 0; src._reserved = 0; src._buf = nullptr; }
 
 	// 6. Reserve space constructor
-	basic_string(U reserve) : _B(reserve) { _Allocate(); }
+	basic_string(U reserve) : _B(nullptr, 0, reserve) { _Allocate(); }
 
 	~basic_string() { if (_buf) { alloc->deallocate(_buf); _buf = 0; _reserved = 0; _used = 0; } }
 
@@ -373,7 +377,7 @@ public:
 		if (e > l)
 			e = l;
 
-		basic_string_base<T, U> ret(U32(e-s), _buf+U32(s));
+		basic_string_base<T, U> ret(_buf+U32(s), U32(e - s));
 		return std::move(ret);
 	}
 
@@ -524,7 +528,7 @@ public:
 	shared_string(const shared_string &src) : shared_base(src._idx) { AddRef(); }
 
 	// 3. move costructor
-	shared_string(shared_string &&src) : shared_base(src._idx) { src._idx = 0; }
+	shared_string(shared_string &&src) noexcept : shared_base(src._idx) { src._idx = 0; }
 
 	// 4. c-string constructor (for txt("hello") and for txt(str.begin(), str.end())
 	template<typename ST> shared_string(const ST *src, const ST *end = nullptr) { MakeNewEntry(src, end); }
@@ -544,7 +548,7 @@ public:
 	shared_string& operator = (const basic_string_base<T, V>& src) { NeedUniq(); GetValue() = src; return *this; }
 	shared_string& operator = (const T* src) { NeedUniq(); GetValue() = src; return *this; }
 	shared_string& operator = (const shared_string& src) { Release(); _idx = src._idx; AddRef(); return *this; }
-	shared_string& operator = (shared_string&& src) { Release(); _idx = src._idx; src._idx = 0; return *this; }
+	shared_string& operator = (shared_string&& src) noexcept { Release(); _idx = src._idx; src._idx = 0; return *this; }
 
 	T operator[](SIZE_T pos) const { return GetValue()[pos]; }
 	T& operator[](SIZE_T pos) { NeedUniq(); return GetValue()[pos]; }
@@ -592,21 +596,17 @@ public:
 	}
 
 	// === compare
-	bool operator == (const basic_string_base<T, U> &str) const { return GetValue() == str; }
-	bool operator == (const shared_string &str) const { return _idx == str._idx ? true : GetValue() == str.GetValue(); } // no need to compare same strings
-	bool operator != (const basic_string_base<T, U> &str) const { return !(GetValue() == str); }
-	bool operator != (const shared_string &str) const { return _idx != str._idx && !(GetValue() == str.GetValue()); } // no need to compare same strings
-	bool startsWith(const basic_string_base<T, U> &str, bool caseInsesitive = false) const { return GetValue().startsWith(str); }
-	bool startsWith(const shared_string &str, bool caseInsesitive = false) const { return GetValue().startsWith(str.GetValue()); }
+	bool operator == (const _B &str) const { return GetValue() == str; }
+	bool operator != (const _B &str) const { return !(GetValue() == str); }
 
-	bool endsWith(const basic_string_base<T, U> &str, bool caseInsesitive = false) const { return GetValue().endsWith(str); }
-	bool endsWith(const shared_string &str, bool caseInsesitive = false) const { return GetValue().endsWith(str.GetValue()); }
+	bool startsWith(const _B &str, bool caseInsesitive = false) const { return GetValue().startsWith(str, caseInsesitive); }
+	bool endsWith(const _B &str, bool caseInsesitive = false) const { return GetValue().endsWith(str, caseInsesitive); }
 
 	U size() const { return GetValue().size(); }
 	void resize(U s) { NeedUniq(); GetValue().resize(s); }
 
-	operator basic_string_base<T, U>&() { return GetValue(); }            // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
-	basic_string_base<T, U> &ToBasicString() const { return GetValue(); } // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
+	operator _B &() const { return GetValue(); }            // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
+	_B &ToBasicString() const { return GetValue(); }        // It is safe. Dont have to "uniq", because basic_string_base is used only as arg (read only).
 
 	const T * c_str() const { return GetValue().c_str(); }
 
@@ -624,6 +624,9 @@ public:
 
 	void UTF8(const basic_string_base<wchar_t, U> &s) { NeedUniq(); GetValue().UTF8(s); }
 	void UTF8(const basic_string_base<char, U> &s)    { NeedUniq(); GetValue().UTF8(s); }
+
+	void UTF8(const wchar_t *_s) { basic_string_base<wchar_t, U> s(const_cast<wchar_t*>(_s)); NeedUniq(); GetValue().UTF8(s); }
+	void UTF8(const char *_s)    { basic_string_base<char, U>    s(const_cast<char*>(_s));    NeedUniq(); GetValue().UTF8(s); }
 
 	void Dump() const
 	{

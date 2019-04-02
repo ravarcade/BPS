@@ -74,6 +74,11 @@ extern "C" {
 		return rb ? rb->Type : false;
 	}
 
+	BAMS_EXPORT bool IResource_IsLoadable(IResource *res)
+	{
+		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		return rb ? rb->isLoadable() : false;
+	}
 	// =========================================================================== RawData
 
 	BAMS_EXPORT unsigned char * IRawData_GetData(IRawData *res)
@@ -259,10 +264,22 @@ extern "C" {
 		uint32_t msgDst,
 		uint32_t msgSrc,
 		const void *data,
-		uint32_t dataLen = 0)
+		uint32_t dataLen)
 	{
 		CORE::Message msg = { msgId, msgDst, msgSrc, data, dataLen };
 		BAMS::CORE::IEngine::SendMsg(&msg);
+	}
+
+	BAMS_EXPORT void IEngine_PostMsg(
+		uint32_t msgId,
+		uint32_t msgDst,
+		uint32_t msgSrc,
+		const void *data,
+		uint32_t dataLen,
+		uint32_t delay)
+	{
+		CORE::Message msg = { msgId, msgDst, msgSrc, data, dataLen };
+		BAMS::CORE::IEngine::PostMsg(&msg, delay * 1ms);
 	}
 
 	BAMS_EXPORT void IEngine_Update(float dt)
@@ -305,6 +322,9 @@ extern "C" {
 
 	BAMS_EXPORT void DoTests()
 	{
+		typedef  basic_string_base<char, U32> QQ;
+//		QQ a("hello");
+
 		return;
 		{
 			WSTR t;

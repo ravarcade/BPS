@@ -6,14 +6,18 @@
 *
 */
 
-class RawData : public ResoureImpl<RawData, RESID_RAWDATA, Allocators::default>
+/// <summary>
+/// Default resource class needed to get raw (not processed) data with given reource type id.
+/// </summary>
+template <U32 DT>
+class TRawData : public ResoureImpl<TRawData<DT>, DT, Allocators::default>
 {
 public:
 	U8 *Data;
 	SIZE_T Size;
 
-	RawData(ResourceBase *res) : Data(nullptr), Size(0) {}	
-	~RawData() { if (Data) deallocate(Data); }
+	TRawData(ResourceBase *res) : Data(nullptr), Size(0) {}
+	~TRawData() { if (Data) deallocate(Data); }
 
 	void Update(ResourceBase *res)
 	{
@@ -33,3 +37,5 @@ public:
 	U8 *GetData() { return Data; }
 	SIZE_T GetSize() { return Size; }
 };
+
+typedef TRawData<RESID_RAWDATA> RawData;

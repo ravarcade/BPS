@@ -285,8 +285,29 @@ void ire::AddShader(const void * params)
 
 void ire::ReloadShader(const void *params)
 {
-	CASTMSGPARAMS(PRELOAD_SHADER);
-	ow->ReloadShader(p->shader);			
+	auto p = static_cast<const PRELOAD_SHADER *>(params); 
+	assert(p!=nullptr);
+	if (p->wnd == -1)
+	{
+		for (auto &ow : outputWindows)
+		{
+			if (ow && ow->Exist())
+			{
+				TRACE("ReloadShader: " << p->shader << ", wnd=" << p->wnd << "\n");
+				ow->ReloadShader(p->shader);
+			}
+		}
+	}
+	else if (p->wnd >= COUNT_OF(outputWindows)) 
+	{
+		auto ow = outputWindows[p->wnd];
+		if (!ow || !ow->Exist())  
+			return;
+
+		TRACE("ReloadShader: " << p->shader << ", wnd=" << p->wnd << "\n");
+		ow->ReloadShader(p->shader);
+
+	}
 }
 
 void ire::GetShaderParams(const void * params)

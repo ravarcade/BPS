@@ -141,7 +141,7 @@ protected:
 	bool _isLoadable;
 	time _waitWithUpdate;
 
-	static constexpr time::duration defaultDelay = 500ms;
+	static constexpr time::duration defaultDelay = 200ms;
 	ResourceUpdateNotifier _updateNotifier;
 
 public:
@@ -149,6 +149,7 @@ public:
 	U32  Type;
 	STR  Name;
 	WSTR Path;
+	STR XML;
 	
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ResourceBase"/> class.
@@ -293,8 +294,9 @@ public:
 
 	void StartDirectoryMonitor();
 	void StopDirectoryMonitor();
-	void AbsolutePath(WSTR &filename);
-	void RelativePath(WSTR &filename);
+	void AbsolutePath(WSTR &filename, const WSTR *_root = nullptr);
+	void RelativePath(WSTR &filename, const WSTR *_root = nullptr);
+	WSTR GetDirPath(const WString &filename);
 };
 
 
@@ -320,3 +322,4 @@ extern ResourceManager *globalResourceManager;
 
 #include "RawData.h"
 #include "ResShader.h"
+#include "ResMesh.h"

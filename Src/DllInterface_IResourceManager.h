@@ -9,12 +9,19 @@
 enum {
 	RESID_CORE_RESOURCES = 0x00010000,
 	RESID_UNKNOWN,
-	RESID_RAWDATA = RESID_UNKNOWN,
+	RESID_RAWDATA,
 
 	// resources used by rendering engine
 	RESID_RENDERING_ENGINE_RESOURCES = 0x00020000,
 	RESID_SHADER,
+	RESID_SHADER_SRC,
+	RESID_SHADER_BIN,
 	RESID_SHADER_PROGRAM,
+
+	RESID_MESH = RESID_RENDERING_ENGINE_RESOURCES + 0x201,
+	RESID_MODEL,
+	RESID_IMPORTMODEL,
+
 	RESID_VERTEXDATA,
 };
 
@@ -47,7 +54,7 @@ extern "C" {
 	BAMS_EXPORT const wchar_t * IResource_GetPath(IResource *res);
 	BAMS_EXPORT bool IResource_IsLoaded(IResource *res);
 	BAMS_EXPORT uint32_t IResource_GetType(IResource *res);
-	BAMS_EXPORT bool IResource_IsLoadingNeeded(IResource *res);
+	BAMS_EXPORT bool IResource_IsLoadable(IResource *res);
 
 	// ResourceManager
 	BAMS_EXPORT IResourceManager *IResourceManager_Create();
@@ -110,7 +117,15 @@ extern "C" {
 		uint32_t msgDst,
 		uint32_t msgSrc,
 		const void *data,
-		uint32_t dateLen);
+		uint32_t dateLen = 0);
+
+	BAMS_EXPORT void IEngine_PostMsg(
+		uint32_t msgId,
+		uint32_t msgDst,
+		uint32_t msgSrc,
+		const void *data,
+		uint32_t dateLen = 0,
+		uint32_t delay = 0);
 
 	BAMS_EXPORT void IEngine_Update(float dt);
 
@@ -174,6 +189,7 @@ extern "C" {
 		const wchar_t *GetPath() { return IResource_GetPath(Get()); }
 		bool IsLoaded() { return IResource_IsLoaded(Get()); }
 		uint32_t GetType() { return IResource_GetType(Get()); }
+		bool IsLoadable() { return IResource_IsLoadable(Get()); }
 
 		void AddRef()  { IResource_AddRef(Get()); }
 		void Release() { IResource_Release(Get()); }
@@ -287,6 +303,17 @@ extern "C" {
 			IEngine_SendMsg( msgId, msgDst, msgSrc, data, dataLen);
 		}
 
+		static void PostMsg(
+			uint32_t msgId,
+			uint32_t msgDst,
+			uint32_t msgSrc,
+			const void *data,
+			uint32_t dataLen = 0,
+			uint32_t delay = 0)
+		{
+			IEngine_PostMsg(msgId, msgDst, msgSrc, data, dataLen, delay);
+		}
+
 		static void Update(float dt)
 		{
 			IEngine_Update(dt);
@@ -319,7 +346,8 @@ public:
 // ============================================================================
 
 enum { // msgDst
-	RENDERING_ENGINE = 0x201 // VK
+	RENDERING_ENGINE = 0x201, // VK
+	IMPORT_MODULE    = 0x401 // 
 };
 
 enum { // msgId
@@ -331,6 +359,10 @@ enum { // msgId
 	RELOAD_SHADER       = 0x20005,
 	GET_SHADER_PARAMS   = 0x20006,
 	GET_OBJECT_PARAMS   = 0x20007,
+
+	// to IMPORT_MODULE (or everyone?)
+	IDENTIFY_RESOURCE   = 0x40001,
+	IMPORTMODEL_UPDATE  = 0x40002,
 };
 
 struct PCREATE_WINDOW {
@@ -377,3 +409,8 @@ struct PGET_OBJECT_PARAMS {
 	BAMS::CORE::Properties **pProperties;
 };
 
+struct PIDETIFY_RESOURCE {
+	const wchar_t *filename;
+	uint32_t *pType;
+	void *res;
+};

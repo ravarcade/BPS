@@ -9,16 +9,23 @@
 
 using namespace BAMS;
 
-void LoadVK()
+void LoadModule(const wchar_t *module)
 {
-	auto hm = LoadLibrary(L"RenderingEngineVK.dll");
+	auto hm = LoadLibrary(module);
 
 	typedef void func(void);
 
-	func *RegisterModule = (func *)GetProcAddress(hm, "RenderingEngine_RegisterModule");
+	func *RegisterModule = (func *)GetProcAddress(hm, "RegisterModule");
 	if (RegisterModule)
-		RegisterModule();	
+		RegisterModule();
 }
+
+void LoadModules()
+{
+	LoadModule(L"RenderingEngineVK.dll");
+	LoadModule(L"ImportModule.dll");
+}
+
 
 const char * UUID2String(GUID &g)
 {
@@ -249,18 +256,6 @@ void TogleWnd(BAMS::CEngine &en, int wnd)
 
 void testloop(BAMS::CEngine &en)
 {
-	static PADD_MESH c0 = { 0, "realcubename", "cube", "cube" };
-	static PADD_MESH c02 = { 0, "cubename", "cube", "default" };
-	static PADD_MESH c1 = { 1, "cubename", "cube", "default" };
-	static PADD_MESH c2 = { 2, "cubename", "cube", "default" };
-	static PCLOSE_WINDOW cw0 = { 0 };
-	static PCLOSE_WINDOW cw1 = { 1 };
-	static PCLOSE_WINDOW cw2 = { 2 };
-
-	static bool w0v = true;
-	static bool w1v = false;
-	static bool w2v = false;
-
 	for (bool isRunning = true; isRunning;)
 	{
 		//		Sleep(100);
@@ -299,13 +294,12 @@ void testloop(BAMS::CEngine &en)
 
 int main()
 {
-
 	uint64_t Max, Current, Counter;
 
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
 	
 	BAMS::Initialize(); // Starts Game Engine Thread, it will create all needed threads ...
-	LoadVK();
+	LoadModules();
 	{
 		BAMS::CEngine en;
 
@@ -361,16 +355,22 @@ int main()
 					rm.LoadSync();
 				printf("%3d: \"%s\", %#010x, %s", i, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
 				wprintf(L", \"%s\"\n", r.GetPath());
-				auto rd = rm.GetRawDataByName(r.GetName());
-				auto rdata = rd.GetData();
-				auto rsize = rd.GetSize();
-				if (rsize > 32)
-					rsize = 32;
-				printf("     ");
-				if (!rdata && rsize > 0)
+				if (r.IsLoadable())
+				{
+					auto rd = rm.GetRawDataByName(r.GetName());
+					auto rdata = rd.GetData();
+					auto rsize = rd.GetSize();
+					if (rsize > 32)
+						rsize = 32;
+					printf("     ");
+					if (!rdata && rsize > 0)
+						printf("[NO LOADING NEEDED]");
+					if (rdata)
+						DumpHex(rdata, rsize);
+				}
+				else {
 					printf("[NO LOADING NEEDED]");
-				if (rdata)
-					DumpHex(rdata, rsize);
+				}
 				printf("\n");
 
 			}

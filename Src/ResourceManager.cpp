@@ -274,7 +274,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		auto rm = reinterpret_cast<ResourceManager::InternalData *>(ctrl);
 		if (!(filename == rm->_manifestFileName))
 			rm->AddResource(filename.c_str());
-
 	}
 
 	void ScanRootdir()
@@ -347,6 +346,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		Tools::NormalizePath(_rootDir);
 		LoadManifest();
 		ScanRootdir();
+		ProcessUnknownResources();
 	}
 
 	void CreateResourceImplementation(ResourceBase *res)
@@ -441,19 +441,13 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 	}
 
 	WSTR fileName, fileNameRenameTo;
-	int addcount, remcount, modcount, rencount;
 	static void Worker(InternalData *rm)
 	{
-		// reset statistics
-		rm->addcount = 0;
-		rm->remcount = 0;
-		rm->modcount = 0;
-		rm->rencount = 0;
-
 		while (!rm->_killWorkerFlag)
 		{
 			// this will wait 1 second for new events to process
 			SleepEx(1000, TRUE); // we do nothing... everything is done in os
+			bool resUpdated = false;
 			while (auto ev = rm->_monitoredDirs.GetDiskEvent()) // we read all events
 			{
 				auto &fn = rm->fileName;
@@ -469,36 +463,39 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 						if (rm->AddResource(rm->fileName.c_str()))
 						{
 							wprintf(L"Add: [%s] \n", fn.c_str());
-							++rm->addcount;
+							resUpdated = true;
 						}
 					}
 					break;
+
 				case FILE_ACTION_REMOVED:
 					rm->RemoveResource(rm->fileName.c_str());
 					wprintf(L"Delete: [%s] \n", fn.c_str());
-					++rm->remcount;
+					resUpdated = true;
 					break;
+
 				case FILE_ACTION_MODIFIED:
 					if (!Tools::IsDirectory(rm->fileName))
 					{
 						rm->UpdateResource(fn);
 						wprintf(L"Modify: [%s]\n", fn.c_str());
-						++rm->modcount;
+						resUpdated = true;
 					}
 					break;
+
 				case FILE_ACTION_RENAMED_NEW_NAME:
 					rm->RenameResource(fn, frn);
 					wprintf(L"Rename: [%s] -> [%s]\n", fn.c_str(), frn.c_str());
-					++rm->rencount;
 					break;
+
 				case FILE_ACTION_RENAMED_OLD_NAME:
 				default:
-					wprintf(L"!!! Default error.\n");
+					wprintf(L"!!! Default: error.\n");
 					break;
 				}
 			}
 			rm->ProcessResources();
-			wprintf(L"Still alive... Add: [%d], Del: [%d], Mod: [%d], Ren: [%d]\n", rm->addcount, rm->remcount, rm->modcount, rm->rencount);
+			wprintf(L"Still alive... \n");
 		}
 	}
 
@@ -506,6 +503,9 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 	{
 		if (res->Type == 0)
 			TRACE("t=0\n");
+
+		if (res->Type == RESID_UNKNOWN)
+			IdentifyResourceType(res);
 
 		if (res->_isLoaded && (res->_isDeleted || (res->_isModified && res->_waitWithUpdate > now)))
 		{
@@ -593,12 +593,33 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		_monitoredDirs.Stop();
 	}
 
+	void IdentifyResourceType(ResourceBase *res)
+	{
+		ResShader::IdentifyResourceType(res);
+		ResImportModel::IdentifyResourceType(res);
+		if (res->Type == RESID_UNKNOWN)
+			res->Type = RESID_RAWDATA;
+	}
+
+	void ProcessUnknownResources()
+	{
+		for (auto *res : _resources)
+		{
+			if (res->_isDeleted)
+				continue;
+			if (res->Type == RESID_UNKNOWN)
+			{
+				IdentifyResourceType(res);
+				TRACEW("RESID_UNKNOWN: " << res->Name.c_str() << "\n");
+			}
+		}
+	}
+
 	void LoadManifest()
 	{
 		WSTR rpath = _rootDir + Tools::wDirectorySeparator;
 		_manifestFileName = rpath + MANIFESTFILENAME;
 		SIZE_T manifestSize = 0;
-		WSTR cvt;
 		STR fn;
 
 		char *manifest = reinterpret_cast<char *>(Tools::LoadFile(&manifestSize, nullptr, _manifestFileName, GetMemoryAllocator()));
@@ -611,15 +632,10 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			auto qty = root->IntAttribute("qty");
 			for (auto r = root->FirstChildElement("Resource"); r; r = r->NextSiblingElement())
 			{
-				auto fileName = r->GetText();
-				if (!fileName)
-					continue;
-				fn = fileName;
-				cvt.UTF8(fn);
-				WSTR wfn = (cvt.size() > 2 && cvt[1] == ':' && cvt[2] == Tools::directorySeparatorChar) ? cvt : rpath + cvt;
-
 				auto res = make_new<ResourceBase>();
-				res->Path = wfn;
+
+				res->XML = r->GetText();
+				res->Path.UTF8(r->Attribute("Path"));
 				res->Name = r->Attribute("Name");
 				SetResourceType(res, r->UnsignedAttribute("Type", RESID_UNKNOWN));
 				const char *uid = r->Attribute("UID");
@@ -628,7 +644,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 				res->_resourceSize = r->Int64Attribute("Size", 0);
 				_resources.push_back(res);
 			}
-			GetMemoryAllocator()->deallocate(manifest);
+			GetMemoryAllocator()->deallocate(manifest);			
 		}
 	}
 
@@ -654,7 +670,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			entry->SetAttribute("Update", res->_resourceTimestamp);
 			entry->SetAttribute("UID", uidbuf);
 			entry->SetAttribute("Size", (I64)res->_resourceSize);
-			entry->SetText(cvt.c_str());
+			entry->SetAttribute("Path", cvt.c_str());
 			rm->InsertEndChild(entry);
 		}
 
@@ -668,8 +684,11 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		printf("-------------- xml ------------------\n%s\n-------------------------------\n", prn.CStr());
 	}
 
-	void AbsolutePath(WSTR & filename)
+	void AbsolutePath(WSTR & filename, const WSTR *root = nullptr)
 	{
+		if (!root)
+			root = &_rootDir;
+
 		if (filename.size() > 3 &&
 			!(
 			((filename[0] >= 'a' && filename[0] <= 'z') || (filename[0] >= 'A' && filename[0] <= 'Z')) &&
@@ -679,21 +698,39 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			)
 		{
 			if (filename[0] == '/' || filename[0] == '\\')
-				filename = _rootDir + filename;
+				filename = (*root) + filename;
 			else
-				filename = _rootDir + Tools::wDirectorySeparator + filename;
+				filename = (*root) + Tools::wDirectorySeparator + filename;
 		}
 
 		return Tools::NormalizePath(filename);
 	}
 
-	void RelativePath(WSTR &filename)
+	void RelativePath(WSTR &filename, const WSTR *root)
 	{
-		if (filename.size() > _rootDir.size() && filename.startsWith(_rootDir) && (filename[_rootDir.size()] == '\\' || filename[_rootDir.size()] == '/'))
+		if (!root)
+			root = &_rootDir;
+
+		if (filename.size() > root->size() && filename.startsWith(*root) && (filename[root->size()] == '\\' || filename[root->size()] == '/'))
 		{
-			filename = filename.substr(static_cast<I32>(_rootDir.size()) + 1); // +1 for directory separator
+			filename = filename.substr(static_cast<I32>(root->size()) + 1); // +1 for directory separator
 		}
 	}
+
+	WSTR GetDirPath(const WString &filename)
+	{
+		WSTR ret(filename);
+
+		U32 newSize = filename.size();
+		for (U32 i = 0; i < filename.size(); ++i)
+		{
+			if (filename[i] == '\\' || filename[i] == '/')
+				newSize = i;
+		}
+		ret.resize(newSize);
+		return std::move(ret);
+	}
+
 };
 
 // ============================================================================ ResourceManager ===
@@ -773,8 +810,8 @@ ResourceBase * ResourceManager::Get(const STR & resName, U32 typeId)
 		// - we don't know type when we ask (typeId == UNKNOWN) or resource type is UNKNOWN (ret->Type == UNKNOWN)
 		// - we don't have other candidates or we don't know resource type for previous candidate
 		if (res->Name == resName &&
-			(typeId == RESID_UNKNOWN || res->Type == RESID_UNKNOWN) &&
-			(ret == nullptr || (ret != nullptr && ret->Type == RESID_UNKNOWN)))
+			(typeId == RESID_UNKNOWN || typeId == RESID_RAWDATA || res->Type == RESID_UNKNOWN || res->Type == RESID_RAWDATA) &&
+			(ret == nullptr || (ret != nullptr && (ret->Type == RESID_UNKNOWN || ret->Type == RESID_RAWDATA))))
 		{
 			ret = res; // we have another candidate
 		}
@@ -834,15 +871,16 @@ void ResourceManager::RootDir(CWSTR path) { _data->RootDir(path); }
 void ResourceManager::StartDirectoryMonitor() { _data->StartMonitoring(); }
 void ResourceManager::StopDirectoryMonitor() { _data->StopMonitoring(); }
 
-void ResourceManager::AbsolutePath(WSTR & filename) { _data->AbsolutePath(filename); }
-void ResourceManager::RelativePath(WSTR &filename) { _data->RelativePath(filename); }
+void ResourceManager::AbsolutePath(WSTR & filename, const WSTR *root) { _data->AbsolutePath(filename, root); }
+void ResourceManager::RelativePath(WSTR & filename, const WSTR *root) { _data->RelativePath(filename, root); }
+WSTR ResourceManager::GetDirPath(const WString & filename) { return std::move(_data->GetDirPath(filename)); }
 
 // ============================================================================ ResourceManagerModule ===
 
 ResourceManager *globalResourceManager = nullptr;
 void ResourceManagerModule::Update(float dt)
 {
-
+	//
 }
 
 void ResourceManagerModule::Initialize()

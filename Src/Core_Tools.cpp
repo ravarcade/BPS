@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include <stdio.h>
+//#include "Core_Tools.h"
 
 NAMESPACE_CORE_BEGIN
 
