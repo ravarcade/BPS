@@ -19,7 +19,7 @@
     <ClInclude Include="ImportModule.h">
       <Filter>Src</Filter>
     </ClInclude>
-    <ClInclude Include="Import.h">
+    <ClInclude Include="AssImp_Loader.h">
       <Filter>Src</Filter>
     </ClInclude>
   </ItemGroup>
@@ -33,7 +33,7 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>Src</Filter>
     </ClCompile>
-    <ClCompile Include="Import.cpp">
+    <ClCompile Include="AssImp_Loader.cpp">
       <Filter>Src</Filter>
     </ClCompile>
   </ItemGroup>

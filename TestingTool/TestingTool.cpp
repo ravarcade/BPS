@@ -345,15 +345,14 @@ int main()
 
 			rm.LoadSync();
 
-			BAMS::IResource *resList[100];
-			uint32_t resCount = 100;
-			rm.Filter(resList, &resCount, "*");
-			for (uint32_t i = 0; i < resCount; ++i)
-			{
-				BAMS::CResource r(resList[i]);
+			uint32_t resCount = 0;
+			rm.Filter([](IResource *res, void *prm) {
+
+				BAMS::CResourceManager &rm = *static_cast<BAMS::CResourceManager *>(prm);
+				BAMS::CResource r(res);
 				if (!r.IsLoaded())
 					rm.LoadSync();
-				printf("%3d: \"%s\", %#010x, %s", i, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
+				printf("%3d: \"%s\", %#010x, %s", 0, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
 				wprintf(L", \"%s\"\n", r.GetPath());
 				if (r.IsLoadable())
 				{
@@ -372,8 +371,7 @@ int main()
 					printf("[NO LOADING NEEDED]");
 				}
 				printf("\n");
-
-			}
+			}, &rm);
 	}
 
 	BAMS::Finalize();

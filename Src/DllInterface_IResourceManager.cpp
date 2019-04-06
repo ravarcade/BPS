@@ -144,13 +144,27 @@ extern "C" {
 		return rb->GetBinary(idx);
 	}
 
+	BAMS_EXPORT void IMesh_SetVertexDescription(IMesh * res, IVertexDescription * _vd, IResource * _meshSrc, U32 _meshIdx)
+	{
+		auto &vd = *reinterpret_cast<BAMS::RENDERINENGINE::VertexDescription *>(_vd);
+		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		rb->SetVertexDescription(vd, reinterpret_cast<ResourceBase *>(_meshSrc), _meshIdx);
+	}
+
+	BAMS_EXPORT const char * IMesh_BuildXML(IVertexDescription * _vd, IResource * _meshSrc, U32 _meshIdx)
+	{
+		static STR xml;
+		auto &vd = *reinterpret_cast<BAMS::RENDERINENGINE::VertexDescription *>(_vd);
+		xml = ResMesh::BuildXML(vd, reinterpret_cast<ResourceBase *>(_meshSrc), _meshIdx);
+		return xml.c_str();
+	}
+
 	// =========================================================================== ResourceManager
 
 	BAMS_EXPORT IResourceManager *IResourceManager_Create()
 	{
 		auto rm = reinterpret_cast<ResourceManagerModule*>(GetModule(IModule::ResourceManagerModule));
 		return rm->GetResourceManager();
-//		return BAMS::ResourceManager::Create();
 	}
 
 	BAMS_EXPORT void IResourceManager_Destroy(IResourceManager *rm)
@@ -183,10 +197,10 @@ extern "C" {
 		return resm->Get(name, type);
 	}
 
-	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource ** resList, uint32_t * resCount, const char * pattern)
+	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, void(*callback)(IResource *, void *), void *localData, const char * pattern, uint32_t typeId)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->Filter(reinterpret_cast<ResourceBase **>(resList), resCount, pattern);
+		resm->Filter(reinterpret_cast<void (*)(ResourceBase *, void *)>(callback), localData, pattern, typeId);
 	}
 
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid)

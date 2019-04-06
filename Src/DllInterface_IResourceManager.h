@@ -31,6 +31,8 @@ extern "C" {
 	typedef void IShader;
 	typedef void IResourceManager;
 	typedef void IModule;
+	typedef void IMesh;
+	typedef void IVertexDescription;
 
 	// Call Initialize befor do anything with resources, game engine, etc. Only some memory allocations.
 	BAMS_EXPORT void Initialize();
@@ -63,7 +65,7 @@ extern "C" {
 	BAMS_EXPORT void IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT void IResourceManager_RootDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name, uint32_t type = 0);
-	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, IResource **resList, uint32_t *resCount, const char *pattern);
+	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, void (*callback)(IResource *, void *), void *localData, const char *pattern = nullptr, uint32_t typeId = RESID_UNKNOWN);
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name);
@@ -71,7 +73,7 @@ extern "C" {
 	BAMS_EXPORT void IResourceManager_RefreshResorceFileInfo(IResourceManager *rm, IResource *res);
 	BAMS_EXPORT void IResourceManager_StartDirectoryMonitor(IResourceManager *rm);
 	BAMS_EXPORT void IResourceManager_StopDirectoryMonitor(IResourceManager *rm);
-
+	
 	// RawData
 	BAMS_EXPORT unsigned char *IRawData_GetData(IRawData *res);
 	BAMS_EXPORT size_t IRawData_GetSize(IRawData *res);
@@ -83,9 +85,12 @@ extern "C" {
 	BAMS_EXPORT const wchar_t * IShader_GetSourceFilename(IShader *res, int type);
 	BAMS_EXPORT const wchar_t * IShader_GetBinaryFilename(IShader *res, int type);
 	BAMS_EXPORT void IShader_Save(IShader *res);
-
 	BAMS_EXPORT uint32_t IShader_GetBinaryCount(IShader *res);
 	BAMS_EXPORT IRawData *IShader_GetBinary(IShader *res, uint32_t idx);
+
+	// Mesh
+	BAMS_EXPORT void IMesh_SetVertexDescription(IMesh *res, IVertexDescription *_vd, IResource *_meshSrc, U32 _meshIdx);
+	BAMS_EXPORT const char * IMesh_BuildXML(IVertexDescription *_vd, IResource *_meshSrc, U32 _meshIdx);
 
 	// Module
 	struct Message
@@ -171,7 +176,6 @@ extern "C" {
 	protected:
 		ResourceSmartPtr _res;
 
-		inline IResource *Get() { return _res.Get(); }
 		friend CResourceManager;
 
 	public:
@@ -194,19 +198,23 @@ extern "C" {
 		void AddRef()  { IResource_AddRef(Get()); }
 		void Release() { IResource_Release(Get()); }
 		uint32_t GetRefCounter() { return IResource_GetRefCounter(Get()); }
+		inline IResource *Get() { return _res.Get(); }
 	};
+
+#define CRESOURCEEXT(x) \
+		C##x() {} \
+		C##x(I##x *r) : CResource(static_cast<IResource *>(r)) {} \
+		C##x(const C##x &src) : CResource(src) {} \
+		C##x(C##x &&src) : CResource(std::move(src)) {} \
+		virtual ~C##x() {} \
+		C##x & operator = (const C##x &src) { _res = src._res; return *this; } \
+		C##x & operator = (C##x &&src) { _res = std::move(src._res); return *this; }
+
 
 	class CRawData : public CResource
 	{
 	public:
-		CRawData() {}
-		CRawData(IRawData *r) : CResource(static_cast<IResource*>(r)) {}
-		CRawData(const CRawData &src) : CResource(src) {}
-		CRawData(CRawData &&src) : CResource(std::move(src)) {}
-		virtual ~CRawData() {}
-
-		CRawData & operator = (const CRawData &src) { _res = src._res; return *this; }
-		CRawData & operator = (CRawData &&src) { _res = std::move(src._res); return *this; }
+		CRESOURCEEXT(RawData)
 
 		unsigned char *GetData() { return IRawData_GetData(static_cast<IRawData*>(Get())); }
 		size_t GetSize() { return IRawData_GetSize(static_cast<IRawData*>(Get())); }
@@ -215,15 +223,7 @@ extern "C" {
 	class CShader : public CResource
 	{
 	public:
-		CShader() {}
-		CShader(IShader *r) : CResource(static_cast<IResource*>(r)) {}
-		CShader(const CShader &src) : CResource(src) {}
-		CShader(CShader &&src) : CResource(std::move(src)) {}
-		virtual ~CShader() {}
-
-		CShader & operator = (const CShader &src) { _res = src._res; return *this; }
-		CShader & operator = (CShader &&src) { _res = std::move(src._res); return *this; }
-
+		CRESOURCEEXT(Shader)
 		unsigned char *GetData() { return IShader_GetData(static_cast<IShader*>(Get())); }
 		size_t GetSize() { return IShader_GetSize(static_cast<IShader*>(Get())); }
 
@@ -235,6 +235,15 @@ extern "C" {
 		CRawData GetBinary(uint32_t idx) { CRawData prg(IShader_GetBinary(static_cast<IShader*>(Get()), idx)); return  std::move(prg); }
 
 		void Save() { IShader_Save(static_cast<IShader*>(Get())); }
+	};
+	
+	class CMesh : public CResource
+	{
+	public:
+		CRESOURCEEXT(Mesh) // define constructors (+copy,+move), virtual destructo, assign operator for copy and move
+		void SetVertexDescription(IVertexDescription *vd, CResource &meshRes, uint32_t meshIdx) { IMesh_SetVertexDescription(static_cast<IMesh*>(Get()), vd, meshRes.Get(), meshIdx); }
+		static const char *BuildXML(IVertexDescription *vd, CResource &meshRes, uint32_t meshIdx) { return IMesh_BuildXML(vd, meshRes.Get(), meshIdx); }
+		static const char *BuildXML(IVertexDescription *vd, IResource *meshRes, uint32_t meshIdx) { return IMesh_BuildXML(vd, meshRes, meshIdx); }
 	};
 
 	class CResourceManager
@@ -253,7 +262,7 @@ extern "C" {
 		void AddDir(const wchar_t *path) { IResourceManager_AddDir(_rm, path); }
 		void RootDir(const wchar_t *path) { IResourceManager_RootDir(_rm, path); }
 
-		void Filter(IResource **resList, uint32_t *resCount, const char *pattern) { IResourceManager_Filter(_rm, resList, resCount, pattern); }
+		void Filter(void (*callback)(IResource *, void *), void *localData, const char *pattern = nullptr, uint32_t typeId = RESID_UNKNOWN) { IResourceManager_Filter(_rm, callback, localData, pattern, typeId); }
 		CResource FindByName(const char *name, uint32_t type = RESID_UNKNOWN) { CResource res(IResourceManager_FindByName(_rm, name, type)); return std::move(res); }
 		CResource FindByUID(const UUID &uid) { CResource res(IResourceManager_FindByUID(_rm, uid)); return std::move(res); }
 

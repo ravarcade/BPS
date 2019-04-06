@@ -39,11 +39,22 @@ class Importer
 private:
 	std::vector<CResource> m_importedModels;
 	CEngine *en;
-	Import imp;
+	AssImp_Loader aiLoader;
 
-	void StartImport(const wchar_t *filename)
+	void StartImport(CResource &res)
 	{
-		imp.Load(filename);
+		aiLoader.PreLoad(res.GetPath());
+		CResourceManager rm;
+		rm.Filter([](BAMS::IResource *res, void *parm) {
+
+		}, nullptr, nullptr, RESID_MESH);
+//		rm.	
+		uint32_t num = 0;
+		aiLoader.ForEachMesh([&] (VertexDescription &vd) {
+			auto x = CMesh::BuildXML(&vd, res, num);
+			TRACE(x);
+			++num;
+		});
 	}
 
 public:
@@ -67,7 +78,7 @@ public:
 				*(p->pType) = RESID_IMPORTMODEL;
 				CResource res(p->res);
 				m_importedModels.emplace_back(res);
-				StartImport(p->filename);
+				StartImport(res);
 				break;
 			}
 		} while ((sz = strtok_s(nullptr, ";", &next_token)));
@@ -81,12 +92,16 @@ public:
 
 	void Initialize()
 	{
+		BAMS::CORE::STR::Initialize();
+		BAMS::CORE::WSTR::Initialize();
 		en = new CEngine();
 	}
 
 	void Finalize()
 	{
 		m_importedModels.clear();
+		BAMS::CORE::WSTR::Finalize();
+		BAMS::CORE::STR::Finalize();
 		delete en;
 		en = nullptr;
 	}

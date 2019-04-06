@@ -32,7 +32,7 @@ class ResShader : public ResoureImpl<ResShader, RESID_SHADER, Allocators::defaul
 
 	// ----------------------------------------------------------------------------------
 
-	ResourceBase *Res;
+	ResourceBase *rb;
 	U8 *Data;
 	SIZE_T Size;
 
@@ -92,9 +92,12 @@ class ResShader : public ResoureImpl<ResShader, RESID_SHADER, Allocators::defaul
 
 	bool _ParseFilename(const WSTR &prg, U32 *pStage, bool *pIsSrc = nullptr);
 
+	void _LoadXML();
+	void _SaveXML();
+
 public:
-	ResShader(ResourceBase *res) : Res(res), Data(nullptr), Size(0), isModified(true), isUpdateRecived(false) {}
-	~ResShader() { Release(Res); }
+	ResShader(ResourceBase *res) : rb(res), Data(nullptr), Size(0), isModified(true), isUpdateRecived(false) {}
+	~ResShader() { Release(rb); }
 
 	U8 *GetData() { return Data; }
 	SIZE_T GetSize() { return Size; }

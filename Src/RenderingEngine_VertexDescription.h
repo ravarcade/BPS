@@ -123,6 +123,11 @@ struct RE_EXPORT Stream {
 	{};
 
 	bool isUsed() const { return m_type != 0; }
+
+	bool isSimilarly(const Stream &s)
+	{
+		return m_type == s.m_type && m_stride == m_stride && m_normalized == s.m_normalized;
+	}
 };
 
 /**
@@ -191,6 +196,23 @@ public:
 		}
 
 		_SetVertexDescription(numTriangles, numVertices, pVertices, pTexCoords, pNormals, pTangents, pBitangents, pColors);
+	}
+
+	bool operator == (const VertexDescription &vd)
+	{
+#define ISSAME(x) bool x##Same = true; for (uint32_t i = 0; i<COUNT_OF(m_##x); ++i) { if (!m_##x[i].isSimilarly(vd.m_##x[i])) { x##Same = false; break; } }
+		ISSAME(colors);
+		ISSAME(textureCoords);
+		ISSAME(boneIDs);
+		ISSAME(boneWeights);
+
+		return m_numVertices == vd.m_numVertices &&
+			m_numIndices == vd.m_numIndices &&
+			m_vertices.isSimilarly(vd.m_vertices) &&
+			m_normals.isSimilarly(vd.m_normals) &&
+			m_tangents.isSimilarly(vd.m_tangents) &&
+			m_bitangents.isSimilarly(vd.m_bitangents) &&
+			colorsSame && textureCoordsSame && boneIDsSame && boneWeightsSame;
 	}
 
 private:
@@ -468,8 +490,8 @@ private:
 			}
 			bonesCounter.clear();
 		} // if (mesh->HasBones()) 
-	} // VertexDescription
+	}
 	*/
-};
+}; // VertexDescription
 
 #endif // _RENDERINGENGINE_VERTEXDESCRIPTION_H_

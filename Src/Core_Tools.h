@@ -22,7 +22,7 @@ public:
 	static void CreateUUID(UUID &uuid);
 	static BYTE *LoadFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path, IMemoryAllocator *alloc);
 	static bool InfoFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path);
-	static bool SaveFile(SIZE_T size, const void *data, WSTR &path);
+	static bool SaveFile(WSTR &path, const void *data, SIZE_T size);
 	static bool IsDirectory(WSTR &path);
 	static bool Exist(WSTR &path);
 	static void UUID2String(const UUID &uuid, char *buf);

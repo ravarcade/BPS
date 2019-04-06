@@ -37,5 +37,5 @@
 #include "string.h"
 
 #define IM_BUILD_DLL
-#include "Import.h"
+#include "AssImp_Loader.h"
 #include "ImportModule.h"

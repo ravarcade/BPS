@@ -273,7 +273,7 @@ public:
 	static ResourceManager *Create();
 	static void Destroy(ResourceManager *);
 
-	void Filter(ResourceBase **resList, U32 *resCount, CSTR &patern);
+	void Filter(void (*callback)(ResourceBase *, void *), void *localData, CSTR namePattern = nullptr, U32 typeId = RESID_UNKNOWN);
 	ResourceBase *GetByFilename(const WSTR &filename, U32 typeId = RESID_UNKNOWN);
 	ResourceBase *Get(const STR &resName, U32 typeId = RESID_UNKNOWN);
 	ResourceBase *Get(CSTR resName, U32 typeId = RESID_UNKNOWN) { return Get(STR(resName), typeId); };

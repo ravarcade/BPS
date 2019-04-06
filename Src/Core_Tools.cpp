@@ -199,7 +199,7 @@ bool Tools::InfoFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path)
 	return true;
 }
 
-bool Tools::SaveFile(SIZE_T size, const void *data, WSTR &path)
+bool Tools::SaveFile(WSTR &path, const void *data, SIZE_T size)
 {
 	HANDLE hFile;
 	OVERLAPPED ol = { 0 };

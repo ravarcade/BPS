@@ -634,8 +634,10 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			{
 				auto res = make_new<ResourceBase>();
 
-				res->XML = r->GetText();
+				auto innerXML = r->GetText();
+				res->XML = innerXML? innerXML : "";
 				res->Path.UTF8(r->Attribute("Path"));
+				AbsolutePath(res->Path);
 				res->Name = r->Attribute("Name");
 				SetResourceType(res, r->UnsignedAttribute("Type", RESID_UNKNOWN));
 				const char *uid = r->Attribute("UID");
@@ -680,7 +682,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 		WSTR manifestFileName = rpath + MANIFESTFILENAME;
 
-		Tools::SaveFile(prn.CStrSize() - 1, prn.CStr(), manifestFileName);
+		Tools::SaveFile(manifestFileName, prn.CStr(), prn.CStrSize() - 1);
 		printf("-------------- xml ------------------\n%s\n-------------------------------\n", prn.CStr());
 	}
 
@@ -689,7 +691,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		if (!root)
 			root = &_rootDir;
 
-		if (filename.size() > 3 &&
+		if (filename.size() < 3 ||
 			!(
 			((filename[0] >= 'a' && filename[0] <= 'z') || (filename[0] >= 'A' && filename[0] <= 'Z')) &&
 				filename[1] == ':' &&
@@ -740,24 +742,18 @@ ResourceManager::~ResourceManager()                { make_delete<InternalData>(_
 ResourceManager * ResourceManager::Create()        { return make_new<ResourceManager>(); }
 void ResourceManager::Destroy(ResourceManager *rm) { make_delete<ResourceManager>(rm); }
 
-void ResourceManager::Filter(ResourceBase ** resList, U32 * resCount, CSTR & _pattern)
+void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void *localData, CSTR  _namePattern, U32 typeId)
 {
-	STR pattern(_pattern);
-	I32 counter = 0;
-	I32 max = (resCount && resList) ? *resCount : 0;
+	STR namePattern(_namePattern ? _namePattern : "");
 
 	for (auto &res : _data->_resources)
 	{
-		if (res->Name.wildcard(pattern))
+		if ((typeId == RESID_UNKNOWN || typeId == res->Type) &&
+			(namePattern.size() == 0 || res->Name.wildcard(namePattern)))
 		{
-			if (counter < max)
-				resList[counter] = res;
-			++counter;
+			callback(res, localData);
 		}
 	}
-
-	if (resCount)
-		*resCount = counter;
 }
 
 ResourceBase *ResourceManager::GetByFilename(const WSTR &filename, U32 typeId)

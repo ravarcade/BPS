@@ -35,12 +35,111 @@ bool ResShader::_ParseFilename(const WSTR & prg, U32 * pStage, bool * pIsSrc)
 	return ret;
 }
 
+void ResShader::_LoadXML()
+{
+	using tinyxml2::XMLPrinter;
+	using tinyxml2::XMLDocument;
+
+	// memory is allocated with RawData MemoryAllocator, so we don't have to copy it.
+	Data = static_cast<U8 *>(rb->GetData());
+	Size = rb->GetSize();
+	auto &rm = globalResourceManager;
+	WSTR currPath(rm->GetDirPath(rb->Path));
+	WSTR cvt;
+	if (Data)
+	{
+		XMLDocument xml;
+		xml.Parse(reinterpret_cast<const char *>(Data), Size);
+
+		auto root = xml.FirstChildElement("Shader");
+		for (auto r = root->FirstChildElement("Program"); r; r = r->NextSiblingElement())
+		{
+			auto fileName = r->GetText();
+			if (!fileName)
+				continue;
+
+			cvt.UTF8(fileName);
+			rm->AbsolutePath(cvt, &currPath);
+
+			if (auto p = AddProgram(cvt))
+			{
+				p->Timestamp = r->Int64Attribute("Update", 0);
+				p->Size = r->Int64Attribute("Size", 0);
+			}
+		}
+	}
+}
+
+void ResShader::_SaveXML()
+{
+	using tinyxml2::XMLPrinter;
+	using tinyxml2::XMLDocument;
+
+	auto &rm = globalResourceManager;
+	XMLDocument out;
+	WSTR currPath(rm->GetDirPath(rb->Path));
+	auto *root = out.NewElement("Shader");
+	STR cvt;
+	auto writeToXML = [&](File &prg) {
+		if (prg.IsEmpty()) // don't add to XML empty entries
+			return;
+
+		auto *entry = out.NewElement("Program");
+
+		// we need relative path and Filename is absolute
+		WSTR fpath = prg.Filename;
+		rm->RelativePath(fpath, &currPath);
+
+		// we need UTF8 (to put in XML)
+		cvt.UTF8(fpath);
+
+		entry->SetAttribute("Update", prg.Timestamp);
+		entry->SetAttribute("Size", static_cast<I64>(prg.Size));
+		entry->SetText(cvt.c_str());
+		root->InsertEndChild(entry);
+	};
+
+	for (auto &prg : Source)
+		writeToXML(prg);
+	for (auto &prg : Binary)
+		writeToXML(prg);
+
+
+	out.InsertFirstChild(root);
+	XMLPrinter prn;
+	out.Print(&prn);
+
+	if (rb->Path.size() == 0)
+	{
+		// build new file name
+		int fidx = 1;
+		WSTR fn = rb->Name;
+		rm->AbsolutePath(fn);
+		WSTR fnWithExt = fn + L".shader";
+		while (Tools::Exist(fnWithExt))
+		{
+			++fidx;
+			fnWithExt = fn + fidx + L".shader";
+		}
+		rb->Path = fnWithExt;
+	}
+
+	if (Size < prn.CStrSize()-1)
+	{
+		if (Data)
+			deallocate(Data);
+		Size = prn.CStrSize()-1;
+		Data = static_cast<U8*>(allocate(Size));
+	}
+	memcpy_s(Data, Size, prn.CStr(), prn.CStrSize() - 1);
+}
+
 ResShader::File * ResShader::AddProgram(WSTR filename)
 {
 	auto rm = globalResourceManager;
-	if (!Res->isLoaded() && !Res->isDeleted())
+	if (!rb->isLoaded() && !rb->isDeleted())
 	{
-		rm->LoadSync(Res);
+		rm->LoadSync(rb);
 	}
 
 	ResourceBase *res = nullptr;
@@ -80,38 +179,8 @@ WSTR & ResShader::GetBinaryFilename(U32 stage)
 
 void ResShader::Update(ResourceBase * res)
 {
-	using tinyxml2::XMLPrinter;
-	using tinyxml2::XMLDocument;
 	isUpdateRecived = true;
-
-	// memory is allocated with RawData MemoryAllocator, so we don't have to copy it.
-	Data = static_cast<U8 *>(res->GetData());
-	Size = res->GetSize();
-	auto &rm = globalResourceManager;
-	WSTR currPath(rm->GetDirPath(res->Path));
-	WSTR cvt;
-	if (Data)
-	{
-		XMLDocument xml;
-		xml.Parse(reinterpret_cast<const char *>(Data), Size);
-
-		auto root = xml.FirstChildElement("Shader");
-		for (auto r = root->FirstChildElement("Program"); r; r = r->NextSiblingElement())
-		{
-			auto fileName = r->GetText();
-			if (!fileName)
-				continue;
-
-			cvt.UTF8(fileName);
-			rm->AbsolutePath(cvt, &currPath);
-
-			if (auto p = AddProgram(cvt))
-			{
-				p->Timestamp = r->Int64Attribute("Update", 0);
-				p->Size = r->Int64Attribute("Size", 0);
-			}
-		}
-	}
+	_LoadXML();
 	isModified = false;
 
 	// step 2: make sure, if we have source, we need compiled program too.
@@ -149,63 +218,12 @@ void ResShader::Save(ResourceBase * res)
 {
 	if (!isModified && isUpdateRecived)
 		return;
-
-	using tinyxml2::XMLPrinter;
-	using tinyxml2::XMLDocument;
-
-	auto &rm = globalResourceManager;
-	XMLDocument out;
-	WSTR currPath(rm->GetDirPath(res->Path));
-	auto *root = out.NewElement("Shader");
-	STR cvt;
-	auto writeToXML = [&](File &prg) {
-		if (prg.IsEmpty()) // don't add to XML empty entries
-			return;
-
-		auto *entry = out.NewElement("Program");
-
-		// we need relative path and Filename is absolute
-		WSTR fpath = prg.Filename;
-		rm->RelativePath(fpath, &currPath);
-
-		// we need UTF8 (to put in XML)
-		cvt.UTF8(fpath);
-
-		entry->SetAttribute("Update", prg.Timestamp);
-		entry->SetAttribute("Size", static_cast<I64>(prg.Size));
-		entry->SetText(cvt.c_str());
-		root->InsertEndChild(entry);
-	};
-
-	for (auto &prg : Source)
-		writeToXML(prg);
-	for (auto &prg : Binary)
-		writeToXML(prg);
-
-
-	out.InsertFirstChild(root);
-	XMLPrinter prn;
-	out.Print(&prn);
-
-	if (res->Path.size() == 0)
-	{
-		// build new file name
-		int fidx = 1;
-		WSTR fn = res->Name;
-		rm->AbsolutePath(fn);
-		WSTR fnWithExt = fn + L".shader";
-		while (Tools::Exist(fnWithExt))
-		{
-			++fidx;
-			fnWithExt = fn + fidx + L".shader";
-		}
-		res->Path = fnWithExt;
-	}
-
-	Tools::SaveFile(prn.CStrSize() - 1, prn.CStr(), res->Path);
+	
+	_SaveXML();
+	Tools::SaveFile(res->Path, Data, Size);
 
 	// file saved... but res may be marked as deleted (not file on disk befor save) or with old file time stamp
-	rm->RefreshResorceFileInfo(res);
+	globalResourceManager->RefreshResorceFileInfo(res);
 }
 
 U32 ResShader::GetBinaryCount()
@@ -291,7 +309,7 @@ void ResShader::Link(File * p)
 {
 	TRACEW(L"link: " << p->Filename.c_str() << L"\n");
 	reloadShaderMessageData.wnd = -1;
-	reloadShaderMessageData.shader = Res->Name.c_str();
+	reloadShaderMessageData.shader = rb->Name.c_str();
 	CORE::Message msg = { RELOAD_SHADER, RENDERING_ENGINE, 0, &reloadShaderMessageData };
 	BAMS::CORE::IEngine::PostMsg(&msg, 100ms);
 }
