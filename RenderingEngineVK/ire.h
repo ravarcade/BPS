@@ -31,6 +31,8 @@ public:
 	VkInstance _instance = VK_NULL_HANDLE;
 	const VkAllocationCallbacks* _allocator = VK_NULL_HANDLE;
 	VkDebugReportCallbackEXT _callback = VK_NULL_HANDLE;
+	VkDebugUtilsMessengerEXT _debugMessengerCallback = VK_NULL_HANDLE;
+
 
 
 	// ------------------------------------
@@ -41,8 +43,10 @@ public:
 	std::vector<const char*> _GetRequiredLayers();
 
 	VkResult _CreateDebugReportCallbackEXT(VkInstance _instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback);
-	void _DestroyDebugReportCallbackEXT(VkInstance _instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator);
+	VkResult _CreateDebugUtilsMessengerEXT(VkInstance _instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger);
 
+	void _DestroyDebugReportCallbackEXT(VkInstance _instance, VkDebugReportCallbackEXT callback, const VkAllocationCallbacks* pAllocator);
+	void _DestroyDebugUtilsMessengerEXT(VkInstance _instance, VkDebugUtilsMessengerEXT callback, const VkAllocationCallbacks* pAllocator);
 	// VK intialization steps:
 	void CreateInstance();
 	void SetupDebugCallback();
@@ -58,6 +62,12 @@ protected:
 		const char* layerPrefix,
 		const char* msg,
 		void* userData);
+
+	static VKAPI_ATTR VkBool32 VKAPI_CALL _DebugCallback2(
+		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+		VkDebugUtilsMessageTypeFlagsEXT messageType,
+		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+		void* pUserData);
 
 	static const std::vector<const char*> validationLayers;
 	static const std::vector<const char*> deviceExtensions;
@@ -96,14 +106,6 @@ public:
 	void GetObjectParams(const void * params);
 
 	void CloseWnd(GLFWwindow* window);
-
-
-	// bellow shoud not be used
-//	void AddShader(int wnd, const char *shader);
-//	DrawObjectInfo *AddMesh(int wnd, const char *object, const BAMS::RENDERINENGINE::VertexDescription *vd, const char *shader);
-//	DrawObjectInfo *GetModel(int wnd, const char *mesh, const char *shader);
-//	uint32_t AddObject(int wnd, DrawObjectInfo * model);
-
 
 	friend OutputWindow;
 };

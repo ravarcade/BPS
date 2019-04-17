@@ -11,24 +11,32 @@ class ResMesh : public ResoureImpl<ResMesh, RESID_MESH, Allocators::default, fal
 	ResourceBase *rb;
 	BAMS::RENDERINENGINE::VertexDescription vd;
 	U32 meshIdx;
+	U32 meshHash;
 	ResourceBase *meshSrc;
-
+	bool isVertexDescriptionDataSet;
 	void _LoadXML();
 	void _SaveXML();
 
 public:
-	ResMesh(ResourceBase *res) : rb(res), meshSrc(nullptr), meshIdx(-1) {
+	ResMesh(ResourceBase *res) : rb(res), meshSrc(nullptr), meshIdx(-1), meshHash(0), isVertexDescriptionDataSet(false) {
 		TRACE("[ResMesh]\n");
-		_LoadXML(); // XML is readed from manifest, so no need to load any file from disk
+		if (res->XML.size())
+			_LoadXML(); // XML is readed from manifest, so no need to load any file from disk
 	}
 	~ResMesh() {}
 
 	void Update(ResourceBase *res) {}
 	void Release(ResourceBase *res) {}
 
-	bool IsSame(BAMS::RENDERINENGINE::VertexDescription &_vd, ResourceBase *_meshSrc, U32 _meshIdx) { return _meshSrc == meshSrc && _meshIdx == meshIdx && _vd == vd; }
-	void SetVertexDescription(BAMS::RENDERINENGINE::VertexDescription &_vd, ResourceBase *_meshSrc, U32 _meshIdx) { vd = _vd; meshSrc = _meshSrc; meshIdx = _meshIdx; _SaveXML(); }
-	static STR BuildXML(BAMS::RENDERINENGINE::VertexDescription &_vd, ResourceBase *_meshSrc, U32 _meshIdx);
+	bool IsSame(BAMS::RENDERINENGINE::VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx) { return _meshSrc == meshSrc && _meshIdx == meshIdx && meshHash == _meshHash && *pvd == vd; }
+	void SetVertexDescription(BAMS::RENDERINENGINE::VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx) { vd = *pvd; meshHash = _meshHash; meshSrc = _meshSrc; meshIdx = _meshIdx; SetVertexDescriptionData(); _SaveXML(); }
+	BAMS::RENDERINENGINE::VertexDescription *GetVertexDescription();
+	static STR BuildXML(BAMS::RENDERINENGINE::VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx);
+	ResourceBase *GetMeshSrc() { return meshSrc; }
+	U32 GetMeshIdx() { return meshIdx; }
+	U32 GetMeshHash() { return meshHash; }
+	void SetMeshIdx(U32 idx) { meshIdx = idx; }
+	void SetVertexDescriptionData() { isVertexDescriptionDataSet = true; }
 };
 
 class ResImportModel : public ResoureImpl<ResImportModel, RESID_IMPORTMODEL, Allocators::default, false>

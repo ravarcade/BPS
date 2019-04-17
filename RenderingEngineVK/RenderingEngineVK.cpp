@@ -5,11 +5,10 @@
 #include "BAMEngine.h"
 
 using namespace BAMS;
+using namespace BAMS::RENDERINENGINE;
 
-BAMS::RENDERINENGINE::VertexDescription *GetDemoCube()
+VertexDescription *GetDemoCube()
 {
-	using namespace BAMS::RENDERINENGINE;
-
 	// demo cube
 	struct Vertex {
 		glm::vec3 pos;
@@ -65,13 +64,13 @@ void VkDoTests()
 		vert[i * 4 + 3] = float((i % 4) - 2);
 	}
 
-	Stream src((uint32_t)::BAMS::RENDERINENGINE::FLOAT_4D, 16, false);
+	Stream src((uint32_t)FLOAT_4D, 16, false);
 	src.m_data = vert;
-	Stream mi((uint32_t)::BAMS::RENDERINENGINE::INT_PACKED, 4, true);
+	Stream mi((uint32_t)INT_PACKED, 4, true);
 	mi.m_data = mid;
-	Stream ou((uint32_t)::BAMS::RENDERINENGINE::FLOAT_4D, 16, false);
+	Stream ou((uint32_t)FLOAT_4D, 16, false);
 	ou.m_data = out;
-	Stream mi2((uint32_t)::BAMS::RENDERINENGINE::INT_PACKED, 4, true);
+	Stream mi2((uint32_t)INT_PACKED, 4, true);
 	mi2.m_data = mid2;
 
 	cv.Convert(mi, src, 1024);

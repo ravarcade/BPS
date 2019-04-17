@@ -5,7 +5,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 
-
 OutputWindow::OutputWindow() :
 	instance(VK_NULL_HANDLE),
 	window(nullptr),
@@ -40,6 +39,9 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 	window = _window;
 	allocator = _allocator;
 
+	glfw.SetWindowUserPointer(window, this);
+	glfw.SetWindowSizeCallback(window, &OutputWindow::_OnWindowSize);
+
 	// ------------------------------------------------------------------------ create surface in output window
 	if (glfwCreateWindowSurface(instance, window, allocator, &surface) != VK_SUCCESS)
 		throw std::runtime_error("failed to create window surface!");
@@ -59,7 +61,7 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 		{
 			physicalDevice = device;
 			msaaSamples = ire::_GetMaxUsableSampleCount(physicalDevice);
-			//msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+//			msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 			break;
 		}
 	}
@@ -197,6 +199,11 @@ void OutputWindow::Close(GLFWwindow* wnd)
 	}
 }
 
+void OutputWindow::_OnWindowSize(GLFWwindow *wnd, int width, int height)
+{
+	auto *ow = reinterpret_cast<OutputWindow*>(glfw.GetWindowUserPointer(wnd));
+	ow->resizeWindow = true;
+}
 
 bool OutputWindow::_IsDeviceSuitable(VkPhysicalDevice device)
 {
@@ -336,6 +343,7 @@ bool OutputWindow::_CreateSwapChain()
 			throw std::runtime_error("failed to create framebuffer!");
 	}
 
+	resizeWindow = false;
 	return true;
 }
 
@@ -669,7 +677,7 @@ void OutputWindow::_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceS
 VkShaderModule OutputWindow::_CreateShaderModule(const char *shaderName)
 {
 	BAMS::CResourceManager rm;
-	auto code = rm.GetRawDataByName(shaderName);
+	auto code = rm.GetRawData(shaderName);
 	if (!code.IsLoaded())
 		rm.LoadSync();
 
@@ -698,6 +706,7 @@ void OutputWindow::_Cleanup()
 		_CleanupSharedUniform();
 		_CleanupSwapChain();
 		_CleanupRenderPass();
+
 		vkDestroy(descriptorPool);
 
 		vkDestroy(renderFinishedSemaphore);
@@ -789,16 +798,20 @@ void OutputWindow::_CreateDescriptorPool()
 		s = sh->GetDescriptorPoolsSize(pools);
 		++numShaderPrograms;
 	});
-	for (auto &x : pools)
-		x += 5;
-	numShaderPrograms += 5;
+
+	if (true)  // force add 5 descriptors to pool
+	{
+		for (auto &x : pools)
+			x += 5;
+		numShaderPrograms += 5;
+		s = static_cast<uint32_t>(pools.size());
+	}
 
 	std::vector<VkDescriptorPoolSize> poolSizes(s);
-	uint32_t idx = 0;
 	for (uint32_t i = 0; i < pools.size(); ++i) {
 		if (pools[i]) {
-			poolSizes[idx].type = static_cast<VkDescriptorType>(VK_DESCRIPTOR_TYPE_BEGIN_RANGE + i);
-			poolSizes[idx].descriptorCount = pools[i];
+			poolSizes[i].type = static_cast<VkDescriptorType>(VK_DESCRIPTOR_TYPE_BEGIN_RANGE + i);
+			poolSizes[i].descriptorCount = pools[i];
 		}
 	}
 
@@ -1001,7 +1014,9 @@ void OutputWindow::_CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBit
 
 void OutputWindow::_LoadShaderPrograms()
 {
+
 	_CreateDescriptorPool();                            // create descriptor pool for all used shader programs
+
 
 	shaders.foreach([&](CShaderProgram *&s) {
 		auto outputNames = s->GetOutputNames();			// select renderPass base on names of output attachments in fragment shader
@@ -1067,7 +1082,7 @@ void OutputWindow::_RecreateCommandBuffers()
 
 void OutputWindow::DrawFrame()
 {
-	if (!swapChain) {
+	if (!swapChain || resizeWindow) {
 		RecreateSwapChain();
 		return;
 	}
@@ -1225,6 +1240,13 @@ ObjectInfo * OutputWindow::AddObject(const char * name, const char * mesh, const
 	return ret;
 }
 
+
+bool OutputWindow::IsBufferFeatureSupported(VkFormat format, VkFormatFeatureFlagBits features)
+{
+	static VkFormatProperties pr;
+	vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &pr);
+	return pr.bufferFeatures & features;
+}
 
 /*
 DrawObjectInfo * OutputWindow::GetModel(const char *name)

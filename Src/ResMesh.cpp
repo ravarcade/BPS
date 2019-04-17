@@ -17,69 +17,75 @@ void ResMesh::_LoadXML()
 
 	auto r = xml.FirstChildElement("Mesh");
 	WSTR srcFileName;
-	srcFileName.UTF8(r->Attribute("Src"));
+	srcFileName.UTF8(r->Attribute("src"));
 	rm->AbsolutePath(srcFileName);
 	meshSrc = rm->GetByFilename(srcFileName, RESID_IMPORTMODEL);
-	meshIdx = r->IntAttribute("MeshIdx", 0);
+	meshIdx = r->IntAttribute("idx", 0);
+	meshHash = r->IntAttribute("hash", 0);
+	vd.m_numVertices = r->IntAttribute("vertices", 0);
+	vd.m_numIndices = r->IntAttribute("indices", 0);
 
 	// vd
-	r = r->FirstChildElement("VertexDescription");
 	auto xml2stream = [&](Stream &o, const char *streamName) {
 		auto s = r->FirstChildElement(streamName);
 		if (s)
 		{
-
-
 			o.m_type = s->IntAttribute("type", 0);
 			o.m_stride = s->IntAttribute("stride", 0);
 			o.m_normalized = s->BoolAttribute("normalized", false);
 		}
 	};
 
-	vd.m_numVertices = r->IntAttribute("numVertices", 0);
-	vd.m_numIndices = r->IntAttribute("numIndices", 0);
-	
+	auto xml2streamarray = [&](Stream *o, int num, const char *streamName) {
+		for (int i=0; i<num;++i)
+			xml2stream(o[i], streamName);
+	};
 
 #define XML2STREAM(x) xml2stream(vd.m_ ## x, #x);
+#define XML2STREAMARRAY(x) xml2streamarray(vd.m_ ## x, static_cast<int>(COUNT_OF(vd.m_ ## x)), #x);
+
 	XML2STREAM(vertices);
 	XML2STREAM(normals);
 	XML2STREAM(tangents);
 	XML2STREAM(bitangents);
-	XML2STREAM(colors[0]);
-	XML2STREAM(colors[1]);
-	XML2STREAM(colors[2]);
-	XML2STREAM(colors[3]);
-	XML2STREAM(textureCoords[0]);
-	XML2STREAM(textureCoords[1]);
-	XML2STREAM(textureCoords[2]);
-	XML2STREAM(textureCoords[3]);
-	XML2STREAM(boneWeights[0]);
-	XML2STREAM(boneWeights[1]);
-	XML2STREAM(boneIDs[0]);
-	XML2STREAM(boneIDs[1]);
+	XML2STREAMARRAY(colors);
+	XML2STREAMARRAY(textureCoords);
+	XML2STREAMARRAY(boneWeights);
+	XML2STREAMARRAY(boneIDs);
+	XML2STREAM(indices);
 
 }
 
-void ResMesh::_SaveXML() { rb->XML = BuildXML(vd, meshSrc, meshIdx); }
+void ResMesh::_SaveXML() { rb->XML = BuildXML(&vd, meshHash, meshSrc, meshIdx); rb->SetTimestamp(); }
 
-STR ResMesh::BuildXML(BAMS::RENDERINENGINE::VertexDescription &_vd, ResourceBase * _meshSrc, U32 _meshIdx)
+BAMS::RENDERINENGINE::VertexDescription * ResMesh::GetVertexDescription()
+{
+	if (!isVertexDescriptionDataSet)
+	{
+		SetVertexDescriptionData(); // Next line will set VD data. We set it now, because Import Module will call GetVertexDescription and we don't want infinite loop.
+		CEngine::SendMsg(IMPORTMODEL_LOADMESH, IMPORT_MODULE, 0, rb);
+	}
+
+	return &vd;
+}
+
+STR ResMesh::BuildXML(BAMS::RENDERINENGINE::VertexDescription *pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
 {
 	using tinyxml2::XMLPrinter;
 	using tinyxml2::XMLDocument;
 
 	auto &rm = globalResourceManager;
 	XMLDocument out;
-	auto *root = out.NewElement("Mesh");
+	auto *r = out.NewElement("Mesh");
 	STR cvt;
 	WSTR msf = _meshSrc->Path;
 	rm->RelativePath(msf);
 	cvt.UTF8(msf);
-	root->SetAttribute("Src", cvt.c_str());
-	root->SetAttribute("MeshIdx", _meshIdx);
-	auto r = out.NewElement("VertexDescription");
-
-	r->SetAttribute("numVertices", _vd.m_numVertices);
-	r->SetAttribute("numIndices", _vd.m_numIndices);
+	r->SetAttribute("src", cvt.c_str());
+	r->SetAttribute("idx", _meshIdx);
+	r->SetAttribute("hash", _meshHash);
+	r->SetAttribute("vertices", pvd->m_numVertices);
+	r->SetAttribute("indices", pvd->m_numIndices);
 	auto stream2xml = [&](Stream &s, const char *streamName) {
 		if (s.isUsed())
 		{
@@ -91,26 +97,26 @@ STR ResMesh::BuildXML(BAMS::RENDERINENGINE::VertexDescription &_vd, ResourceBase
 		}
 	};
 
-#define STREAM2XML(x) stream2xml(_vd.m_ ## x, #x);
+	auto streamarray2xml = [&](Stream *s, int num, const char *streamName) {
+		for (int i = 0; i < num; ++i)
+			stream2xml(s[i], streamName);
+	};
+
+
+#define STREAM2XML(x) stream2xml(pvd->m_ ## x, #x);
+#define STREAMARRAY2XML(x) streamarray2xml(pvd->m_ ## x, static_cast<int>(COUNT_OF(pvd->m_ ## x)), #x);
+
 	STREAM2XML(vertices);
 	STREAM2XML(normals);
 	STREAM2XML(tangents);
 	STREAM2XML(bitangents);
-	STREAM2XML(colors[0]);
-	STREAM2XML(colors[1]);
-	STREAM2XML(colors[2]);
-	STREAM2XML(colors[3]);
-	STREAM2XML(textureCoords[0]);
-	STREAM2XML(textureCoords[1]);
-	STREAM2XML(textureCoords[2]);
-	STREAM2XML(textureCoords[3]);
-	STREAM2XML(boneWeights[0]);
-	STREAM2XML(boneWeights[1]);
-	STREAM2XML(boneIDs[0]);
-	STREAM2XML(boneIDs[1]);
+	STREAMARRAY2XML(colors);
+	STREAMARRAY2XML(textureCoords);
+	STREAMARRAY2XML(boneWeights);
+	STREAMARRAY2XML(boneIDs);
+	STREAM2XML(indices);
 
-	root->InsertEndChild(r);
-	out.InsertFirstChild(root);
+	out.InsertFirstChild(r);
 	XMLPrinter prn;
 	out.Print(&prn);
 

@@ -105,6 +105,17 @@ void ResourceBase::Init(CWSTR path)
 	Name = STR(pBegin, pEnd);
 }
 
+void ResourceBase::Init(CSTR name)
+{
+	_resourceData = nullptr;
+	_resourceSize = 0;
+	_isLoaded = false;
+	_refCounter = 0;
+	// we do nothing with Path, by default it is empty
+	Name = name;
+	Tools::CreateUUID(UID);
+}
+
 // ============================================================================ ResourceFactoryChain ===
 
 ResourceFactoryChain * ResourceFactoryChain::First = nullptr;
@@ -200,6 +211,17 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		res->Init(path);
 		MakeNameUniq(res);
 		_resources.push_back(res);
+		return res;
+	}
+
+	ResourceBase *AddResource(CSTR resName, U32 type)
+	{
+		auto res = make_new<ResourceBase>();
+		res->Init(resName);
+		res->Type = type;
+		MakeNameUniq(res);
+		_resources.push_back(res);
+		CreateResourceImplementation(res);
 		return res;
 	}
 
@@ -346,6 +368,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		Tools::NormalizePath(_rootDir);
 		LoadManifest();
 		ScanRootdir();
+		CEngine::SendMsg(RESOURCE_MANIFEST_PARSED);
 		ProcessUnknownResources();
 	}
 
@@ -673,6 +696,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			entry->SetAttribute("UID", uidbuf);
 			entry->SetAttribute("Size", (I64)res->_resourceSize);
 			entry->SetAttribute("Path", cvt.c_str());
+			entry->SetText(res->XML.c_str());
 			rm->InsertEndChild(entry);
 		}
 
@@ -688,6 +712,9 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 	void AbsolutePath(WSTR & filename, const WSTR *root = nullptr)
 	{
+		if (!filename.size())
+			return;
+
 		if (!root)
 			root = &_rootDir;
 
@@ -705,7 +732,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 				filename = (*root) + Tools::wDirectorySeparator + filename;
 		}
 
-		return Tools::NormalizePath(filename);
+		Tools::NormalizePath(filename);
 	}
 
 	void RelativePath(WSTR &filename, const WSTR *root)
@@ -816,7 +843,7 @@ ResourceBase * ResourceManager::Get(const STR & resName, U32 typeId)
 	if (!ret)
 	{
 		ret = make_new<ResourceBase>();
-		ret->Name = resName;
+		ret->Init(resName.c_str());
 		ret->Type = typeId;
 		_data->AddResource(ret);
 	}
@@ -861,6 +888,7 @@ ResourceBase * ResourceManager::Get(const UUID & resUID)
 void ResourceManager::LoadSync(ResourceBase *res) { _data->LoadEverything(res); }
 void ResourceManager::RefreshResorceFileInfo(ResourceBase *res) { _data->RefreshResorceFileInfo(res); }
 ResourceBase *ResourceManager::Add(CWSTR path) { return _data->AddResource(path); }
+ResourceBase *ResourceManager::Add(CSTR resName, U32 type) { return _data->AddResource(resName, type); }
 void ResourceManager::CreateResourceImplementation(ResourceBase *res) { _data->CreateResourceImplementation(res); }
 void ResourceManager::AddDir(CWSTR path) { _data->AddDirToMonitor(path, 0); }
 void ResourceManager::RootDir(CWSTR path) { _data->RootDir(path); }

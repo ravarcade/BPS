@@ -5,6 +5,7 @@ VisualStudioVersion = 15.0.26430.6
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestingTool", "TestingTool\TestingTool.vcxproj", "{2B7AA103-06B9-4A4C-B97C-747D19CE71A9}"
 	ProjectSection(ProjectDependencies) = postProject
+		{AA875634-3828-41D8-82B2-90EFAA85EF3C} = {AA875634-3828-41D8-82B2-90EFAA85EF3C}
 		{906F9B77-F39E-4D64-ABF6-A4E5840077BB} = {906F9B77-F39E-4D64-ABF6-A4E5840077BB}
 		{0986E2E6-C949-4496-8D00-DC01AE7A61CD} = {0986E2E6-C949-4496-8D00-DC01AE7A61CD}
 	EndProjectSection
@@ -12,8 +13,14 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BAMEngine", "BAMEngine\BAMEngine.vcxproj", "{0986E2E6-C949-4496-8D00-DC01AE7A61CD}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RenderingEngineVK", "RenderingEngineVK\RenderingEngineVK.vcxproj", "{906F9B77-F39E-4D64-ABF6-A4E5840077BB}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0986E2E6-C949-4496-8D00-DC01AE7A61CD} = {0986E2E6-C949-4496-8D00-DC01AE7A61CD}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImportModule", "ImportModule\ImportModule.vcxproj", "{AA875634-3828-41D8-82B2-90EFAA85EF3C}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0986E2E6-C949-4496-8D00-DC01AE7A61CD} = {0986E2E6-C949-4496-8D00-DC01AE7A61CD}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

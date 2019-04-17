@@ -213,6 +213,7 @@
     <ClCompile Include="..\Src\Core_Engine.cpp" />
     <ClCompile Include="..\Src\Core_MemoryAllocator.cpp" />
     <ClCompile Include="..\Src\Core_Module.cpp" />
+    <ClCompile Include="..\Src\RenderingEngine_VertexDescription.cpp" />
     <ClCompile Include="..\Src\ResMesh.cpp" />
     <ClCompile Include="..\Src\ResourceManager.cpp" />
     <ClCompile Include="..\Src\Core_Tools.cpp" />

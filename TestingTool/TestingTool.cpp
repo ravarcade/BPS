@@ -213,7 +213,12 @@ void SetObjParams(Properties *pprop, int num)
 
 	uint32_t i = num;
 	int pos = ((i & 1) ? 1 : -1) * ((i + 1) & 0xfffe);
-	glm::mat4 model = glm::rotate(glm::translate(glm::mat4(1.0f), glm::vec3(pos, 0, 0)), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	static float s = 0.02f;
+	glm::mat4 I(1.0f);
+	auto S = glm::scale(I, glm::vec3(s));
+	auto R = glm::rotate(I, time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	auto T = glm::translate(I, glm::vec3(pos, 0, 0));
+	auto model = T * R * S;
 	
 	memcpy_s(m.val, 16 * sizeof(float), &model[0][0], 16 * sizeof(float));
 
@@ -221,8 +226,8 @@ void SetObjParams(Properties *pprop, int num)
 
 void AddToWnd(BAMS::CEngine &en, int wnd, int i)
 {
-	static PADD_MESH c0 = { 0, "realcubename", "cube", "cube" };
-	static PADD_MESH c1 = { 0, "cubename", "cube", "default" };
+	static PADD_MESH c0 = { 0, "realcubename", "Mesh_1", "cube" };
+	static PADD_MESH c1 = { 0, "cubename", "Mesh_1", "default" };
 	uint32_t oid = -1;
 	Properties *pprop = nullptr;
 	PADD_MESH *obj = i == 0 ? &c0 : &c1;
@@ -303,8 +308,6 @@ int main()
 	{
 		BAMS::CEngine en;
 
-		BAMS::RENDERINENGINE::VertexDescription vd;
-
 
 		BAMS::DoTests();
 			BAMS::CResourceManager rm;
@@ -312,6 +315,9 @@ int main()
 			rm.LoadSync();
 			en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w0, sizeof(w0));
 
+
+			CMesh m1 = rm.Find("Mesh_1", RESID_MESH);
+			auto vd = m1.GetVertexDescription();
 			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 			
 			// default shader program ... not needed any more
@@ -319,7 +325,7 @@ int main()
 //			s.AddProgram(L"/Shaders/default.vert.glsl");
 //			s.AddProgram(L"/Shaders/default.frag.glsl");
 
-			auto r = rm.GetRawDataByName("ReadMe");
+			auto r = rm.GetRawData("ReadMe");
 			printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
 			rm.LoadSync();
 			printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
@@ -329,12 +335,12 @@ int main()
 			auto rdata = r.GetData();
 			auto rsize = r.GetSize();
 
-			auto res = rm.FindByName("ReadMe");
+			CResource res = rm.Find("ReadMe");
 			auto uid = res.GetUID();
 			auto path = res.GetPath();
 			auto name = res.GetName();
 
-			auto rr = rm.GetRawDataByUID(uid);
+			auto rr = rm.GetRawData(uid);
 			uid = rr.GetUID();
 			path = rr.GetPath();
 			name = rr.GetName();
@@ -356,7 +362,7 @@ int main()
 				wprintf(L", \"%s\"\n", r.GetPath());
 				if (r.IsLoadable())
 				{
-					auto rd = rm.GetRawDataByName(r.GetName());
+					auto rd = rm.GetRawData(r.GetName());
 					auto rdata = rd.GetData();
 					auto rsize = rd.GetSize();
 					if (rsize > 32)

@@ -155,6 +155,16 @@ struct hash<const char *>
 	}
 };
 
+template<>
+struct hash<const wchar_t *>
+{
+	U32 operator() (const wchar_t *key)
+	{
+		return JSHash(reinterpret_cast<const U8*>(key), wcslen(key)*sizeof(wchar_t));
+	}
+};
+
+
 // --------------------------------------------------------------------------------------
 
 template<typename K>

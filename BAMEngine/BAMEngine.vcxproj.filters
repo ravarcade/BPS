@@ -181,5 +181,8 @@
     <ClCompile Include="..\Src\ResMesh.cpp">
       <Filter>ResourceManager</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\RenderingEngine_VertexDescription.cpp">
+      <Filter>RenderingEngine</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

@@ -62,7 +62,6 @@ void CShaderProgram::SetRenderPassAndMsaaSamples(VkRenderPass renderPass, VkSamp
 VkPipeline CShaderProgram::CreateGraphicsPipeline()
 {
 	vk->vkDestroy(m_graphicsPipeline); // delete graphicsPipline if it exist
-//	m_graphicsPipeline = nullptr;
 
 	auto shaderStages = _Compile();
 	auto vertexInputInfo = _GetVertexInputInfo();
@@ -93,8 +92,18 @@ VkPipeline CShaderProgram::CreateGraphicsPipeline()
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
 	pipelineInfo.basePipelineIndex = -1; // Optional
 
+#ifdef _DEBUG
+	for (uint32_t i = 0; i < pipelineInfo.pVertexInputState->vertexAttributeDescriptionCount; ++i)
+	{
+		if (!vk->IsBufferFeatureSupported(pipelineInfo.pVertexInputState->pVertexAttributeDescriptions[i].format, VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT))
+		{
+			throw std::runtime_error("Failed to create graphics pipeline! Attrib vertex fromat is not supported.");
+		}
+	}
+#endif
+
 	if (vkCreateGraphicsPipelines(vk->device, VK_NULL_HANDLE, 1, &pipelineInfo, vk->allocator, &m_graphicsPipeline) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create graphics pipeline!");
+		throw std::runtime_error("Failed to create graphics pipeline!");
 	}
 	// some cleanups
 	for (auto shaderStage : shaderStages)
@@ -450,12 +459,19 @@ void CShaderProgram::_CreateNewBufferSet(uint32_t numVertices, uint32_t numIndec
 	m_bufferSets.emplace_back(set);
 }
 
-BAMS::RENDERINENGINE::VertexDescription *GetDemoCube();
+VertexDescription *GetDemoCube();
 
-
-BAMS::RENDERINENGINE::VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
+VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
 {
 	// TODO: Load mesh from resources
+	BAMS::CResourceManager rm;
+	if (auto res = rm.Find(name, RESID_MESH))
+	{
+		CMesh m(res);
+		auto pvd = reinterpret_cast<VertexDescription*>(m.GetVertexDescription());
+		if (pvd)
+			return pvd;
+	}
 	return GetDemoCube();
 }
 

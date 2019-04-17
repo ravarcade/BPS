@@ -3,19 +3,22 @@
 
 NAMESPACE_BAMS_BEGIN
 using namespace CORE;
+using namespace RENDERINENGINE;
 
 extern "C" {
-
+	static STR *pRetStrHelper;
 
 	BAMS_EXPORT void Initialize()
 	{
 		setlocale(LC_CTYPE, "");
 		RegisteredClasses::Initialize();
 		IEngine::Initialize();
+		pRetStrHelper = new STR();
 	}
 
 	BAMS_EXPORT void Finalize()
 	{
+		delete pRetStrHelper;
 		IEngine::Finalize();
 		RegisteredClasses::Finalize();
 	}
@@ -78,6 +81,14 @@ extern "C" {
 	{
 		auto *rb = reinterpret_cast<ResourceBase *>(res);
 		return rb ? rb->isLoadable() : false;
+	}
+
+	BAMS_EXPORT const char *IResource_GetXML(IResource *res, uint32_t *pSize)
+	{
+		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		if (pSize)
+			*pSize = rb->XML.size();
+		return rb->XML.c_str();
 	}
 	// =========================================================================== RawData
 
@@ -144,19 +155,48 @@ extern "C" {
 		return rb->GetBinary(idx);
 	}
 
-	BAMS_EXPORT void IMesh_SetVertexDescription(IMesh * res, IVertexDescription * _vd, IResource * _meshSrc, U32 _meshIdx)
+	BAMS_EXPORT void IMesh_SetVertexDescription(IMesh * res, IVertexDescription * vd, uint32_t meshHash, IResource * meshSrc, U32 meshIdx)
 	{
-		auto &vd = *reinterpret_cast<BAMS::RENDERINENGINE::VertexDescription *>(_vd);
+		auto pvd = reinterpret_cast<VertexDescription *>(vd);
 		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		rb->SetVertexDescription(vd, reinterpret_cast<ResourceBase *>(_meshSrc), _meshIdx);
+		rb->SetVertexDescription(pvd, meshHash, reinterpret_cast<ResourceBase *>(meshSrc), meshIdx);
 	}
 
-	BAMS_EXPORT const char * IMesh_BuildXML(IVertexDescription * _vd, IResource * _meshSrc, U32 _meshIdx)
+	BAMS_EXPORT IVertexDescription *IMesh_GetVertexDescription(IMesh * res)
 	{
-		static STR xml;
-		auto &vd = *reinterpret_cast<BAMS::RENDERINENGINE::VertexDescription *>(_vd);
-		xml = ResMesh::BuildXML(vd, reinterpret_cast<ResourceBase *>(_meshSrc), _meshIdx);
-		return xml.c_str();
+		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return rb->GetVertexDescription();
+	}
+
+	BAMS_EXPORT IResource * IMesh_GetMeshSrc(IMesh * res)
+	{
+		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return rb->GetMeshSrc();
+	}
+
+	BAMS_EXPORT uint32_t IMesh_GetMeshIdx(IMesh * res)
+	{
+		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return rb->GetMeshIdx();
+	}
+
+	BAMS_EXPORT void IMesh_SetMeshIdx(IMesh * res, uint32_t idx)
+	{
+		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		rb->SetMeshIdx(idx);
+	}
+
+	BAMS_EXPORT uint32_t IMesh_GetMeshHash(IMesh * res)
+	{
+		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return rb->GetMeshHash();
+	}
+
+	BAMS_EXPORT const char * IMesh_BuildXML(IVertexDescription * vd, uint32_t meshHash, IResource * meshSrc, U32 meshIdx)
+	{
+		auto pvd = reinterpret_cast<VertexDescription *>(vd);
+		*pRetStrHelper = ResMesh::BuildXML(pvd, meshHash, reinterpret_cast<ResourceBase *>(meshSrc), meshIdx);
+		return pRetStrHelper->c_str();
 	}
 
 	// =========================================================================== ResourceManager
@@ -177,6 +217,12 @@ extern "C" {
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
 		return resm->Add(path);
+	}
+
+	BAMS_EXPORT IResource *IResourceManager_AddResourceWithoutFile(IResourceManager *rm, const char *resName, uint32_t type)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		return resm->Add(resName, type);
 	}
 
 	BAMS_EXPORT void IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path)

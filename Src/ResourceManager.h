@@ -173,6 +173,7 @@ public:
 	};
 
 	void Init(CWSTR path);
+	void Init(CSTR name);
 
 	void ResourceLoad(void *data, SIZE_T size = -1) 
 	{
@@ -191,6 +192,7 @@ public:
 	void *GetData() { return _resourceData; }
 	SIZE_T GetSize() { return _resourceSize; }
 	time_t GetTimestamp() { return _resourceTimestamp; }
+	void SetTimestamp() { time(_resourceTimestamp); }
 	ResourceImplementationInterface *GetImplementation() { return _resourceImplementation; }
 
 	void AddRef() { ++_refCounter; }
@@ -286,6 +288,8 @@ public:
 	ResourceBase *Get(CSTR resName) { return Get(resName, T::GetTypeId()); }
 
 	ResourceBase *Add(CWSTR path);
+	ResourceBase *Add(CSTR resName, U32 type = 0);
+
 	void AddDir(CWSTR path);
 	void RootDir(CWSTR path);
 

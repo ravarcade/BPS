@@ -172,52 +172,86 @@ public:
 };
 
 
-template <typename T>
-struct CStringStructHastable
+template <typename K, typename T>
+class cstringhastable
 {
-	IMemoryAllocator *alloc;
-	BAMS::CORE::hashtable<const char *, T *> ht;
+	template<typename X>
+	typename std::enable_if<std::is_trivially_destructible<X>::value == false>::type
+		deleteObjects()
+	{
+		ht.foreach([&](T *o) {
+			o->~T();
+		});
+	}
 
-	CStringStructHastable()
+	template<typename X>
+	typename std::enable_if<std::is_trivially_destructible<X>::value == true>::type
+		deleteObjects()
+	{
+		// Trivially destructible objects can be reused without using the destructor.
+	}
+
+public:
+	IMemoryAllocator *alloc;
+	BAMS::CORE::hashtable<const K *, T *> ht;
+
+	cstringhastable()
 	{
 		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);
 	}
 
-	~CStringStructHastable()
+	~cstringhastable()
 	{
+		deleteObjects<T>();
 		delete alloc;
 	}
 
 	void clear()
 	{
+		deleteObjects<T>();                                                     // call destructors of objects if needed
 		ht.clear();                                                             // clear hashtable data
 		delete alloc;                                                           // delete allocated memory for strings (all at once)
 		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);  // create new allocator for strings (with empty buffer)
 	}
 
-	T * find(const char *s) { auto pv = ht.find(s); return pv ? *pv : nullptr; }
+	T * find(const K *s) { auto p = ht.find(s); return p ? *p : nullptr; }
 
-	T * add(const char *s)
+	SIZE_T keyLength(const char *s) { return strlen(s)+1; }
+	SIZE_T keyLength(const wchar_t *s) { return (wcslen(s) + 1) * sizeof(wchar_t); }
+
+	template<class... Args>
+	T * add(const K *s, Args &&...args)
 	{
 		auto h = ht.getHash(s);
 		auto pV = ht.find(s, h);
 		if (!pV)
 		{
-			SIZE_T l = strlen(s) + 1;
-			char *newS = static_cast<char *>(alloc->allocate(l));
-			T *pT = static_cast<T *>(alloc->allocate(sizeof(T)));
+			SIZE_T l = keyLength(s);
+			K *newS = static_cast<K *>(alloc->allocate(l));
 			memcpy_s(newS, l, s, l);
 			s = newS;
 			pV = ht.add(s, h);
-			*pV = pT;
+			*pV = new (alloc->allocate(sizeof(T))) T(std::forward<Args>(args)...);
 		}
 		return *pV;
+	}
+
+	T & operator[] (const K *s)
+	{
+		return *add(s);
 	}
 
 	template<typename Callback>
 	void foreach(Callback &f) { ht.foreach(f); }
 };
 
+template<typename T>
+using CStringHastable = cstringhastable<char, T> ;
+
+template<typename T>
+using CWStringHastable = cstringhastable<wchar_t, T>;
+
+/*
 template <typename T>
 class CStringHastable
 {
@@ -287,3 +321,74 @@ public:
 	template<typename Callback>
 	void foreach(Callback &f) { ht.foreach(f); }
 };
+
+template <typename T>
+class CWStringHastable
+{
+	template<typename X>
+	typename std::enable_if<std::is_trivially_destructible<X>::value == false>::type
+		deleteObjects()
+	{
+		ht.foreach([&](T *o) {
+			o->~T();
+		});
+	}
+
+	template<typename X>
+	typename std::enable_if<std::is_trivially_destructible<X>::value == true>::type
+		deleteObjects()
+	{
+		// Trivially destructible objects can be reused without using the destructor.
+	}
+
+public:
+	IMemoryAllocator *alloc;
+	BAMS::CORE::hashtable<const wchar_t *, T *> ht;
+
+	CWStringHastable()
+	{
+		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);
+	}
+
+	~CWStringHastable()
+	{
+		deleteObjects<T>();
+		delete alloc;
+	}
+
+	void clear()
+	{
+		deleteObjects<T>();                                                     // call destructors of objects if needed
+		ht.clear();                                                             // clear hashtable data
+		delete alloc;                                                           // delete allocated memory for strings (all at once)
+		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);  // create new allocator for strings (with empty buffer)
+	}
+
+	T * find(const wchar_t *s) { auto p = ht.find(s); return p ? *p : nullptr; }
+
+	template<class... Args>
+	T * add(const wchar_t *s, Args &&...args)
+	{
+		auto h = ht.getHash(s);
+		auto pV = ht.find(s, h);
+		if (!pV)
+		{
+			SIZE_T l = (wcslen(s) + 1) * sizeof(wchar_t);
+			wchar_t *newS = static_cast<wchar_t *>(alloc->allocate(l));
+			memcpy_s(newS, l, s, l);
+			s = newS;
+			pV = ht.add(s, h);
+			*pV = new (alloc->allocate(sizeof(T))) T(std::forward<Args>(args)...);
+		}
+		return *pV;
+	}
+
+	T & operator[] (const wchar_t *s)
+	{
+		return *add(s);
+	}
+
+	template<typename Callback>
+	void foreach(Callback &f) { ht.foreach(f); }
+};
+/**/

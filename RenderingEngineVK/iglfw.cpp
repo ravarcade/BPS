@@ -81,5 +81,19 @@ void iglfw::GetWndSize(GLFWwindow *wnd, int *width, int *height)
 	glfwGetWindowSize(wnd, width, height);
 }
 
+void iglfw::SetWindowSizeCallback(GLFWwindow *wnd, void(*OnWindowResizeCallback)(GLFWwindow *wnd, int width, int height))
+{
+	glfwSetWindowSizeCallback(wnd, OnWindowResizeCallback);
+}
+
+void *iglfw::GetWindowUserPointer(GLFWwindow *wnd)
+{
+	return glfwGetWindowUserPointer(wnd);
+}
+
+void iglfw::SetWindowUserPointer(GLFWwindow *wnd, void *userPointer)
+{
+	glfwSetWindowUserPointer(wnd, userPointer);
+}
 
 iglfw glfw;

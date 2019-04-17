@@ -1,8 +1,17 @@
 #include "stdafx.h"
 
 AssImp_Loader::AssImp_Loader() :
+	_isLoaded(false),
+	_meshBinData(nullptr),
 	minTex(0), maxTex(0)
 {
+}
+
+AssImp_Loader::~AssImp_Loader()
+{
+	if (_meshBinData)
+		delete _meshBinData;
+	_meshBinDataSize = 0;
 }
 
 void AssImp_Loader::PreLoad(const wchar_t * filename, const char * name, Assimp::IOSystem * io, bool importMaterials)
@@ -20,8 +29,9 @@ void AssImp_Loader::PreLoad(const wchar_t * filename, const char * name, Assimp:
 	if (_pScene)
 	{
 		ProcessScene();
-		_aii.FreeScene();
+		//_aii.FreeScene();
 	}
+	_isLoaded = true;
 }
 
 void AssImp_Loader::PreLoad(const uint8_t * pBuffer, size_t length, const char * name, Assimp::IOSystem * io, bool importMaterials)
@@ -35,8 +45,9 @@ void AssImp_Loader::PreLoad(const uint8_t * pBuffer, size_t length, const char *
 	if (_pScene)
 	{
 		ProcessScene();
-		_aii.FreeScene();
+		//aii.FreeScene();
 	}
+	_isLoaded = true;
 }
 
 void AssImp_Loader::LoadBones()
@@ -46,8 +57,8 @@ void AssImp_Loader::LoadBones()
 
 void AssImp_Loader::AddMesh_broken(aiMesh *mesh)
 {
-	_meshes.push_back(VertexDescription());
-	VertexDescription &vd = *_meshes.rbegin();
+	_meshes.push_back(ImportedMesh());
+	VertexDescription &vd = _meshes.rbegin()->vd;
 
 	vd.m_numVertices = mesh->mNumVertices;
 	vd.m_vertices = Stream(&mesh->mVertices[0][0]);
@@ -275,20 +286,74 @@ void AssImp_Loader::AddMesh_broken(aiMesh *mesh)
 
 using namespace BAMS::CORE;
 
+U32 JSHash(Stream &s, U32 numVert, U32 hash = 0)
+{
+	U16 l = Stream::typeOptimalStride[s.m_type];
+	if (l == s.m_stride)
+	{
+		return JSHash(reinterpret_cast<U8*>(s.m_data), l*numVert, hash);
+	}
+
+	U8 *p = reinterpret_cast<U8*>(s.m_data);
+	for (U32 i = 0; i < numVert; ++i) 
+	{
+		hash = JSHash(p, l, hash);
+		p += s.m_stride;
+	}
+	return hash;
+}
+
+U32 AssImp_Loader::_JSHash(VertexDescription &vd, U32 hash)
+{
+	auto hashStream = [&](Stream &s) {
+		if (s.isUsed())
+			hash = JSHash(s, vd.m_numVertices, hash);
+	};
+
+	hashStream(vd.m_vertices);
+	hashStream(vd.m_normals);
+	hashStream(vd.m_tangents);
+	hashStream(vd.m_bitangents);
+	for (auto s : vd.m_textureCoords)
+		hashStream(s);
+	for (auto s : vd.m_colors)
+		hashStream(s);
+	for (auto s : vd.m_boneIDs)
+		hashStream(s);
+	for (auto s : vd.m_boneWeights)
+		hashStream(s);
+
+	// indices...
+	if (vd.m_indices.m_type == IDX_UINT32_1D)
+	{
+		auto *p = reinterpret_cast<U8*>(&u32_indicesData[reinterpret_cast<U64>(vd.m_indices.m_data)]);
+		hash = JSHash(p, vd.m_numIndices * sizeof(U32), hash);
+	}
+	if (vd.m_indices.m_type == IDX_UINT16_1D)
+	{
+		auto *p = reinterpret_cast<U8*>(&u16_indicesData[reinterpret_cast<U64>(vd.m_indices.m_data)]);
+		hash = JSHash(p, vd.m_numIndices * sizeof(U16), hash);
+	}
+	return hash;
+}
+
 void AssImp_Loader::AddMesh(aiMesh *mesh)
 {
-	_meshes.push_back(VertexDescription());
-	VertexDescription &vd = *_meshes.rbegin();
+	_meshes.push_back(ImportedMesh());
+	auto &m = *_meshes.rbegin();
+	VertexDescription &vd = m.vd;
+	m.match = false;
 
 	vd.m_numVertices = mesh->mNumVertices;
-	vd.m_vertices = Stream(FLOAT_3D, 3 * sizeof(F32), false);
+	vd.m_vertices = Stream(&mesh->mVertices[0][0]);
 
 	if (mesh->HasNormals())
-		vd.m_normals = Stream(FLOAT_3D, 3 * sizeof(F32), false);
+		vd.m_normals = Stream(&mesh->mNormals[0][0]);
 
-	if (mesh->HasTangentsAndBitangents()) {
-		vd.m_tangents = Stream(FLOAT_3D, 3 * sizeof(F32), false);
-		vd.m_bitangents = Stream(FLOAT_3D, 3 * sizeof(F32), false);
+	if (mesh->HasTangentsAndBitangents()) 
+	{
+		vd.m_tangents = Stream(&mesh->mTangents[0][0]);
+		vd.m_bitangents = Stream(&mesh->mBitangents[0][0]);
 	}
 
 	for (int i = 0; i < COUNT_OF(vd.m_colors); ++i)
@@ -307,7 +372,8 @@ void AssImp_Loader::AddMesh(aiMesh *mesh)
 					}
 				}
 			}
-			vd.m_colors[i] = Stream(FLOAT_4D, 4 * sizeof(F32), normalized);
+			vd.m_colors[i] = Stream(&mesh->mColors[i][0][0], 4);
+			vd.m_colors[i].m_normalized = normalized;
 		}
 	}
 
@@ -327,17 +393,16 @@ void AssImp_Loader::AddMesh(aiMesh *mesh)
 					}
 				}
 			}
-			auto n = mesh->mNumUVComponents[i];
-			vd.m_textureCoords[i] = Stream(FLOAT_1D - 1 + n, static_cast<U16>(n * sizeof(F32)), normalized);
+			vd.m_textureCoords[i] = Stream(&mesh->mTextureCoords[i][0][0], mesh->mNumUVComponents[i], sizeof(mesh->mTextureCoords[i][0][0]) * 3);
+			vd.m_textureCoords[i].m_normalized = normalized;
 		}
 	}
-
 	if (mesh->HasFaces())
 	{
 		uint32_t faces = 0;
 		bool uint16IsFine = true;
 		const int MAX_UINT16 = 0xffff;
-
+		SIZE_T l = 3 * sizeof(U32);
 		for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
 		{
 			if (mesh->mFaces[i].mNumIndices == 3)
@@ -356,12 +421,41 @@ void AssImp_Loader::AddMesh(aiMesh *mesh)
 		if (faces)
 		{
 			vd.m_numIndices = faces * 3;
+
 			if (uint16IsFine)
-				vd.m_indices = Stream(IDX_UINT16_1D, sizeof(U16), false);
-			else
-				vd.m_indices = Stream(IDX_UINT32_1D, sizeof(U32), false);
+			{
+				auto first = u16_indicesData.size();
+				u16_indicesData.resize(first+faces * 3);
+				U16 *p = &u16_indicesData[first];
+
+				vd.m_indices = Stream(reinterpret_cast<U16*>(first), 0); // it is index, so len = 0
+				for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
+				{
+					if (mesh->mFaces[i].mNumIndices != 3)
+						continue;
+					*p++ = (UINT16)mesh->mFaces[i].mIndices[0];
+					*p++ = (UINT16)mesh->mFaces[i].mIndices[1];
+					*p++ = (UINT16)mesh->mFaces[i].mIndices[2];
+				}
+			}
+			else {
+				auto first = u32_indicesData.size();
+				u32_indicesData.resize(first+faces * 3);
+				U32 *p = &u32_indicesData[first];
+
+				vd.m_indices = Stream(reinterpret_cast<U32*>(first), 0); // it is index, so len = 0
+				for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
+				{
+					if (mesh->mFaces[i].mNumIndices != 3)
+						continue;
+					*p++ = mesh->mFaces[i].mIndices[0];
+					*p++ = mesh->mFaces[i].mIndices[1];
+					*p++ = mesh->mFaces[i].mIndices[2];
+				}
+			}
 		} // if (faces) 
 	} // if (mesh->HasFaces()) 
+	m.hash = _JSHash(vd);
 
 	/*
 	if (mesh->HasBones())
@@ -558,6 +652,14 @@ void AssImp_Loader::LoadMeshes()
 		*/
 		++validMeshID;
 	}
+
+	// second pass to fill correct pointer to indeces
+	for (auto &m : _meshes)
+	{
+		auto &i = m.vd.m_indices;
+		i.m_data = i.m_type == IDX_UINT32_1D ? (void *)&u32_indicesData[reinterpret_cast<U64>(i.m_data)] : (void *)&u16_indicesData[reinterpret_cast<U64>(i.m_data)];
+	}
+
 }
 
 void AssImp_Loader::LoadAnims()
@@ -578,4 +680,26 @@ void AssImp_Loader::ProcessScene()
 	LoadBones();
 	LoadMeshes();
 	LoadAnims();
+	_OptimizeMeshStorage();
+}
+
+void AssImp_Loader::_OptimizeMeshStorage()
+{
+	/* pass 1:
+	 * Calc size of bin data and optimized VertexDescrition structs
+	 */
+
+	auto o = BAMS::RENDERINENGINE::GetOptimize();
+	_meshBinDataSize = 0;
+	for (auto m : _meshes)
+	{
+		auto vd = o->OptimizeVertexDescription(m.vd);
+		_meshBinDataSize += vd.GetStride() * vd.m_numVertices;
+
+		TRACE(m.vd.GetStride() << " => " << vd.GetStride() << "\n");
+	}
+	_meshBinDataSize += u32_indicesData.size() * sizeof(uint32_t);
+	_meshBinDataSize += u16_indicesData.size() * sizeof(uint16_t);
+
+	TRACE("mem: " << _meshBinDataSize << "\n");
 }

@@ -62,6 +62,7 @@ struct RE_EXPORT Stream {
 	U16 m_stride;
 	U32 m_type;
 	bool m_normalized;
+	static U16 typeOptimalStride[MAX_TYPE];
 
 	Stream(U32 type,  U16 stride, bool normalized, void *data = nullptr) :
 		m_data(data),
@@ -215,6 +216,8 @@ public:
 			colorsSame && textureCoordsSame && boneIDsSame && boneWeightsSame;
 	}
 
+	uint32_t GetStride();
+
 private:
 	void _SetVertexDescription(
 		U32 numTriangles,
@@ -269,6 +272,7 @@ private:
 			}
 		}
 	}
+
 	/*
 	VertexDescription(const aiMesh *mesh, BonesFactory *boneMap)
 	{

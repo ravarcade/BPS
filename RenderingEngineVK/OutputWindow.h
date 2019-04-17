@@ -57,6 +57,7 @@ private:
 	VkDescriptorSet currentDescriptorSet;
 	std::vector<VkCommandBuffer> commandBuffers;
 	bool recreateCommandBuffers = false;
+	bool resizeWindow = false;
 
 	bool _IsDeviceSuitable(VkPhysicalDevice device);
 	VkFormat _FindDepthFormat();
@@ -100,6 +101,9 @@ private:
 	CShaderProgram *_GetShader(const char *shader);
 	ObjectInfo *_GetObject(const char *name);
 
+
+	static void _OnWindowSize(GLFWwindow *wnd, int width, int height);
+
 public:
 	OutputWindow();
 	~OutputWindow() { _Cleanup(); }
@@ -114,6 +118,7 @@ public:
 	bool Exist() { return device != VK_NULL_HANDLE; }
 	void BufferRecreationNeeded() { recreateCommandBuffers = true; }
 	bool IsValid() { return window != nullptr; }
+	bool IsBufferFeatureSupported(VkFormat format, VkFormatFeatureFlagBits features);
 
 	template<typename T> void vkDestroy(T &v) { if (v) { vkDestroyDevice(v, allocator); v = VK_NULL_HANDLE; } }
 

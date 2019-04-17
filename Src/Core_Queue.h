@@ -116,8 +116,9 @@ public:
 	template<typename TSelector, typename TCallback >
 	void filter(TSelector &test, TCallback &process)
 	{
-		if (!first && used) // do not waste time on empty queue
+		if (!first && !used) // do not waste time on empty queue
 			return;
+
 		Entry *fFirst = nullptr;
 		{	// we have segment here, because we want to release lck
 			std::lock_guard<std::mutex> lck(mutex);
@@ -148,7 +149,6 @@ public:
 				p = np;
 			}
 		}
-
 		// We removed all "filtered" entrys from queue/list 
 		// ... and we have all that entrys in separate queue
 		for (Entry *ent = fFirst; ent; ent = ent->next)
@@ -176,6 +176,7 @@ public:
 		deleteObjects<T>();
 		used = 0;
 		last = nullptr;
+		first = nullptr;
 		delete alloc;
 		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, queueSize);
 	}

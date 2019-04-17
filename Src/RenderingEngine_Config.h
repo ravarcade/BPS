@@ -18,20 +18,12 @@ enum {
 	MOD4 = 2
 };
 
-enum TUsage {
-	POSITION = 0,
-	NORMALIZED = 1,
-	TEXTURECOORD = 2,
-	COLOR = 3,
-	WEIGHT = 4,
-	INDICES = 5,
-	BITANGENT = 6,
-	BONE_ID = 7,
-	BONE_WEIGHT = 8
-};
+struct VertexDescription;
 
 struct RE_EXPORT Optimize {
 	Optimize();
+	VertexDescription OptimizeVertexDescription(VertexDescription &vd);
+
 	U32 normals;							// normals, tangents, bitangents
 	U32 stride;
 	U32 colors;

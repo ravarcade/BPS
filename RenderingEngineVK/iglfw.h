@@ -5,6 +5,7 @@ class iglfw {
 public:
 	static int GLFW_LastErr;
 	static const char *GLFW_LastErrStr;
+	
 
 	std::vector<GLFWwindow*> windows;
 	iglfw();
@@ -18,6 +19,9 @@ public:
 	GLFWwindow *CreateWnd(int wnd, int width, int height);
 	void CreateVKSurface(VkInstance instance, int wnd, const VkAllocationCallbacks* allocator, VkSurfaceKHR* surface);
 	void GetWndSize(GLFWwindow *wnd, int *width, int *height);
+	void SetWindowSizeCallback(GLFWwindow *wnd, void(*OnWindowResizeCallback)(GLFWwindow *wnd, int width, int height));
+	void *GetWindowUserPointer(GLFWwindow *wnd);
+	void SetWindowUserPointer(GLFWwindow *wnd, void *userPointer);
 
 };
 

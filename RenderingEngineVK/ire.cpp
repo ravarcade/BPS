@@ -182,6 +182,20 @@ void ire::SetupDebugCallback()
 		{
 			throw std::runtime_error("failed to set up debug callback!");
 		}
+
+
+		{
+			VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
+			createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+			createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+			createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+			createInfo.pfnUserCallback = _DebugCallback2;
+			createInfo.pUserData = nullptr; // Optional
+
+			if (_CreateDebugUtilsMessengerEXT(_instance, &createInfo, nullptr, &_debugMessengerCallback) != VK_SUCCESS) {
+				throw std::runtime_error("failed to set up debug messenger!");
+			}
+		}
 	}
 }
 
@@ -202,6 +216,10 @@ void ire::Cleanup()
 
 		if (_callback)
 			_DestroyDebugReportCallbackEXT(_instance, _callback, _allocator);
+
+		if (_debugMessengerCallback)
+			_DestroyDebugUtilsMessengerEXT(_instance, _debugMessengerCallback, _allocator);
+
 		vkDestroyInstance(_instance, _allocator);
 
 		_callback = VK_NULL_HANDLE;
@@ -231,7 +249,6 @@ void ire::CreateWnd(const void * params)
 	glfwSetWindowPos(window, p->x, p->y);
 
 	auto ow = outputWindows[p->wnd];
-
 	ow->AddShader("default");
 
 	ow->Prepare(_instance, window, _allocator);
@@ -353,6 +370,20 @@ VKAPI_ATTR VkBool32 VKAPI_CALL ire::_DebugCallback(
 	return VK_FALSE;
 }
 
+
+VKAPI_ATTR VkBool32 VKAPI_CALL ire::_DebugCallback2(
+	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+	VkDebugUtilsMessageTypeFlagsEXT messageType,
+	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+	void* pUserData) 
+{
+
+	if (messageSeverity > VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT)
+		std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+
+	return VK_FALSE;
+}
+
 /// <summary>
 /// Creates the debug report callback.
 /// </summary>
@@ -374,6 +405,16 @@ VkResult ire::_CreateDebugReportCallbackEXT(VkInstance instance, const VkDebugRe
 	}
 }
 
+VkResult ire::_CreateDebugUtilsMessengerEXT(VkInstance _instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
+	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkCreateDebugUtilsMessengerEXT");
+	if (func != nullptr) {
+		return func(_instance, pCreateInfo, pAllocator, pDebugMessenger);
+	}
+	else {
+		return VK_ERROR_EXTENSION_NOT_PRESENT;
+	}
+}
+
 /// <summary>
 /// Destroys the debug report callback.
 /// </summary>
@@ -389,6 +430,13 @@ void ire::_DestroyDebugReportCallbackEXT(VkInstance instance, VkDebugReportCallb
 	}
 }
 
+void ire::_DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
+{
+	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+	if (func != nullptr) {
+		func(instance, debugMessenger, pAllocator);
+	}
+}
 
 bool ire::_HasStencilComponent(VkFormat format)
 {
@@ -571,6 +619,7 @@ std::vector<const char*> ire::_GetRequiredExtensions()
 	if (enableValidationLayers)
 	{
 		extensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 	}
 
 	return extensions;

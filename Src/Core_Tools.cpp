@@ -160,6 +160,8 @@ time_t Tools::GetTimestamp(const WSTR & fname)
 */
 bool Tools::InfoFile(SIZE_T *pFileSize, time_t *pTimestamp, WSTR &path)
 {
+	if (!path.size())
+		return true;
 	HANDLE hFile;
 	OVERLAPPED ol = { 0 };
 
@@ -234,6 +236,9 @@ bool Tools::IsDirectory(WSTR &path)
 
 bool Tools::Exist(WSTR &path)
 {
+	if (!path.size())
+		return true;
+
 	DWORD dwAttrib = GetFileAttributes(path.c_str());
 
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&

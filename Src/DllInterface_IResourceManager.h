@@ -57,11 +57,13 @@ extern "C" {
 	BAMS_EXPORT bool IResource_IsLoaded(IResource *res);
 	BAMS_EXPORT uint32_t IResource_GetType(IResource *res);
 	BAMS_EXPORT bool IResource_IsLoadable(IResource *res);
+	BAMS_EXPORT const char *IResource_GetXML(IResource *res, uint32_t *pSize = nullptr);
 
 	// ResourceManager
 	BAMS_EXPORT IResourceManager *IResourceManager_Create();
 	BAMS_EXPORT void IResourceManager_Destroy(IResourceManager *);
 	BAMS_EXPORT IResource *IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path);
+	BAMS_EXPORT IResource *IResourceManager_AddResourceWithoutFile(IResourceManager *rm, const char *resName, uint32_t type = 0);
 	BAMS_EXPORT void IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT void IResourceManager_RootDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name, uint32_t type = 0);
@@ -89,9 +91,13 @@ extern "C" {
 	BAMS_EXPORT IRawData *IShader_GetBinary(IShader *res, uint32_t idx);
 
 	// Mesh
-	BAMS_EXPORT void IMesh_SetVertexDescription(IMesh *res, IVertexDescription *_vd, IResource *_meshSrc, U32 _meshIdx);
-	BAMS_EXPORT const char * IMesh_BuildXML(IVertexDescription *_vd, IResource *_meshSrc, U32 _meshIdx);
-
+	BAMS_EXPORT void IMesh_SetVertexDescription(IMesh *res, IVertexDescription *_vd, uint32_t _meshHash, IResource *_meshSrc, U32 _meshIdx);
+	BAMS_EXPORT const char * IMesh_BuildXML(IVertexDescription *_vd, uint32_t _meshHash, IResource *_meshSrc, U32 _meshIdx);
+	BAMS_EXPORT IVertexDescription * IMesh_GetVertexDescription(IMesh * res);
+	BAMS_EXPORT IResource *IMesh_GetMeshSrc(IMesh * res);
+	BAMS_EXPORT uint32_t IMesh_GetMeshIdx(IMesh * res);
+	BAMS_EXPORT uint32_t IMesh_GetMeshHash(IMesh * res);
+	BAMS_EXPORT void IMesh_SetMeshIdx(IMesh * res, uint32_t idx);
 	// Module
 	struct Message
 	{
@@ -199,6 +205,7 @@ extern "C" {
 		void Release() { IResource_Release(Get()); }
 		uint32_t GetRefCounter() { return IResource_GetRefCounter(Get()); }
 		inline IResource *Get() { return _res.Get(); }
+		const char *GetXML(uint32_t *pSize = nullptr) { return IResource_GetXML(Get(), pSize); }
 	};
 
 #define CRESOURCEEXT(x) \
@@ -241,9 +248,15 @@ extern "C" {
 	{
 	public:
 		CRESOURCEEXT(Mesh) // define constructors (+copy,+move), virtual destructo, assign operator for copy and move
-		void SetVertexDescription(IVertexDescription *vd, CResource &meshRes, uint32_t meshIdx) { IMesh_SetVertexDescription(static_cast<IMesh*>(Get()), vd, meshRes.Get(), meshIdx); }
-		static const char *BuildXML(IVertexDescription *vd, CResource &meshRes, uint32_t meshIdx) { return IMesh_BuildXML(vd, meshRes.Get(), meshIdx); }
-		static const char *BuildXML(IVertexDescription *vd, IResource *meshRes, uint32_t meshIdx) { return IMesh_BuildXML(vd, meshRes, meshIdx); }
+		void SetVertexDescription(IVertexDescription *vd, uint32_t meshHash, CResource &meshRes, uint32_t meshIdx) { IMesh_SetVertexDescription(static_cast<IMesh*>(Get()), vd, meshHash, meshRes.Get(), meshIdx); }
+		void SetVertexDescription(IVertexDescription *vd, uint32_t meshHash, IResource *meshRes, uint32_t meshIdx) { IMesh_SetVertexDescription(static_cast<IMesh*>(Get()), vd, meshHash, meshRes, meshIdx); }
+		IVertexDescription *GetVertexDescription() { return IMesh_GetVertexDescription(static_cast<IMesh*>(Get())); }
+		static const char *BuildXML(IVertexDescription *vd, uint32_t meshHash, CResource &meshRes, uint32_t meshIdx) { return IMesh_BuildXML(vd, meshHash, meshRes.Get(), meshIdx); }
+		static const char *BuildXML(IVertexDescription *vd, uint32_t meshHash, IResource *meshRes, uint32_t meshIdx) { return IMesh_BuildXML(vd, meshHash, meshRes, meshIdx); }
+		IResource *GetMeshSrc() { return IMesh_GetMeshSrc(static_cast<IMesh*>(Get())); }
+		uint32_t GetMeshIdx() { return IMesh_GetMeshIdx(static_cast<IMesh*>(Get())); }
+		uint32_t GetMeshHash() { return IMesh_GetMeshHash(static_cast<IMesh*>(Get())); }
+		void SetMeshIdx(uint32_t idx) { IMesh_SetMeshIdx(static_cast<IMesh*>(Get()), idx); }
 	};
 
 	class CResourceManager
@@ -255,19 +268,18 @@ extern "C" {
 		CResourceManager(IResourceManager *rm) : _rm(rm) {};
 		~CResourceManager() { IResourceManager_Destroy(_rm); _rm = nullptr; }
 
-		void AddResource(const wchar_t *path) 
-		{ 
-			IResourceManager_AddResource(_rm, path); 
-		}
+		IResource * AddResource(const wchar_t *path) { return IResourceManager_AddResource(_rm, path); }
+		IResource * AddResource(const char *resName, uint32_t type = 0) { return IResourceManager_AddResourceWithoutFile(_rm, resName, type); }
+
 		void AddDir(const wchar_t *path) { IResourceManager_AddDir(_rm, path); }
 		void RootDir(const wchar_t *path) { IResourceManager_RootDir(_rm, path); }
 
 		void Filter(void (*callback)(IResource *, void *), void *localData, const char *pattern = nullptr, uint32_t typeId = RESID_UNKNOWN) { IResourceManager_Filter(_rm, callback, localData, pattern, typeId); }
-		CResource FindByName(const char *name, uint32_t type = RESID_UNKNOWN) { CResource res(IResourceManager_FindByName(_rm, name, type)); return std::move(res); }
-		CResource FindByUID(const UUID &uid) { CResource res(IResourceManager_FindByUID(_rm, uid)); return std::move(res); }
+		IResource * Find(const char *name, uint32_t type = RESID_UNKNOWN) { return IResourceManager_FindByName(_rm, name, type); }
+		IResource * Find(const UUID &uid) { return IResourceManager_FindByUID(_rm, uid); }
 
-		CRawData GetRawDataByName(const char *name) { CRawData res(IResourceManager_GetRawDataByName(_rm, name)); return std::move(res); }
-		CRawData GetRawDataByUID(const UUID &uid) { CRawData res(IResourceManager_GetRawDataByUID(_rm, uid)); return std::move(res); }
+		CRawData GetRawData(const char *name) { CRawData res(IResourceManager_GetRawDataByName(_rm, name)); return std::move(res); }
+		CRawData GetRawData(const UUID &uid) { CRawData res(IResourceManager_GetRawDataByUID(_rm, uid)); return std::move(res); }
 
 		CShader GetShaderByName(const char *name) { CShader res(IResourceManager_FindByName(_rm, name, RESID_SHADER)); return std::move(res); }
 		void LoadSync() { IResourceManager_LoadSync(_rm, nullptr); }
@@ -304,9 +316,9 @@ extern "C" {
 
 		static void SendMsg(
 			uint32_t msgId,
-			uint32_t msgDst,
-			uint32_t msgSrc,
-			const void *data,
+			uint32_t msgDst = 0,
+			uint32_t msgSrc = 0,
+			const void *data = nullptr,
 			uint32_t dataLen = 0)
 		{
 			IEngine_SendMsg( msgId, msgDst, msgSrc, data, dataLen);
@@ -360,18 +372,22 @@ enum { // msgDst
 };
 
 enum { // msgId
+	// to everybady (general notifications)
+	RESOURCE_MANIFEST_PARSED = 0x10003,
+
 	// to RENDERING_ENGINE
-	CREATE_WINDOW       = 0x20001,
-	CLOSE_WINDOW        = 0x20002,
-	ADD_MESH            = 0x20003, // mesh_name_in_shader + mesh_name_as_resource + shader_program
-	ADD_SHADER          = 0x20004,
-	RELOAD_SHADER       = 0x20005,
-	GET_SHADER_PARAMS   = 0x20006,
-	GET_OBJECT_PARAMS   = 0x20007,
+	CREATE_WINDOW        = 0x20001,
+	CLOSE_WINDOW         = 0x20002,
+	ADD_MESH             = 0x20003, // mesh_name_in_shader + mesh_name_as_resource + shader_program
+	ADD_SHADER           = 0x20004,
+	RELOAD_SHADER        = 0x20005,
+	GET_SHADER_PARAMS    = 0x20006,
+	GET_OBJECT_PARAMS    = 0x20007,
 
 	// to IMPORT_MODULE (or everyone?)
-	IDENTIFY_RESOURCE   = 0x40001,
-	IMPORTMODEL_UPDATE  = 0x40002,
+	IDENTIFY_RESOURCE    = 0x40001,
+	IMPORTMODEL_UPDATE   = 0x40002,
+	IMPORTMODEL_LOADMESH = 0x40003,
 };
 
 struct PCREATE_WINDOW {
