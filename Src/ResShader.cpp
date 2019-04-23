@@ -137,7 +137,7 @@ void ResShader::_SaveXML()
 ResShader::File * ResShader::AddProgram(WSTR filename)
 {
 	auto rm = globalResourceManager;
-	if (!rb->isLoaded() && !rb->isDeleted())
+	if (!rb->isLoaded() && !rb->isDeleted() && rb->Path.size()>0)
 	{
 		rm->LoadSync(rb);
 	}

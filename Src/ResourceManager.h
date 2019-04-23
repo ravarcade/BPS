@@ -11,6 +11,8 @@ class ResourceImplementationInterface;
 class ResourceFactoryInterface;
 class ResourceManager;
 
+extern ResourceManager *globalResourceManager;
+
 /// <summary>
 /// Interface to resource implementation
 /// </summary>
@@ -144,6 +146,7 @@ protected:
 	static constexpr time::duration defaultDelay = 200ms;
 	ResourceUpdateNotifier _updateNotifier;
 
+	void _CreateResourceImplementation();
 public:
 	UUID UID;
 	U32  Type;
@@ -195,7 +198,13 @@ public:
 	void SetTimestamp() { time(_resourceTimestamp); }
 	ResourceImplementationInterface *GetImplementation() { return _resourceImplementation; }
 
-	void AddRef() { ++_refCounter; }
+	void AddRef() { 
+		if (!_resourceImplementation && !_refCounter)
+			_CreateResourceImplementation();
+
+		++_refCounter; 
+	}
+
 	U32 GetRefCounter() { return _refCounter; }
 
 	void Release() 
@@ -266,7 +275,9 @@ private:
 	struct InternalData;
 	InternalData *_data;
 
+protected:
 	void CreateResourceImplementation(ResourceBase *res);
+	friend class ResourceBase;
 
 public:
 	ResourceManager();
@@ -319,8 +330,6 @@ public:
 
 	ResourceManager *GetResourceManager();
 };
-
-extern ResourceManager *globalResourceManager;
 
 #define RESOURCEMANAGER_ADD_FILE 0x10001
 

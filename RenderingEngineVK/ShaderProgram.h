@@ -93,7 +93,6 @@ private:
 	VkPipelineLayout _GetPipelineLayout();
 	VkRenderPass _GetRenderPass();
 	uint32_t _GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSize);
-	void _SendVertexStream(BAMS::RENDERINENGINE::Stream dst, const BAMS::RENDERINENGINE::Stream &src, uint8_t *outBuf, std::vector<uint32_t> &bindingOffset, uint32_t numVertices);
 	void _CreateUniformBuffers();
 	void _BuildShaderProperties();
 	void _BuindShaderProgramParamsDesc();

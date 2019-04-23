@@ -14,11 +14,11 @@ class ResShader : public ResoureImpl<ResShader, RESID_SHADER, Allocators::defaul
 	static constexpr char *SubprogramTypes[] = { "Vert", "Frag", "Geom", "Ctrl", "Eval" };
 	static constexpr SIZE_T NumSubprogramTypes = COUNT_OF(SubprogramTypes);
 	static constexpr wchar_t *src[] = {
-		L".vert.glsl", nullptr,
-		L".frag.glsl", nullptr,
-		L".geom.glsl", nullptr,
-		L".tesc.glsl", nullptr,
-		L".tese.glsl", nullptr,
+		L".vert.glsl", L".vert", nullptr,
+		L".frag.glsl", L".frag", nullptr,
+		L".geom.glsl", L".geom", nullptr,
+		L".tesc.glsl", L".tesc", nullptr,
+		L".tese.glsl", L".tese", nullptr,
 		nullptr, nullptr };
 
 	static constexpr wchar_t *bin[] = {
@@ -84,7 +84,6 @@ class ResShader : public ResoureImpl<ResShader, RESID_SHADER, Allocators::defaul
 		
 	};
 
-	//	File Subprograms[NumSubprogramTypes*2];
 	File Source[NumSubprogramTypes];
 	File Binary[NumSubprogramTypes];
 

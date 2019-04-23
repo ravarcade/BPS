@@ -100,7 +100,6 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <ShowProgress>LinkVerboseLib</ShowProgress>
     </Link>
     <PostBuildEvent>
       <Command>@echo "Copying $(ProjectName).lib"

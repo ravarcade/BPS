@@ -226,11 +226,17 @@ void SetObjParams(Properties *pprop, int num)
 
 void AddToWnd(BAMS::CEngine &en, int wnd, int i)
 {
-	static PADD_MESH c0 = { 0, "realcubename", "Mesh_1", "cube" };
-	static PADD_MESH c1 = { 0, "cubename", "Mesh_1", "default" };
+	static PADD_MESH c[] = {
+		{ 0, "realcubename", "Mesh_1", "basic" },
+		{ 0, "cubename", "Mesh_2", "basic" },
+		{ 0, "realcubename", "Mesh_4", "basic" },
+		{ 0, "realcubename", "Mesh_5", "basic" },
+		{ 0, "realcubename", "Mesh_6", "basic" },
+		{ 0, "realcubename", "Mesh_7", "basic" },
+	};
 	uint32_t oid = -1;
 	Properties *pprop = nullptr;
-	PADD_MESH *obj = i == 0 ? &c0 : &c1;
+	PADD_MESH *obj = &c[i];
 	obj->wnd = wnd;
 	obj->pProperties = &pprop;
 	obj->pId = &oid;
@@ -287,10 +293,10 @@ void testloop(BAMS::CEngine &en)
 
 				case 'Q': AddToWnd(en, 0, 0);	break;
 				case 'A': AddToWnd(en, 0, 1);	break;
-				case 'W': AddToWnd(en, 1, 0);	break;
-				case 'S': AddToWnd(en, 1, 1);	break;
-				case 'E': AddToWnd(en, 2, 0);	break;
-				case 'D': AddToWnd(en, 2, 1);	break;
+				case 'W': AddToWnd(en, 1, 2);	break;
+				case 'S': AddToWnd(en, 1, 3);	break;
+				case 'E': AddToWnd(en, 2, 4);	break;
+				case 'D': AddToWnd(en, 2, 5);	break;
 				}
 			}
 		}

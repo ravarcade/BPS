@@ -8,6 +8,7 @@ const int MAX_NUM_OF_BONES_IN_VERT = 8 / 4;
 /**
 * enum: Constants definition
 */
+/*
 enum {
 	UNUSED = 0,
 	FLOAT_1D = 1,
@@ -52,6 +53,73 @@ enum {
 
 	MAX_TYPE = 30
 };
+*/
+enum VERTEXATTR {
+	// ================================ used as  ...
+	VA_UNKNOWN = -1,
+	VA_POSITION = 0,
+	VA_NORMAL,
+	VA_TANGENT,
+	VA_BITANGENT,
+	VA_TEXCOORD,
+	VA_TEXCOORD2,
+	VA_TEXCOORD3,
+	VA_TEXCOORD4,
+	VA_COLOR,
+	VA_COLOR2,
+	VA_COLOR3,
+	VA_COLOR4,
+	VA_BONEWEIGHT,
+	VA_BONEWEIGHT2,
+	VA_BONEID,
+	VA_BONEID2,
+	VA_INDICES,
+
+	// ============================================ data type (as single int value)
+	VAT_UNUSED = 0,
+	VAT_FLOAT_1D = 1,
+	VAT_FLOAT_2D = 2,
+	VAT_FLOAT_3D = 3,
+	VAT_FLOAT_4D = 4,
+	VAT_COL_UINT8_4D = 5, // colors
+	VAT_IDX_UINT16_1D = 6, // index buffer
+	VAT_IDX_UINT32_1D = 7, // index buffer
+	VAT_HALF_1D = 8,
+	VAT_HALF_2D = 9,
+	VAT_HALF_3D = 10,
+	VAT_HALF_4D = 11,
+	VAT_N_SHORT_1D = 12,  // used for normals/tangents... _N_ = normalized
+	VAT_N_SHORT_2D = 13,
+	VAT_N_SHORT_3D = 14,
+	VAT_N_SHORT_4D = 15, // not needed	
+	VAT_N_USHORT_1D = 16,  // used for colors
+	VAT_N_USHORT_2D = 17,
+	VAT_N_USHORT_3D = 18,
+	VAT_N_USHORT_4D = 19, // not needed	
+	VAT_INT_PACKED = 20,  // packed formats: GL_INT_2_10_10_10_REV & GL_UNSIGNED_INT_2_10_10_10_REV
+	VAT_UINT_PACKED = 21,
+	VAT_UINT16_1D = 22,
+	VAT_UINT16_2D = 23,
+	VAT_UINT16_3D = 24,
+	VAT_UINT16_4D = 25,
+	VAT_UINT8_1D = 26,
+	VAT_UINT8_2D = 27,
+	VAT_UINT8_3D = 28,
+	VAT_UINT8_4D = 29,
+	VAT_MAX_TYPE = 30,
+
+
+	// ==================================== usage pattern
+	VAUP_POSITION = 0,
+	VAUP_NORMALIZED = 1,
+	VAUP_TEXTURECOORD = 2,
+	VAUP_COLOR = 3,
+	VAUP_WEIGHT = 4,
+	VAUP_INDICES = 5,
+	VAUP_BITANGENT = 6,
+	VAUP_BONE_ID = 7,
+	VAUP_BONE_WEIGHT = 8
+};
 
 /**
 * Desction of single data information stream.
@@ -62,7 +130,16 @@ struct RE_EXPORT Stream {
 	U16 m_stride;
 	U32 m_type;
 	bool m_normalized;
-	static U16 typeOptimalStride[MAX_TYPE];
+
+	struct Desc {
+		U16 size;   /// num of bytes
+		U16 count;  /// num of parts (like vec2 = 2, vec3 = 3, vec4 = 4)
+		bool normalized;
+	};
+
+	static Desc TypeDescription[VAT_MAX_TYPE];
+
+	Desc &GetDesc() { return TypeDescription[m_type]; }
 
 	Stream(U32 type,  U16 stride, bool normalized, void *data = nullptr) :
 		m_data(data),
@@ -81,13 +158,13 @@ struct RE_EXPORT Stream {
 	Stream() :
 		m_data(0),
 		m_stride(0),
-		m_type(UNUSED),
+		m_type(VAT_UNUSED),
 		m_normalized(false)
 	{};
 
 	Stream(F32 *data, U16 len = 3, U16 stride = 0) :
 		m_data(data),
-		m_type(FLOAT_1D - 1 + len),
+		m_type(VAT_FLOAT_1D - 1 + len),
 		m_stride(stride == 0 ? sizeof(data[0])*len : stride),
 		m_normalized(false)
 	{};
@@ -95,14 +172,14 @@ struct RE_EXPORT Stream {
 
 	Stream(DWORD *data, U16 len = 4, U16 stride = 0) :
 		m_data(data),
-		m_type(COL_UINT8_4D),
+		m_type(VAT_COL_UINT8_4D),
 		m_stride(stride == 0 ? sizeof(U8)*len : stride),
 		m_normalized(false)
 	{};
 
 	Stream(U8 *data, U16 len = 1, U16 stride = 0) :
 		m_data(data),
-		m_type(UINT8_1D - 1 + len),
+		m_type(VAT_UINT8_1D - 1 + len),
 		m_stride(stride == 0 ? sizeof(data[0])*len : stride),
 		m_normalized(false)
 	{};
@@ -111,14 +188,14 @@ struct RE_EXPORT Stream {
 	// len = 0 means index
 	Stream(U16 *data, U16 len = 0, U16 stride = 0) :
 		m_data(data),
-		m_type(len == 0 ? IDX_UINT16_1D : UINT16_1D - 1 + len),
+		m_type(len == 0 ? VAT_IDX_UINT16_1D : VAT_UINT16_1D - 1 + len),
 		m_stride(stride == 0 ? sizeof(data[0])*(len == 0 ? 1 : len) : stride),
 		m_normalized(false)
 	{};
 
 	Stream(U32 *data, U16 len = 1, U16 stride = 0) :
 		m_data(data),
-		m_type(IDX_UINT32_1D),
+		m_type(VAT_IDX_UINT32_1D),
 		m_stride(stride == 0 ? sizeof(data[0]) : stride),
 		m_normalized(false)
 	{};
@@ -163,7 +240,7 @@ public:
 		F32 *pBitangents = nullptr,
 		F32 *pColors = nullptr)
 	{
-		m_indices = Stream(IDX_UINT16_1D, sizeof(U16), false, pIndices);
+		m_indices = Stream(VAT_IDX_UINT16_1D, sizeof(U16), false, pIndices);
 		_SetVertexDescription(numTriangles, numVertices, pVertices, pTexCoords, pNormals, pTangents, pBitangents, pColors);
 	}
 
@@ -178,7 +255,7 @@ public:
 		F32 *pBitangents = nullptr, 
 		F32 *pColors = nullptr)
 	{
-		m_indices = Stream(IDX_UINT32_1D, sizeof(U32), false, pIndices);
+		m_indices = Stream(VAT_IDX_UINT32_1D, sizeof(U32), false, pIndices);
 		bool uint16IsFine = true;
 		const U32 MAX_UINT16 = 0xffff;
 
@@ -193,7 +270,7 @@ public:
 
 		if (uint16IsFine)
 		{
-			m_indices.m_type = IDX_UINT16_1D;
+			m_indices.m_type = VAT_IDX_UINT16_1D;
 		}
 
 		_SetVertexDescription(numTriangles, numVertices, pVertices, pTexCoords, pNormals, pTangents, pBitangents, pColors);
@@ -217,6 +294,48 @@ public:
 	}
 
 	uint32_t GetStride();
+	static uint32_t StreamLen(const Stream &s);
+	void Copy(Stream &dst, const Stream &src);
+	void Copy(const VertexDescription &src);
+	void Copy(void *&buf, void *&i16, void *&i32, const VertexDescription &src);
+
+	Stream* GetStream(uint32_t type);
+
+	template<typename T>
+	void ForEachStream(T f)
+	{
+		f(m_vertices);
+		f(m_normals);
+		f(m_tangents);
+		f(m_bitangents);
+		for (uint32_t i = 0; i < COUNT_OF(m_textureCoords); ++i)
+			f(m_textureCoords[i]);
+		for (uint32_t i = 0; i < COUNT_OF(m_colors); ++i)
+			f(m_colors[i]);
+		for (uint32_t i = 0; i < COUNT_OF(m_boneWeights); ++i)
+			f(m_boneWeights[i]);
+		for (uint32_t i = 0; i < COUNT_OF(m_boneIDs); ++i)
+			f(m_boneIDs[i]);
+	}
+
+	template<typename T>
+	void ForEachStream(const VertexDescription &src, T f)
+	{
+		f(m_vertices, src.m_vertices);
+		f(m_normals, src.m_normals);
+		f(m_tangents, src.m_tangents);
+		f(m_bitangents, src.m_bitangents);
+		for (uint32_t i = 0; i < COUNT_OF(m_textureCoords); ++i)
+			f(m_textureCoords[i], src.m_textureCoords[i]);
+		for (uint32_t i = 0; i < COUNT_OF(m_colors); ++i)
+			f(m_colors[i], src.m_colors[i]);
+		for (uint32_t i = 0; i < COUNT_OF(m_boneWeights); ++i)
+			f(m_boneWeights[i], src.m_boneWeights[i]);
+		for (uint32_t i = 0; i < COUNT_OF(m_boneIDs); ++i)
+			f(m_boneIDs[i], src.m_boneIDs[i]);
+	}
+
+	void Dump(uint32_t numVert = 10, uint32_t numIndices = 10);
 
 private:
 	void _SetVertexDescription(

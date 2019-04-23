@@ -23,6 +23,7 @@ struct VertexDescription;
 struct RE_EXPORT Optimize {
 	Optimize();
 	VertexDescription OptimizeVertexDescription(VertexDescription &vd);
+	uint32_t GetOptimizedType(uint32_t type, uint32_t size, bool normalized = true);
 
 	U32 normals;							// normals, tangents, bitangents
 	U32 stride;

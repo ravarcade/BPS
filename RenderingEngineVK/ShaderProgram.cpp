@@ -464,13 +464,17 @@ VertexDescription *GetDemoCube();
 VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
 {
 	// TODO: Load mesh from resources
+	static VertexDescription vd;
 	BAMS::CResourceManager rm;
 	if (auto res = rm.Find(name, RESID_MESH))
 	{
 		CMesh m(res);
 		auto pvd = reinterpret_cast<VertexDescription*>(m.GetVertexDescription());
 		if (pvd)
-			return pvd;
+		{
+			vd = *pvd;
+			return &vd;
+		}
 	}
 	return GetDemoCube();
 }
@@ -534,7 +538,7 @@ uint32_t CShaderProgram::AddMesh(const char *name)
 	uint32_t meshId = static_cast<uint32_t>(m_meshes.size());
 	m_meshes.push_back(m);
 
-	m_meshNames.add(name, meshId);
+	*m_meshNames.add(name) = meshId;
 
 	return meshId;
 }
@@ -547,19 +551,6 @@ uint32_t CShaderProgram::AddObject(uint32_t meshIdx)
 	m_drawObjectData.push_back(dod);
 
 	return dod.paramsSetId;
-}
-
-void CShaderProgram::_SendVertexStream(BAMS::RENDERINENGINE::Stream dst, const BAMS::RENDERINENGINE::Stream & src, uint8_t *outBuf, std::vector<uint32_t> &bindingOffset, uint32_t numVertices)
-{
-	static CAttribStreamConverter conv;
-
-	if(src.isUsed())
-	{
-		VertexDescriptionInfoPack vdip;
-		vdip.data = dst.m_data;
-		dst.m_data = outBuf + vdip.offset + bindingOffset[vdip.binding];
-		conv.Convert(dst, src, numVertices);
-	}
 }
 
 void CShaderProgram::_CreateUniformBuffers()
@@ -717,6 +708,7 @@ void CShaderProgram::_BuindShaderDataBuffers()
 
 void CShaderProgram::_ImportMeshData(const VertexDescription *vd, void *dst)
 {
+	auto outBuf = reinterpret_cast<uint8_t *>(dst);
 	uint32_t vboSize = 0; 
 	uint32_t iboSize = vd->m_numIndices * sizeof(uint32_t);
 
@@ -727,20 +719,19 @@ void CShaderProgram::_ImportMeshData(const VertexDescription *vd, void *dst)
 		vboSize += vd->m_numVertices * ps;
 		bindingOffset.push_back(vboSize);
 	}
-
+	// buffer for different binds are put one after another
+	// this is BAD, because different meshes can't share buffers...
 	assert(vboSize == vd->m_numVertices * m_vi.size);
-
-	CAttribStreamConverter conv;
-
-	auto &d = m_vi.descriptions;
-	auto outBuf = reinterpret_cast<uint8_t *>(dst);
-#define SENDVERTEXSTREAM(x) _SendVertexStream(d.m_ ## x, vd->m_ ## x, outBuf, bindingOffset, vd->m_numVertices);
-	SENDVERTEXSTREAM(vertices);
-	SENDVERTEXSTREAM(colors[0]);
-#undef SENDVERTEXSTREAM
-
-	Stream out((U32)IDX_UINT32_1D, sizeof(uint32_t), false, reinterpret_cast<uint8_t *>(dst) + vboSize);
-	conv.Convert(out, vd->m_indices, vd->m_numIndices);
+	for (auto &attr : m_vi.attribs)
+	{
+		auto s = m_vi.descriptions.GetStream(attr.type);
+		attr.pStream = s;
+		s->m_data = outBuf + bindingOffset[attr.binding] + attr.offset;
+	}
+	auto d = m_vi.descriptions;  // copy of Vertex Description. We don't want to overwrite orginal
+	d.m_indices = Stream(VAT_IDX_UINT32_1D, sizeof(uint32_t), false, outBuf + vboSize);
+	d.Copy(*vd);
+	d.Dump();
 }
 
 void CShaderProgram::CreateDescriptorSets()

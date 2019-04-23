@@ -13,26 +13,6 @@ struct ObjectMemoryRequirements
 };
 
 struct VertexAttribDesc {
-	enum {
-		UNKNOWN = -1,
-		VERTEX = 0,
-		NORMAL,
-		TANGENT,
-		BITANGENT,
-		TEXCOORD,
-		TEXCOORD2,
-		TEXCOORD3,
-		TEXCOORD4,
-		COLOR,
-		COLOR2,
-		COLOR3,
-		COLOR4,
-		BONEWEIGHT,
-		BONEWEIGHT2,
-		BONEID,
-		BONEID2
-	};
-
 	uint32_t binding;
 	uint32_t location;
 	uint32_t vecsize;	// if vector it is size of vector ..... probably always = 1
@@ -40,6 +20,7 @@ struct VertexAttribDesc {
 	VkFormat format;	// vulkan vertex format
 	uint32_t size;		// 
 	uint32_t offset;	// offset in binding
+	BAMS::RENDERINENGINE::Stream *pStream;      // stream in VertexDescription...
 };
 
 
@@ -79,16 +60,16 @@ struct ShaderDataInfo {
 	uint32_t max_single_ubo_size;
 	std::vector<uint32_t> ubo_sizes;
 };
-
-union VertexDescriptionInfoPack {
-	void *data;
-	uint32_t info;
-#pragma pack(push, 1)
-	struct {
-		uint16_t offset, binding;
-	};
-#pragma pack(pop)
-};
+//
+//union VertexDescriptionInfoPack {
+//	void *data;
+//	uint32_t info;
+//#pragma pack(push, 1)
+//	struct {
+//		uint16_t offset, binding;
+//	};
+//#pragma pack(pop)
+//};
 
 enum ShaderReflectionType {
 	UNKNOWN = 0,

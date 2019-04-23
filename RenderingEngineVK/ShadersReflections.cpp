@@ -6,31 +6,53 @@ using namespace spirv_cross;
 using namespace BAMS::RENDERINENGINE;
 const char *SharedUniformBufferObject = "UniformBufferObject";
 
+/*
+enum {
+	UNKNOWN = -1,
+	VERTEX = 0,
+	NORMAL,
+	TANGENT,
+	BITANGENT,
+	TEXCOORD,
+	TEXCOORD2,
+	TEXCOORD3,
+	TEXCOORD4,
+	COLOR,
+	COLOR2,
+	COLOR3,
+	COLOR4,
+	BONEWEIGHT,
+	BONEWEIGHT2,
+	BONEID,
+	BONEID2
+};
+*/
+
 uint32_t FindVertexAttribType(const std::string &name)
 {
 	static std::vector<std::vector<std::string>> VertexAttribAliases = {
-		{ "Vertex", "Position", "inPosition", "Vert" },
-		{ "Normal", "inNormal", "Norm" },
-		{ "Tangents", "inTangents", "Tang" },
-		{ "Bitangents", "inBitangents" "Bitang" },
+	{ "Vertex", "Position", "inPosition", "Vert", "inPos" },
+	{ "Normal", "inNormal", "Norm", "inNor" },
+	{ "Tangent", "inTangent", "Tang", "inTan" },
+	{ "Bitangent", "inBitangent" "Bitang", "inBit" },
 
-		{ "Texture",  "Texture1", "inTexture", "inTexture1", "Tex", "Tex1" },
-		{ "Texture2", "inTexture2", "Tex2" },
-		{ "Texture3", "inTexture3", "Tex3" },
-		{ "Texture4", "inTexture4", "Tex4" },
+	{ "Texture",  "Texture1", "inTexture", "inTexture1", "Tex", "Tex1", "inUV", "inUV1" },
+	{ "Texture2", "inTexture2", "Tex2", "inUV2" },
+	{ "Texture3", "inTexture3", "Tex3", "inUV3" },
+	{ "Texture4", "inTexture4", "Tex4", "inUV3" },
 
-		{ "Color", "Color1", "inColor", "inColor1", "Col", "Col1" },
-		{ "Color2", "inColor2", "Col2" },
-		{ "Color3", "inColor2", "Col3" },
-		{ "Color4", "inColor2", "Col4" },
+	{ "Color", "Color1", "inColor", "inColor1", "Col", "Col1" },
+	{ "Color2", "inColor2", "Col2" },
+	{ "Color3", "inColor2", "Col3" },
+	{ "Color4", "inColor2", "Col4" },
 
-		{ "BoneWeight", "BWeight", "BoneWeight1", "BWeight1", },
-		{ "BoneWeight2", "BWeight2", },
-		{ "BoneId", "BId", "BondId1", "BId1" },
-		{ "BondId2", "BId2" },
+	{ "BoneWeight", "BWeight", "BoneWeight1", "BWeight1", },
+	{ "BoneWeight2", "BWeight2", },
+	{ "BoneId", "BId", "BondId1", "BId1" },
+	{ "BondId2", "BId2" },
 	};
 
-	for (uint32_t i = VertexAttribDesc::VERTEX; i <= VertexAttribDesc::BONEID2; ++i) {
+	for (uint32_t i = VA_POSITION; i <= VA_BONEID2; ++i) {
 		for (auto &alias : VertexAttribAliases[i]) {
 			if (Utils::icasecmp(name, alias)) {
 				return i;
@@ -38,7 +60,83 @@ uint32_t FindVertexAttribType(const std::string &name)
 		}
 	}
 
-	return VertexAttribDesc::UNKNOWN;
+	return VA_UNKNOWN;
+}
+
+void SetVkFormat(VertexAttribDesc &vad)
+{
+	static VkFormat f32_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT };
+	static VkFormat f16_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_R16_SFLOAT, VK_FORMAT_R16G16_SFLOAT, VK_FORMAT_R16G16B16_SFLOAT, VK_FORMAT_R16G16B16A16_SFLOAT };
+	static VkFormat i16_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_R16_SINT, VK_FORMAT_R16G16_SINT, VK_FORMAT_R16G16B16A16_SINT, VK_FORMAT_R16G16B16A16_SINT };
+	static VkFormat u16_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_R16_UINT, VK_FORMAT_R16G16_UINT, VK_FORMAT_R16G16B16A16_UINT, VK_FORMAT_R16G16B16A16_UINT };
+	static VkFormat i8_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_R8_SINT, VK_FORMAT_R8G8_SINT, VK_FORMAT_R8G8B8A8_SINT, VK_FORMAT_R8G8B8A8_SINT };
+	static VkFormat u8_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_R8_UINT, VK_FORMAT_R8G8_UINT, VK_FORMAT_R8G8B8A8_UINT, VK_FORMAT_R8G8B8A8_UINT };
+	static VkFormat p10_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_A2R10G10B10_SNORM_PACK32, VK_FORMAT_A2R10G10B10_SNORM_PACK32, VK_FORMAT_A2R10G10B10_SNORM_PACK32, VK_FORMAT_A2R10G10B10_SNORM_PACK32 };
+	static VkFormat up10_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_A2R10G10B10_SNORM_PACK32, VK_FORMAT_A2R10G10B10_SNORM_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_FORMAT_A2R10G10B10_SNORM_PACK32 };
+	static VkFormat u8n_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_R8_UNORM, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM };
+	static VkFormat i8n_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_R8_SNORM, VK_FORMAT_R8G8_SNORM, VK_FORMAT_R8G8B8A8_SNORM, VK_FORMAT_R8G8B8A8_SNORM };
+	static VkFormat i16n_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_R16_SNORM, VK_FORMAT_R16G16_SNORM, VK_FORMAT_R16G16B16A16_SNORM, VK_FORMAT_R16G16B16A16_SNORM };
+	static VkFormat u16n_formats[5] = { VK_FORMAT_UNDEFINED,  VK_FORMAT_R16_UNORM, VK_FORMAT_R16G16_UNORM, VK_FORMAT_R16G16B16A16_UNORM, VK_FORMAT_R16G16B16A16_UNORM };
+
+	static uint32_t f32_size[5] = { 0, 4, 8, 12, 16 };
+	static uint32_t f16_size[5] = { 0, 4, 4, 8, 8 };
+	static uint32_t i16_size[5] = { 0, 4, 4, 8, 8 };
+	static uint32_t u16_size[5] = { 0, 4, 4, 8, 8 };
+	static uint32_t i8_size[5] = { 0, 4, 4, 4, 4 };
+	static uint32_t u8_size[5] = { 0, 4, 4, 4, 4 };
+	static uint32_t p10_size[5] = { 0, 4, 4, 4, 4 };
+	static uint32_t up10_size[5] = { 0, 4, 4, 4, 4 };
+	static uint32_t i8n_size[5] = { 0, 4, 4, 4, 4 };
+	static uint32_t u8n_size[5] = { 0, 4, 4, 4, 4 };
+	static uint32_t i16n_size[5] = { 0, 4, 4, 8, 8 };
+	static uint32_t u16n_size[5] = { 0, 4, 4, 8, 8 };
+	struct {
+		VkFormat *vkf;
+		uint32_t *vkl;
+	} vk[] = {
+		nullptr, nullptr,         // UNKNOWN
+		f32_formats, f32_size,    // FLOAT_1D
+		f32_formats, f32_size,    // FLOAT_2D
+		f32_formats, f32_size,    // FLOAT_3D
+		f32_formats, f32_size,    // FLOAT_4D
+
+		u8n_formats, u8n_size,    // COL_UINT8_4D
+
+		u16_formats, u16_size,    // IDX_UINT16_1D  *** will not occur as attrib
+		u16_formats, u16_size,    // IDX_UINT32_1D  *** will not occur as attrib
+
+		f16_formats, f16_size,    // HALF_1D
+		f16_formats, f16_size,    // HALF_2D
+		f16_formats, f16_size,    // HALF_3D
+		f16_formats, f16_size,    // HALF_4D
+
+		i16n_formats, i16n_size,  // N_SHORT_1D
+		i16n_formats, i16n_size,  // N_SHORT_2D
+		i16n_formats, i16n_size,  // N_SHORT_3D
+		i16n_formats, i16n_size,  // N_SHORT_4D
+
+		u16n_formats, u16n_size,  // N_USHORT_1D
+		u16n_formats, u16n_size,  // N_USHORT_2D
+		u16n_formats, u16n_size,  // N_USHORT_3D
+		u16n_formats, u16n_size,  // N_USHORT_4D
+
+		p10_formats, p10_size,    // INT_PACKED
+		up10_formats, up10_size,  // UINT_PACKED
+
+		u16_formats, u16_size,    // UINT16_1D
+		u16_formats, u16_size,    // UINT16_2D
+		u16_formats, u16_size,    // UINT16_3D
+		u16_formats, u16_size,    // UINT16_4D
+
+		u8_formats, u8_size,      // UINT8_1D
+		u8_formats, u8_size,      // UINT8_2D
+		u8_formats, u8_size,      // UINT8_3D
+		u8_formats, u8_size,      // UINT8_4D
+	};
+
+	auto &t = vk[vad.pStream->m_type];
+	vad.format = t.vkf[vad.vecsize];
+	vad.size = t.vkl[vad.vecsize];
 }
 
 void FindVertexAttribFormatAndSize(VertexAttribDesc &vd)
@@ -78,36 +176,36 @@ void FindVertexAttribFormatAndSize(VertexAttribDesc &vd)
 	auto &o = *GetOptimize();
 	uint32_t op = NONE;
 	switch (vd.type) {
-	case VertexAttribDesc::VERTEX: // vecsize = 1 and vecsize = 4 are pointless.... but maybe not?
+	case VA_POSITION: // vecsize = 1 and vecsize = 4 are pointless.... but maybe not?
 		break;
 
-	case VertexAttribDesc::NORMAL:
-	case VertexAttribDesc::TANGENT:
-	case VertexAttribDesc::BITANGENT:
+	case VA_NORMAL:
+	case VA_TANGENT:
+	case VA_BITANGENT:
 		op = o.normals;
 		break;
 
-	case VertexAttribDesc::COLOR:
-	case VertexAttribDesc::COLOR2:
-	case VertexAttribDesc::COLOR3:
-	case VertexAttribDesc::COLOR4:
+	case VA_COLOR:
+	case VA_COLOR2:
+	case VA_COLOR3:
+	case VA_COLOR4:
 		op = o.colors;
 		break;
 
-	case VertexAttribDesc::TEXCOORD:
-	case VertexAttribDesc::TEXCOORD2:
-	case VertexAttribDesc::TEXCOORD3:
-	case VertexAttribDesc::TEXCOORD4:
+	case VA_TEXCOORD:
+	case VA_TEXCOORD2:
+	case VA_TEXCOORD3:
+	case VA_TEXCOORD4:
 		op = o.coords;
 		break;
 
-	case VertexAttribDesc::BONEWEIGHT:
-	case VertexAttribDesc::BONEWEIGHT2:
+	case VA_BONEWEIGHT:
+	case VA_BONEWEIGHT2:
 		op = o.bone_weights;
 		break;
 
-	case VertexAttribDesc::BONEID:
-	case VertexAttribDesc::BONEID2:
+	case VA_BONEID:
+	case VA_BONEID2:
 		op = o.bone_ids;
 		break;
 	}
@@ -263,6 +361,64 @@ ShaderDataInfo CShadersReflections::LoadProgram(const char *shaderName)
 
 // ============================================================================ ShadersReflections private methods ===
 
+VkFormat GetVkFormat(uint32_t streamFormat)
+{
+	VkFormat mainFormats[] = {
+		VK_FORMAT_R32G32B32A32_SFLOAT,  // VAT_UNUSED = 0,
+		VK_FORMAT_R32_SFLOAT,           // VAT_FLOAT_1D = 1,
+		VK_FORMAT_R32G32_SFLOAT,        // VAT_FLOAT_2D = 2,
+		VK_FORMAT_R32G32B32_SFLOAT,     // VAT_FLOAT_3D = 3,
+		VK_FORMAT_R32G32B32A32_SFLOAT,  // VAT_FLOAT_4D = 4,
+	    VK_FORMAT_R8G8B8A8_UNORM,       // VAT_COL_UINT8_4D = 5, // colors
+		VK_FORMAT_R16_UINT,             // VAT_IDX_UINT16_1D = 6, // index buffer
+		VK_FORMAT_R32_UINT,             // VAT_IDX_UINT32_1D = 7, // index buffer
+		VK_FORMAT_R16G16_SFLOAT,        // VAT_HALF_1D = 8,
+		VK_FORMAT_R16G16_SFLOAT,        // VAT_HALF_2D = 9,
+		VK_FORMAT_R16G16B16A16_SFLOAT,  // VAT_HALF_3D = 10,
+		VK_FORMAT_R16G16B16A16_SFLOAT,  // VAT_HALF_4D = 11,
+		VK_FORMAT_R16G16_SNORM,         // VAT_N_SHORT_1D = 12,  // used for normals/tangents... _N_ = normalized
+		VK_FORMAT_R16G16_SNORM,         // VAT_N_SHORT_2D = 13,
+		VK_FORMAT_R16G16B16A16_SNORM,   // VAT_N_SHORT_3D = 14,
+		VK_FORMAT_R16G16B16A16_SNORM,   // VAT_N_SHORT_4D = 15, // not needed	
+	    VK_FORMAT_R16G16_UNORM,         // VAT_N_USHORT_1D = 16,  // used for colors
+		VK_FORMAT_R16G16_UNORM,         // VAT_N_USHORT_2D = 17,
+		VK_FORMAT_R16G16B16A16_UNORM,   // VAT_N_USHORT_3D = 18,
+		VK_FORMAT_R16G16B16A16_UNORM,   // VAT_N_USHORT_4D = 19, // not needed	
+		VK_FORMAT_A2R10G10B10_SNORM_PACK32, // VAT_INT_PACKED = 20,  // packed formats: GL_INT_2_10_10_10_REV & GL_UNSIGNED_INT_2_10_10_10_REV
+		VK_FORMAT_A2R10G10B10_UNORM_PACK32, // VAT_UINT_PACKED = 21,
+		VK_FORMAT_R16_UINT,             // VAT_UINT16_1D = 22,
+		VK_FORMAT_R16G16_UINT,          // VAT_UINT16_2D = 23,
+		VK_FORMAT_R16G16B16A16_UINT,    // VAT_UINT16_3D = 24,
+		VK_FORMAT_R16G16B16A16_UINT,    // VAT_UINT16_4D = 25,
+		VK_FORMAT_R8G8B8A8_UINT,        // VAT_UINT8_1D = 26,
+		VK_FORMAT_R8G8B8A8_UINT,        // VAT_UINT8_2D = 27,
+		VK_FORMAT_R8G8B8A8_UINT,        // VAT_UINT8_3D = 28,
+		VK_FORMAT_R8G8B8A8_UINT,        // VAT_UINT8_4D = 29,
+	};
+	auto f = mainFormats[streamFormat];
+
+	// TODO: Add format check and fallbacks
+
+	return f;
+}
+
+VertexAttribDesc GetVertexAttribDecription(CompilerGLSL &compiler, Resource &attrib, VertexDescription &vd)
+{
+	VertexAttribDesc vad = {
+		compiler.get_decoration(attrib.id, spv::DecorationBinding),
+		compiler.get_decoration(attrib.id, spv::DecorationLocation),
+		compiler.get_type(attrib.type_id).vecsize,
+		FindVertexAttribType(compiler.get_name(attrib.id))
+	};
+	
+	vad.pStream = vd.GetStream(vad.type);
+	vad.pStream->m_type = GetOptimize()->GetOptimizedType(vad.type, vad.vecsize);
+	vad.pStream->m_normalized = vad.pStream->GetDesc().normalized;
+	vad.format = GetVkFormat(vad.pStream->m_type);
+	vad.size = vad.pStream->GetDesc().size;
+	return std::move(vad);
+}
+
 /// <summary>
 /// Parses shader programs (with reflection from SPIRV-Cross).
 /// We get:
@@ -295,9 +451,8 @@ void CShadersReflections::_ParsePrograms()
 	{		
 		auto code = prg.resource;
 		auto bin = (uint32_t*)code.GetData();
+		assert(bin != nullptr);
 		auto blen = (code.GetSize() + sizeof(uint32_t) - 1) / sizeof(uint32_t);
-		if (bin == nullptr)
-			TRACE("PANIC");
 		CompilerGLSL compiler((uint32_t*)code.GetData(), (code.GetSize() + sizeof(uint32_t) - 1) / sizeof(uint32_t));
 		auto resources = compiler.get_shader_resources();
 		auto entry_points = compiler.get_entry_points_and_stages();
@@ -353,19 +508,14 @@ void CShadersReflections::_ParsePrograms()
 
 		if (prg.stage == VK_SHADER_STAGE_VERTEX_BIT)
 		{
+			if (resources.stage_inputs.size() == 4)
+				TRACE("NOW");
 			vi.attribs.clear();
+			vi.descriptions = {}; // clear
 			for (auto attrib : resources.stage_inputs) 
 			{
-				VertexAttribDesc vd = {
-					compiler.get_decoration(attrib.id, spv::DecorationBinding),
-					compiler.get_decoration(attrib.id, spv::DecorationLocation),
-					compiler.get_type(attrib.type_id).vecsize,
-					FindVertexAttribType(compiler.get_name(attrib.id))
-				};
-
-				FindVertexAttribFormatAndSize(vd);
-
-				vi.attribs.push_back(vd);
+				VertexAttribDesc vad = GetVertexAttribDecription(compiler, attrib, vi.descriptions);
+				vi.attribs.push_back(vad);				
 			}
 		}
 
@@ -380,6 +530,8 @@ void CShadersReflections::_ParsePrograms()
 		}
 	}
 
+
+	// (1) build strides for every binding point
 	auto &strides = vi.strides;
 	strides.clear();
 	vi.size = 0;
@@ -397,42 +549,10 @@ void CShadersReflections::_ParsePrograms()
 		vi.size += attr.size;
 	}
 
-	vi.descriptions = {}; // clear
-	CAttribStreamConverter conv;
+	// (2) copy calculated strides to vertex description
 	for (auto &attr : vi.attribs)
 	{
-		Stream *s; 
-		switch (attr.type) {
-		case VertexAttribDesc::VERTEX:      s = &vi.descriptions.m_vertices; break;
-
-		case VertexAttribDesc::NORMAL:      s = &vi.descriptions.m_normals; break;
-		case VertexAttribDesc::TANGENT:     s = &vi.descriptions.m_tangents; break;
-		case VertexAttribDesc::BITANGENT:   s = &vi.descriptions.m_bitangents; break;
-
-		case VertexAttribDesc::COLOR:       s = &vi.descriptions.m_colors[0]; break;
-		case VertexAttribDesc::COLOR2:      s = &vi.descriptions.m_colors[1]; break;
-		case VertexAttribDesc::COLOR3:      s = &vi.descriptions.m_colors[2]; break;
-		case VertexAttribDesc::COLOR4:      s = &vi.descriptions.m_colors[3]; break;
-
-		case VertexAttribDesc::TEXCOORD:    s = &vi.descriptions.m_textureCoords[0]; break;
-		case VertexAttribDesc::TEXCOORD2:   s = &vi.descriptions.m_textureCoords[1]; break;
-		case VertexAttribDesc::TEXCOORD3:   s = &vi.descriptions.m_textureCoords[2]; break;
-		case VertexAttribDesc::TEXCOORD4:   s = &vi.descriptions.m_textureCoords[3]; break;
-
-		case VertexAttribDesc::BONEWEIGHT:  s = &vi.descriptions.m_boneWeights[0]; break;
-		case VertexAttribDesc::BONEWEIGHT2: s = &vi.descriptions.m_boneWeights[1]; break;
-		case VertexAttribDesc::BONEID:      s = &vi.descriptions.m_boneIDs[0]; break;
-		case VertexAttribDesc::BONEID2:     s = &vi.descriptions.m_boneIDs[1]; break;
-		default:
-			continue;
-		}
-
-		VertexDescriptionInfoPack vdip;
-		vdip.data = nullptr;
-		vdip.offset  = static_cast<uint8_t>(attr.offset);
-		vdip.binding = static_cast<uint8_t>(attr.binding);
-
-		conv.ConvertAttribStreamDescription(*s, VkStream(attr.format, strides[attr.binding], vdip.data));
+		attr.pStream->m_stride = strides[attr.binding];
 	}
 
 	// push constants
@@ -446,7 +566,7 @@ void CShadersReflections::_ParsePrograms()
 			pc.entry.size });
 		vi.push_constatns_size += pc.entry.size;
 	}
-
+	vi.descriptions = BAMS::RENDERINENGINE::GetOptimize()->OptimizeVertexDescription(vi.descriptions);
 	
 }
 

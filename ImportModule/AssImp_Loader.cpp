@@ -29,7 +29,7 @@ void AssImp_Loader::PreLoad(const wchar_t * filename, const char * name, Assimp:
 	if (_pScene)
 	{
 		ProcessScene();
-		//_aii.FreeScene();
+		_aii.FreeScene();
 	}
 	_isLoaded = true;
 }
@@ -45,7 +45,7 @@ void AssImp_Loader::PreLoad(const uint8_t * pBuffer, size_t length, const char *
 	if (_pScene)
 	{
 		ProcessScene();
-		//aii.FreeScene();
+		_aii.FreeScene();
 	}
 	_isLoaded = true;
 }
@@ -288,7 +288,7 @@ using namespace BAMS::CORE;
 
 U32 JSHash(Stream &s, U32 numVert, U32 hash = 0)
 {
-	U16 l = Stream::typeOptimalStride[s.m_type];
+	U16 l = Stream::TypeDescription[s.m_type].size;
 	if (l == s.m_stride)
 	{
 		return JSHash(reinterpret_cast<U8*>(s.m_data), l*numVert, hash);
@@ -324,12 +324,12 @@ U32 AssImp_Loader::_JSHash(VertexDescription &vd, U32 hash)
 		hashStream(s);
 
 	// indices...
-	if (vd.m_indices.m_type == IDX_UINT32_1D)
+	if (vd.m_indices.m_type == VAT_IDX_UINT32_1D)
 	{
 		auto *p = reinterpret_cast<U8*>(&u32_indicesData[reinterpret_cast<U64>(vd.m_indices.m_data)]);
 		hash = JSHash(p, vd.m_numIndices * sizeof(U32), hash);
 	}
-	if (vd.m_indices.m_type == IDX_UINT16_1D)
+	if (vd.m_indices.m_type == VAT_IDX_UINT16_1D)
 	{
 		auto *p = reinterpret_cast<U8*>(&u16_indicesData[reinterpret_cast<U64>(vd.m_indices.m_data)]);
 		hash = JSHash(p, vd.m_numIndices * sizeof(U16), hash);
@@ -657,7 +657,7 @@ void AssImp_Loader::LoadMeshes()
 	for (auto &m : _meshes)
 	{
 		auto &i = m.vd.m_indices;
-		i.m_data = i.m_type == IDX_UINT32_1D ? (void *)&u32_indicesData[reinterpret_cast<U64>(i.m_data)] : (void *)&u16_indicesData[reinterpret_cast<U64>(i.m_data)];
+		i.m_data = i.m_type == VAT_IDX_UINT32_1D ? (void *)&u32_indicesData[reinterpret_cast<U64>(i.m_data)] : (void *)&u16_indicesData[reinterpret_cast<U64>(i.m_data)];
 	}
 
 }
@@ -685,10 +685,7 @@ void AssImp_Loader::ProcessScene()
 
 void AssImp_Loader::_OptimizeMeshStorage()
 {
-	/* pass 1:
-	 * Calc size of bin data and optimized VertexDescrition structs
-	 */
-
+	// (1) Calc size of bin data for optimized VertexDescritions
 	auto o = BAMS::RENDERINENGINE::GetOptimize();
 	_meshBinDataSize = 0;
 	for (auto m : _meshes)
@@ -698,8 +695,31 @@ void AssImp_Loader::_OptimizeMeshStorage()
 
 		TRACE(m.vd.GetStride() << " => " << vd.GetStride() << "\n");
 	}
-	_meshBinDataSize += u32_indicesData.size() * sizeof(uint32_t);
-	_meshBinDataSize += u16_indicesData.size() * sizeof(uint16_t);
 
-	TRACE("mem: " << _meshBinDataSize << "\n");
+	size_t u32Len = u32_indicesData.size() * sizeof(uint32_t);
+	size_t u16Len = u16_indicesData.size() * sizeof(uint16_t);
+	_meshBinDataSize += u32Len;
+	_meshBinDataSize += u16Len;
+	_meshBinData = new uint8_t[_meshBinDataSize];
+
+	// (2) Set pointer do memory for vertex data and indices (16 & 32 bit)
+	void *i16 = reinterpret_cast<uint16_t*>(_meshBinData + _meshBinDataSize - u16_indicesData.size() * sizeof(uint16_t));
+	void *i32 = reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(i16) - u32_indicesData.size() * sizeof(uint32_t));
+	void *pv = _meshBinData;
+
+	// (3) Copy data to new memory (we will be able to release AssImpp memory after this)
+	for (auto &m : _meshes)
+	{
+		auto vd = o->OptimizeVertexDescription(m.vd);
+		vd.Copy(pv, i16, i32, m.vd);
+		m.vd = vd;
+	}
+
+	// (4) Debug info:
+	TRACE("----------- File: " << _fileName.c_str() << ", " << _meshes.size() << "\n");
+	int i = 0;
+	for (auto &m : _meshes)
+	{
+		TRACE(i << ": V: " << m.vd.m_numVertices << ", I: " << m.vd.m_numIndices << ", H: " << m.hash << "\n");
+	}
 }

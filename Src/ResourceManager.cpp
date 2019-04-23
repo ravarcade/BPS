@@ -62,6 +62,12 @@ const wchar_t *MANIFESTFILENAME = L"resource_manifest.xml";
 
 // ============================================================================ ResourceBase ===
 
+void ResourceBase::_CreateResourceImplementation()
+{
+	// create resource
+	globalResourceManager->CreateResourceImplementation(this);
+}
+
 void ResourceBase::Init(CWSTR path)
 {
 	_resourceData = nullptr;
@@ -549,7 +555,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			}
 		}
 
-		if (res->_refCounter && !res->_isLoaded)
+		if (res->_refCounter && !res->_isLoaded && res->Path.size())
 		{
 			allLoaded = false;
 		}
