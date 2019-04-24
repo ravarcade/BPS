@@ -40,6 +40,7 @@ struct RE_EXPORT Optimize {
 	U32 max_VAO_data_memory_size;
 	U32 max_VAO_idx_data_memory_size;
 	U32 max_num_of_bones_in_vertex;
+	float max_smoothing_angle;
 };
 
 Optimize RE_EXPORT *GetOptimize();

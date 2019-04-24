@@ -38,6 +38,8 @@
 #  endif
 #endif
 
+#define TRACEM(m) { if (false) {TRACE(#m << ":\n"); for (uint32_t y=0; y<4; ++y) { for (uint32_t x=0; x<4; ++x) {TRACE(m[x][y]); if (x<3) TRACE(", ");} TRACE("\n");}}}
+
 template< class Type, ptrdiff_t n >
 constexpr ptrdiff_t COUNT_OF(Type const (&)[n]) noexcept { return n; }
 

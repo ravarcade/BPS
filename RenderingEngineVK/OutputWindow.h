@@ -154,6 +154,7 @@ public:
 	CShaderProgram *ReloadShader(const char *shader);
 	void GetShaderParams(const char *shader, BAMS::CORE::Properties **params);
 	void GetObjectParams(const char * objectName, BAMS::CORE::Properties ** props);
+	void UpdateDrawCommands();
 
 	// DrawObjectInfo *GetModel(const char *name);
 	//	CShaderProgram cubeShader;

@@ -19,7 +19,6 @@ class ResMesh : public ResoureImpl<ResMesh, RESID_MESH, Allocators::default, fal
 
 public:
 	ResMesh(ResourceBase *res) : rb(res), meshSrc(nullptr), meshIdx(-1), meshHash(0), isVertexDescriptionDataSet(false) {
-		TRACE("[ResMesh]\n");
 		if (res->XML.size())
 			_LoadXML(); // XML is readed from manifest, so no need to load any file from disk
 	}
@@ -47,7 +46,6 @@ class ResImportModel : public ResoureImpl<ResImportModel, RESID_IMPORTMODEL, All
 
 public:
 	ResImportModel(ResourceBase *res) : rb(res), resourceSize(res->GetSize()), resourceTimestamp(res->GetTimestamp()) {
-		TRACE("[ResImportModel]\n");
 	}
 	~ResImportModel() {}
 

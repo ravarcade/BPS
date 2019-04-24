@@ -178,7 +178,7 @@ bool wndState[3] = { true, false, false };
 uint32_t propIdxModel = -1;
 uint32_t propIdxBaseColor = -1;
 
-void SetPorpIdx(Properties *pprop)
+void SetPropIdx(Properties *pprop)
 {
 	static bool once = true;
 	if (once) {
@@ -213,21 +213,54 @@ void SetObjParams(Properties *pprop, int num)
 
 	uint32_t i = num;
 	int pos = ((i & 1) ? 1 : -1) * ((i + 1) & 0xfffe);
-	static float s = 0.02f;
+//	static float s = 0.02f;
+	static float s = 1.0f;
 	glm::mat4 I(1.0f);
 	auto S = glm::scale(I, glm::vec3(s));
-	auto R = glm::rotate(I, time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	auto T = glm::translate(I, glm::vec3(pos, 0, 0));
+//	auto R = glm::rotate(I, time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	auto R = glm::rotate(I, pos * glm::radians(90.0f/4), glm::vec3(0.0f, 0.0f, 1.0f));
+	auto T = glm::translate(I, glm::vec3(pos * 15, 0, 0));
 	auto model = T * R * S;
 	
 	memcpy_s(m.val, 16 * sizeof(float), &model[0][0], 16 * sizeof(float));
 
 }
 
+void Spin(BAMS::CEngine &en)
+{
+	static auto startTime = std::chrono::high_resolution_clock::now();
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
+
+	for (uint32_t i = 0; i < COUNT_OF(onWnd); ++i)
+	{
+		auto &wnd = onWnd[i];
+		if (wnd.size())
+		{
+			static float s = 1.0f;
+			auto &prop = wnd[0];
+			auto &m = prop[propIdxModel];
+			glm::mat4 I(1.0f);
+			auto S = glm::scale(I, glm::vec3(1,1,0.1));
+			auto R = glm::rotate(I, time * glm::radians(90.0f / 4), glm::vec3(0.0f, 0.0f, 1.0f));
+			auto T = glm::translate(I, glm::vec3(0, 0, 0));
+			auto model = T * R * S;
+			TRACEM(model);
+			auto m2 = glm::transpose(glm::inverse(model));
+			TRACEM(m2);
+
+			memcpy_s(m.val, 16 * sizeof(float), &model[0][0], 16 * sizeof(float));
+			PUPDATE_DRAW_COMMANDS cw = { i };
+			en.SendMsg(UPDATE_DRAW_COMMANDS, RENDERING_ENGINE, 0, &cw);
+		}
+	}
+}
+
 void AddToWnd(BAMS::CEngine &en, int wnd, int i)
 {
 	static PADD_MESH c[] = {
-		{ 0, "realcubename", "Mesh_1", "basic" },
+//		{ 0, "realcubename", "Mesh_1", "basic" },
+		{ 0, "realcubename", "Mesh_10", "basic" },
 		{ 0, "cubename", "Mesh_2", "basic" },
 		{ 0, "realcubename", "Mesh_4", "basic" },
 		{ 0, "realcubename", "Mesh_5", "basic" },
@@ -242,7 +275,7 @@ void AddToWnd(BAMS::CEngine &en, int wnd, int i)
 	obj->pId = &oid;
 	en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, obj);
 	if (pprop) {
-		SetPorpIdx(pprop);
+		SetPropIdx(pprop);
 		SetObjParams(pprop, (int)onWnd[wnd].size());
 		onWnd[wnd].push_back(*pprop);
 	}
@@ -270,6 +303,7 @@ void testloop(BAMS::CEngine &en)
 	for (bool isRunning = true; isRunning;)
 	{
 		//		Sleep(100);
+		Spin(en);
 		BAMS::CEngine::Update(25.0f);
 		SleepEx(25, TRUE);
 		updateAllKeysScan();

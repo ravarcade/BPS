@@ -804,7 +804,7 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 		vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &vk->currentDescriptorSet, 0, nullptr);
 	}
 
-	TRACE("[" << m_drawObjectData.size() << "]");
+//	TRACE("[" << m_drawObjectData.size() << "]");
 
 	uint8_t *pushConstantsData = m_pushConstantsStride ? m_paramsBuffer[m_pushConstantsBufferId].data() : nullptr;
 	for (auto &dod : m_drawObjectData)

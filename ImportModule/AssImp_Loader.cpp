@@ -5,6 +5,7 @@ AssImp_Loader::AssImp_Loader() :
 	_meshBinData(nullptr),
 	minTex(0), maxTex(0)
 {
+	_aii.SetPropertyFloat("PP_GSN_MAX_SMOOTHING_ANGLE", BAMS::RENDERINENGINE::GetOptimize()->max_smoothing_angle);
 }
 
 AssImp_Loader::~AssImp_Loader()

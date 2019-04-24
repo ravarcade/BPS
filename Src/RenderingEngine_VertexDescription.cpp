@@ -152,11 +152,11 @@ void VertexDescription::Copy(Stream &dst, const Stream &src)
 				case STDDT::UPACK:
 				{
 					UINT32 x = s[0];
-					v[0] = double(x & 0x3ff) / double(0x3ff);
+					v[2] = double(x & 0x3ff) / double(0x3ff);
 					x = x >> 10;
 					v[1] = double(x & 0x3ff) / double(0x3ff);
 					x = x >> 10;
-					v[2] = double(x & 0x3ff) / double(0x3ff);
+					v[0] = double(x & 0x3ff) / double(0x3ff);
 					x = x >> 10;
 					v[3] = double(x & 0x3) / double(0x3);
 				}
@@ -165,13 +165,13 @@ void VertexDescription::Copy(Stream &dst, const Stream &src)
 				{
 					UINT32 x = s[0], y;
 					y = x & 0x3ff;					
-					v[0] = y < 0x200 ? double(y) / double(0x1ff) : double(0x400-y) / double(0x1ff);
+					v[2] = y < 0x200 ? double(y) / double(0x1ff) : double(0x400-y) / double(0x1ff);
 					x = x >> 10;
 					y = x & 0x3ff;
 					v[1] = y < 0x200 ? double(y) / double(0x1ff) : double(0x400 - y) / double(0x1ff);
 					x = x >> 10;
 					y = x & 0x3ff;
-					v[2] = y < 0x200 ? double(y) / double(0x1ff) : double(0x400 - y) / double(0x1ff);
+					v[0] = y < 0x200 ? double(y) / double(0x1ff) : double(0x400 - y) / double(0x1ff);
 					x = x >> 10;
 					y = x & 0x3;
 					v[3] = y < 0x2 ? double(y) : double(0x4 - y);
@@ -202,10 +202,10 @@ void VertexDescription::Copy(Stream &dst, const Stream &src)
 					reinterpret_cast<INT16 *>(d)[j] = INT16(dn ? v[j] * double(0x7fff) : v[j]);
 					break;
 				case STDDT::UPACK:
-					reinterpret_cast<UINT32 *>(d)[0] = UINT32((INT32(v[0] * 1023) & 0x3ff) << 0 | (INT32(v[1] * 1023) & 0x3ff) << 10 | (INT32(v[2] * 1023) & 0x3ff) << 20 | (INT32(v[3] * 3) & 0x3) << 30);
+					reinterpret_cast<UINT32 *>(d)[0] = UINT32((INT32(v[2] * 1023) & 0x3ff) << 0 | (INT32(v[1] * 1023) & 0x3ff) << 10 | (INT32(v[0] * 1023) & 0x3ff) << 20 | (INT32(v[3] * 3) & 0x3) << 30);
 					break;
 				case STDDT::IPACK:
-					reinterpret_cast<UINT32 *>(d)[0] = UINT32((INT32(v[0] * 511) & 0x3ff) << 0 | (INT32(v[1] * 511) & 0x3ff) << 10 | (INT32(v[2] * 511) & 0x3ff) << 20 | (INT32(v[3] * 1) & 0x1) << 30);
+					reinterpret_cast<UINT32 *>(d)[0] = UINT32((INT32(v[2] * 511) & 0x3ff) << 0 | (INT32(v[1] * 511) & 0x3ff) << 10 | (INT32(v[0] * 511) & 0x3ff) << 20 | (INT32(v[3] * 1) & 0x1) << 30);
 					break;
 				}
 

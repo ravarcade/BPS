@@ -383,6 +383,7 @@ enum { // msgId
 	RELOAD_SHADER        = 0x20005,
 	GET_SHADER_PARAMS    = 0x20006,
 	GET_OBJECT_PARAMS    = 0x20007,
+	UPDATE_DRAW_COMMANDS  = 0x20008,
 
 	// to IMPORT_MODULE (or everyone?)
 	IDENTIFY_RESOURCE    = 0x40001,
@@ -438,4 +439,8 @@ struct PIDETIFY_RESOURCE {
 	const wchar_t *filename;
 	uint32_t *pType;
 	void *res;
+};
+
+struct PUPDATE_DRAW_COMMANDS {
+	uint32_t wnd;
 };

@@ -339,6 +339,12 @@ void ire::GetObjectParams(const void * params)
 	ow->GetObjectParams(p->name, p->pProperties);
 }
 
+void ire::UpdateDrawCommands(const void *params)
+{
+	CASTMSGPARAMS(PUPDATE_DRAW_COMMANDS);
+	ow->UpdateDrawCommands();
+}
+
 // ============================================================================ ire : Rendering Engine - protected methods ===
 
 /// <summary>

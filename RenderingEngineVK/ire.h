@@ -104,6 +104,7 @@ public:
 	void ReloadShader(const void * params);
 	void GetShaderParams(const void * params);
 	void GetObjectParams(const void * params);
+	void UpdateDrawCommands(const void *params);
 
 	void CloseWnd(GLFWwindow* window);
 

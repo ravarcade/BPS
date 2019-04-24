@@ -884,7 +884,7 @@ void OutputWindow::_CreateCommandBuffers()
 			shader->DrawObjects(commandBuffers[i]);
 			//shader->GetPipelineLayout();
 		});
-		TRACE("\n");
+//		TRACE("\n");
 
 
 
@@ -1054,8 +1054,12 @@ void OutputWindow::UpdateUniformBuffer()
 
 	//	UniformBufferObject ubo = {};
 	auto &ubo = *sharedUboData;
-	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f + time, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+	time = 0;
+//	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f + time, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	ubo.view = glm::lookAt(glm::vec3(100.0f, 100.0f + time*50.0f, 100.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	
+	TRACEM(ubo.view);
+	ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 550.0f);
 	ubo.proj[1][1] *= -1;
 }
 
@@ -1202,6 +1206,11 @@ void OutputWindow::GetObjectParams(const char *objectName, BAMS::CORE::Propertie
 	auto oi = objects.find(objectName);
 	if (!oi) return;
 	*props = oi->GetProperties();
+}
+
+void OutputWindow::UpdateDrawCommands()
+{
+	BufferRecreationNeeded();
 }
 
 CShaderProgram * OutputWindow::_GetShader(const char *shader)

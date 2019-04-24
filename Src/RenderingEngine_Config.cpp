@@ -76,6 +76,8 @@ Optimize::Optimize()
 	max_num_of_bones_in_vertex = 4;
 	bone_weights = FLOATS_TO_UINT8;
 	bone_ids = UINT16_TO_UINT8;
+
+	max_smoothing_angle = 90.0f;
 }
 
 VertexDescription Optimize::OptimizeVertexDescription(VertexDescription &vd)

@@ -39,8 +39,6 @@ enum {
 #include "Utils.h"
 #include "ShadersReflections.h"
 #include "ShaderProgram.h"
-#include "AttribStreamConverter.h"
-
 #include "iglfw.h"
 #include "OutputWindow.h"
 #include "ire.h"
