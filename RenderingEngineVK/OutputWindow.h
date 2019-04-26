@@ -12,11 +12,40 @@ class OutputWindow
 private:
 	struct SharedUniformBufferObject
 	{
-		//		glm::mat4 model; // is push constant now
+		//glm::mat4 model; // is push constant now
 		glm::mat4 view;
 		glm::mat4 proj;
 	};
 
+	struct FrameBufferAttachment 
+	{
+		VkImage image;
+		VkDeviceMemory memory;
+		VkImageView view;
+		VkFormat format;
+		VkImageUsageFlags usage;
+	};
+
+	struct DeferredFrameBuffers
+	{
+		uint32_t width, height;
+		FrameBufferAttachment albedo;
+		FrameBufferAttachment normals;
+		FrameBufferAttachment pbr;
+		FrameBufferAttachment depth;
+		VkFramebuffer frameBuffer;
+		VkRenderPass renderPass;
+		VkSampler colorSampler;
+
+		template<typename T>
+		void ForEachFrameBuffer(T f) 
+		{
+			f(albedo);
+			f(normals);
+			f(pbr);
+			f(depth);
+		};
+	};
 
 	VkInstance instance;				// required to: (1) create and destroy VkSurfaceKHR, (2) select physical device matching surface
 	VkPhysicalDevice physicalDevice;
@@ -36,12 +65,22 @@ private:
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
 	VkRenderPass renderPass = nullptr;
+
+	FrameBufferAttachment depth;
+	FrameBufferAttachment color;
+
+	DeferredFrameBuffers deferredFrameBuf;
+
+	/*
 	VkImage depthImage;
 	VkDeviceMemory depthImageMemory;
 	VkImageView depthImageView;
+
 	VkImage colorImage;
 	VkDeviceMemory colorImageMemory;
 	VkImageView colorImageView;
+	*/
+
 	VkCommandPool commandPool;
 	VkCommandPool transferPool;
 	VkSemaphore imageAvailableSemaphore;
@@ -66,6 +105,8 @@ private:
 	// image functions
 	void _CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage & image, VkDeviceMemory & imageMemory);
 	VkImageView _CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+	void _CreateAttachment(VkFormat format, VkImageUsageFlags usage, VkExtent2D extent, FrameBufferAttachment &attachment);
+
 	void _TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 
 	uint32_t _FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
@@ -77,6 +118,8 @@ private:
 	void _CreateBufferAndCopy(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, const void * srcData, VkBuffer & buffer, VkDeviceMemory & bufferMemory);
 	void _CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset = 0, VkDeviceSize dstOffset = 0);
 	VkShaderModule _CreateShaderModule(const char * shaderName);
+
+	VkExtent2D _GetVkExtentSize();
 
 	bool _CreateSwapChain();
 	void _CleanupSwapChain();
@@ -91,6 +134,7 @@ private:
 	void _CreateCommandBuffers();
 	void _RecreateCommandBuffers();
 	void _CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples);
+	void _CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagBits samples);
 
 	SharedUniformBufferObject *sharedUboData = nullptr;
 
@@ -139,7 +183,9 @@ public:
 	Define_vkDestroy(Semaphore);
 	Define_vkDestroy(CommandPool);
 	Define_vkDestroy(ShaderModule);
+	Define_vkDestroy(Sampler);
 	template<> void vkDestroy(VkSurfaceKHR &v) { if (v) { vkDestroySurfaceKHR(instance, v, allocator); v = VK_NULL_HANDLE; } }
+	template<> void vkDestroy(FrameBufferAttachment &v) { vkDestroy(v.image); vkDestroy(v.view); vkFree(v.memory); }
 
 	void vkFree(VkDeviceMemory &v) { if (v) { vkFreeMemory(device, v, allocator); v = nullptr; } }
 	void vkFree(VkCommandPool &v1, std::vector<VkCommandBuffer> &v2) { if (v1 && v2.size()) { vkFreeCommandBuffers(device, v1, static_cast<uint32_t>(v2.size()), v2.data()); v2.clear(); } }
@@ -156,6 +202,19 @@ public:
 	void GetObjectParams(const char * objectName, BAMS::CORE::Properties ** props);
 	void UpdateDrawCommands();
 
+	// ------------------------ for deferred rendering -----------
+
+	template<> void vkDestroy(DeferredFrameBuffers &fb)
+	{
+		vkDestroy(fb.colorSampler);
+		vkDestroy(fb.frameBuffer);
+		vkDestroy(fb.renderPass);
+		vkDestroy(fb.albedo);
+		vkDestroy(fb.normals);
+		vkDestroy(fb.pbr);
+		vkDestroy(fb.depth);
+	}
+	
 	// DrawObjectInfo *GetModel(const char *name);
 	//	CShaderProgram cubeShader;
 	friend CShaderProgram;

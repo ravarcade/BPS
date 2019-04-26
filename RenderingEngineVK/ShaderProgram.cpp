@@ -339,7 +339,8 @@ VkRenderPass CShaderProgram::_GetRenderPass()
 
 uint32_t CShaderProgram::_GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSize)
 {
-	if (poolsSize.size() < VK_DESCRIPTOR_TYPE_RANGE_SIZE) {
+	if (poolsSize.size() < VK_DESCRIPTOR_TYPE_RANGE_SIZE) 
+	{
 		uint32_t i = static_cast<uint32_t>(poolsSize.size());
 		poolsSize.resize(VK_DESCRIPTOR_TYPE_RANGE_SIZE);
 		for (; i < poolsSize.size(); ++i) {
@@ -349,10 +350,14 @@ uint32_t CShaderProgram::_GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSiz
 
 	auto layout = m_reflection.GetLayout();
 
-	for (auto &set : layout.descriptorSets) {
-		if (set.uniform_buffer_mask) {
+	for (auto &set : layout.descriptorSets) 
+	{
+		if (set.uniform_buffer_mask)
 			poolsSize[VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER] += Utils::count_bits(set.uniform_buffer_mask);
-		}
+		
+		if (set.sampled_image_mask) 
+			poolsSize[VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER] += Utils::count_bits(set.sampled_image_mask);
+		
 	}
 
 	uint32_t nonZero = 0;
@@ -372,7 +377,8 @@ void CShaderProgram::CreatePipelineLayout()
 	auto layout = m_reflection.GetLayout();
 	for (auto &set : layout.descriptorSets)
 	{
-		if (set.uniform_buffer_mask)
+		if (set.uniform_buffer_mask ||
+			set.sampled_image_mask)
 			lastSet = i;
 		++i;
 	}
@@ -394,6 +400,21 @@ void CShaderProgram::CreatePipelineLayout()
 					bindings.push_back({ i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, descriptorCount, stages, nullptr });
 				}
 			}
+		}
+
+		if (set.sampled_image_mask)
+		{
+			for (unsigned i = 0; i < VULKAN_NUM_BINDINGS; i++)
+			{
+				uint32_t bitMask = 1u << i;
+				uint32_t descriptorCount = set.descriptorCount[i];
+				uint32_t stages = set.stages[i];
+
+				if (set.sampled_image_mask & bitMask) {
+					bindings.push_back({ i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorCount, stages, nullptr });
+				}
+			}
+
 		}
 
 		if (bindings.size())

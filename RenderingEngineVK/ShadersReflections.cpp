@@ -299,6 +299,7 @@ void CShadersReflections::_ParsePrograms()
 		prg.entryPointName = entry_point.name;
 		prg.stage = executionModelToStage[entry_point.execution_model];
 
+		// uniform buffers
 		for (auto buffer : resources.uniform_buffers)
 		{
 			auto set = compiler.get_decoration(buffer.id, spv::DecorationDescriptorSet);
@@ -328,7 +329,7 @@ void CShadersReflections::_ParsePrograms()
 			}
 
 			auto name = compiler.get_name(buffer.id);
-			SPIRType type = compiler.get_type(buffer.type_id);
+			const SPIRType &type = compiler.get_type(buffer.type_id);
 			uint32_t descriptorCount = type.array.size() == 1 ? type.array[0] : 1;
 
 			m_layout.descriptorSets[set].uniform_buffer_mask |= 1u << binding;
@@ -336,6 +337,7 @@ void CShadersReflections::_ParsePrograms()
 			m_layout.descriptorSets[set].stages[binding] |= prg.stage;
 		}
 
+		// push constants
 		for (auto pushConst : resources.push_constant_buffers)
 		{
 			uint32_t size = static_cast<uint32_t>(compiler.get_declared_struct_size(compiler.get_type(pushConst.base_type_id)));
@@ -345,6 +347,25 @@ void CShadersReflections::_ParsePrograms()
 			vi.params_in_push_constants.push_back(vd);
 		}
 
+		// sampled_images
+		for (auto resource : resources.sampled_images)
+		{
+			auto set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
+			auto binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
+			auto name = compiler.get_name(resource.id);
+			const SPIRType &type = compiler.get_type(resource.type_id);
+			uint32_t descriptorCount = type.array.size() == 1 ? type.array[0] : 1;
+			assert(type.basetype == SPIRType::SampledImage);
+			if (type.basetype == SPIRType::SampledImage)
+			{
+				vi.sampled_images.push_back({set, binding, name, static_cast<uint32_t>(type.image.dim), static_cast<uint32_t>(prg.stage)});
+				m_layout.descriptorSets[set].sampled_image_mask |= 1u << binding;
+				m_layout.descriptorSets[set].descriptorCount[binding] = descriptorCount;
+				m_layout.descriptorSets[set].stages[binding] |= prg.stage;
+			}
+		}
+
+		// for vertex stage get attributes
 		if (prg.stage == VK_SHADER_STAGE_VERTEX_BIT)
 		{
 			if (resources.stage_inputs.size() == 4)
@@ -358,6 +379,7 @@ void CShadersReflections::_ParsePrograms()
 			}
 		}
 
+		// for fragment stage get target (outputNames)
 		if (prg.stage == VK_SHADER_STAGE_FRAGMENT_BIT) 
 		{
 			m_outputNames.clear();

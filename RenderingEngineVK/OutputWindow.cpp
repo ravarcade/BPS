@@ -60,8 +60,8 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 		if (_IsDeviceSuitable(device))
 		{
 			physicalDevice = device;
-			msaaSamples = ire::_GetMaxUsableSampleCount(physicalDevice);
-//			msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+//			msaaSamples = ire::_GetMaxUsableSampleCount(physicalDevice);
+			msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 			break;
 		}
 	}
@@ -234,14 +234,26 @@ bool OutputWindow::_IsDeviceSuitable(VkPhysicalDevice device)
 
 // ----------------------------------------------------------------------------
 
+VkExtent2D OutputWindow::_GetVkExtentSize()
+{
+	VkSurfaceCapabilitiesKHR capabilities;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &capabilities);
+	VkExtent2D extent = ire::_ChooseSwapExtent(capabilities, window);
+
+	return extent;
+}
+
+// ----------------------------------------------------------------------------
+
 bool OutputWindow::_CreateSwapChain()
+
 {
 	// ------------------------------------------------------------------------ create swap chain
 	SwapChainSupportDetails swapChainSupport(physicalDevice, surface);
+	VkExtent2D extent = ire::_ChooseSwapExtent(swapChainSupport.capabilities, window);
 
 	VkSurfaceFormatKHR surfaceFormat = ire::_ChooseSwapSurfaceFormat(swapChainSupport.formats);
 	VkPresentModeKHR presentMode = ire::_ChooseSwapPresentMode(swapChainSupport.presentModes);
-	VkExtent2D extent = ire::_ChooseSwapExtent(swapChainSupport.capabilities, window);
 	if (extent.height == 0 || extent.width == 0)
 		return false;
 
@@ -303,32 +315,24 @@ bool OutputWindow::_CreateSwapChain()
 		swapChainImageViews[i] = _CreateImageView(swapChainImages[i], swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 	}
 
-	//	// ------------------------------------------------------------------------ create render pass
+	// ------------------------------------------------------------------------ create render pass
 
 	//	if (renderPass == nullptr)
 	//		_CreateSimpleRenderPass(swapChainImageFormat, msaaSamples);
 
-		// ------------------------------------------------------------------------ create color resources
-	VkFormat colorFormat = swapChainImageFormat;
+	// ------------------------------------------------------------------------ create color, depth resources
 
-	_CreateImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, colorFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
-	colorImageView = _CreateImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT);
-
-	_TransitionImageLayout(colorImage, colorFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	// ------------------------------------------------------------------------ create depth resources
-	VkFormat depthFormat = _FindDepthFormat();
-	_CreateImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples, depthFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
-	depthImageView = _CreateImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-	_TransitionImageLayout(depthImage, depthFormat, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+	_CreateAttachment(swapChainImageFormat, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, swapChainExtent, color);
+	_CreateAttachment(_FindDepthFormat(), VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, swapChainExtent, depth);
 
 	// ------------------------------------------------------------------------ create frame buffers
 	swapChainFramebuffers.resize(swapChainImageViews.size());
 
 	for (size_t i = 0; i < swapChainImageViews.size(); i++)
 	{
-		std::vector<VkImageView> attachments = { swapChainImageViews[i], depthImageView };
+		std::vector<VkImageView> attachments = { swapChainImageViews[i], depth.view };
 		if (msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-			attachments = { colorImageView, depthImageView,  swapChainImageViews[i] };
+			attachments = { color.view, depth.view,  swapChainImageViews[i] };
 
 		VkFramebufferCreateInfo framebufferInfo = {};
 		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -351,7 +355,8 @@ bool OutputWindow::_CreateSwapChain()
 VkFormat OutputWindow::_FindDepthFormat()
 {
 	return _FindSupportedFormat(
-		{ VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT },
+		{ VK_FORMAT_D24_UNORM_S8_UINT, /*VK_FORMAT_D32_SFLOAT,*/ VK_FORMAT_D32_SFLOAT_S8_UINT }, // i want stencil buffer?
+//		{ VK_FORMAT_D24_UNORM_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT }, // i want stencil buffer?
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
 	);
@@ -450,6 +455,35 @@ VkImageView OutputWindow::_CreateImageView(VkImage image, VkFormat format, VkIma
 	}
 
 	return imageView;
+}
+
+void OutputWindow::_CreateAttachment(VkFormat format, VkImageUsageFlags usage, VkExtent2D extent, FrameBufferAttachment &attachment)
+{
+	VkImageAspectFlags aspectFlags = 0;
+	VkImageLayout imageLayout;
+	uint32_t mipLevels = 1;
+	VkSampleCountFlagBits numSamples = msaaSamples;
+	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
+	VkMemoryPropertyFlags properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+	attachment.format = format;
+	attachment.usage = usage;
+	if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+	{
+		usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+		aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
+		imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	}
+	if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+	{
+		aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+		imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	}
+
+	_CreateImage(extent.width, extent.height, mipLevels, numSamples, format, tiling, usage, properties, attachment.image, attachment.memory);
+	attachment.view = _CreateImageView(attachment.image, format, aspectFlags);
+	_TransitionImageLayout(attachment.image, format, VK_IMAGE_LAYOUT_UNDEFINED, imageLayout);
+
 }
 
 /// <summary>
@@ -731,13 +765,8 @@ void OutputWindow::_CleanupSwapChain()
 	// ... and will set val = nullptr;
 	// same about vkFree
 
-	vkDestroy(colorImageView);
-	vkDestroy(colorImage);
-	vkFree(colorImageMemory);
-
-	vkDestroy(depthImageView);
-	vkDestroy(depthImage);
-	vkFree(depthImageMemory);
+	vkDestroy(color);
+	vkDestroy(depth);
 
 	vkFree(commandPool, commandBuffers);
 
@@ -782,10 +811,12 @@ void OutputWindow::_CreateRenderPass()
 	SwapChainSupportDetails swapChainSupport(physicalDevice, surface);
 	VkSurfaceFormatKHR surfaceFormat = ire::_ChooseSwapSurfaceFormat(swapChainSupport.formats);
 	_CreateSimpleRenderPass(surfaceFormat.format, msaaSamples);
+	_CreateDeferredRenderPass(surfaceFormat.format, msaaSamples);
 }
 
 void OutputWindow::_CleanupRenderPass()
 {
+	vkDestroy(deferredFrameBuf);
 	vkDestroy(renderPass);
 }
 
@@ -1012,11 +1043,123 @@ void OutputWindow::_CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBit
 		throw std::runtime_error("failed to create render pass!");
 }
 
+void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagBits samples)
+{
+	// create render passes
+	VkExtent2D winExtent = _GetVkExtentSize();
+	deferredFrameBuf.width = winExtent.width;
+	deferredFrameBuf.height = winExtent.height;
+
+	samples = VK_SAMPLE_COUNT_1_BIT;
+
+	_CreateAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, winExtent, deferredFrameBuf.albedo);
+	_CreateAttachment(VK_FORMAT_R16G16_SNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, winExtent, deferredFrameBuf.normals);
+	_CreateAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, winExtent, deferredFrameBuf.pbr);
+	_CreateAttachment(_FindDepthFormat(), VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, winExtent, deferredFrameBuf.depth);
+
+	std::vector<VkAttachmentDescription> attachmentDescs;
+	std::vector<VkAttachmentReference> colorReferences;
+	VkAttachmentReference depthReference;
+	std::vector<VkImageView> attachments;
+
+	deferredFrameBuf.ForEachFrameBuffer([&](FrameBufferAttachment &fba) {
+		VkAttachmentDescription desc;
+		desc.flags = 0;
+		desc.samples = samples;
+		desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;		
+		desc.format = fba.format;
+		if (fba.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+		{
+			desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+			depthReference = { static_cast<uint32_t>(attachmentDescs.size()), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+		}
+		else {
+			desc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			colorReferences.push_back({ static_cast<uint32_t>(attachmentDescs.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+		}
+		attachmentDescs.push_back(desc);
+		attachments.push_back(fba.view);
+		
+	});
+
+	VkSubpassDescription subpass = {};
+	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+	subpass.pColorAttachments = colorReferences.data();
+	subpass.colorAttachmentCount = static_cast<uint32_t>(colorReferences.size());
+	subpass.pDepthStencilAttachment = &depthReference;
+//	subpass.pResolveAttachments = samples != VK_SAMPLE_COUNT_1_BIT ? &colorAttachmentResolveRef : nullptr;
+
+	std::array<VkSubpassDependency, 2> dependencies;
+
+	dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[0].dstSubpass = 0;
+	dependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	dependencies[1].srcSubpass = 0;
+	dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+	dependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	dependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+	dependencies[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	dependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+	dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+	VkRenderPassCreateInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+	renderPassInfo.pAttachments = attachmentDescs.data();
+	renderPassInfo.attachmentCount = static_cast<uint32_t>(attachmentDescs.size());
+	renderPassInfo.subpassCount = 1;
+	renderPassInfo.pSubpasses = &subpass;
+	renderPassInfo.dependencyCount = 2;
+	renderPassInfo.pDependencies = dependencies.data();
+
+
+	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &deferredFrameBuf.renderPass) != VK_SUCCESS)
+		throw std::runtime_error("failed to create render pass!");
+
+
+	VkFramebufferCreateInfo fbufCreateInfo = {};
+	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fbufCreateInfo.pNext = NULL;
+	fbufCreateInfo.renderPass = deferredFrameBuf.renderPass;
+	fbufCreateInfo.pAttachments = attachments.data();
+	fbufCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	fbufCreateInfo.width = deferredFrameBuf.width;
+	fbufCreateInfo.height = deferredFrameBuf.height;
+	fbufCreateInfo.layers = 1;
+	if (vkCreateFramebuffer(device, &fbufCreateInfo, nullptr, &deferredFrameBuf.frameBuffer) != VK_SUCCESS)
+		throw std::runtime_error("failed to create frame buffer!");
+
+	// sampler 
+	VkSamplerCreateInfo sampler{};
+	sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	sampler.maxAnisotropy = 1.0f;
+	sampler.magFilter = VK_FILTER_NEAREST;
+	sampler.minFilter = VK_FILTER_NEAREST;
+	sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampler.addressModeV = sampler.addressModeU;
+	sampler.addressModeW = sampler.addressModeU;
+	sampler.mipLodBias = 0.0f;
+	sampler.maxAnisotropy = 1.0f;
+	sampler.minLod = 0.0f;
+	sampler.maxLod = 1.0f;
+	sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+	if (vkCreateSampler(device, &sampler, nullptr, &deferredFrameBuf.colorSampler) != VK_SUCCESS)
+		throw std::runtime_error("failed to sampler!");
+}
+
 void OutputWindow::_LoadShaderPrograms()
 {
 
 	_CreateDescriptorPool();                            // create descriptor pool for all used shader programs
-
 
 	shaders.foreach([&](CShaderProgram *&s) {
 		auto outputNames = s->GetOutputNames();			// select renderPass base on names of output attachments in fragment shader

@@ -39,6 +39,14 @@ struct ValMemberDetails {
 	std::vector<ValMemberDetails> members;
 };
 
+struct SampledImageDesc {
+	uint32_t set = 0;
+	uint32_t binding = 0;
+	std::string name;
+	uint32_t dim = 0;
+	uint32_t stage = VK_SHADER_STAGE_VERTEX_BIT;
+};
+
 struct ValDetails {
 	uint32_t set = 0;
 	uint32_t binding = 0;
@@ -54,6 +62,7 @@ struct ShaderDataInfo {
 
 	std::vector<ValDetails> params_in_ubos;
 	std::vector<ValDetails> params_in_push_constants;
+	std::vector<SampledImageDesc> sampled_images;
 	uint32_t push_constatns_size;
 	uint32_t shared_ubos_size;
 	uint32_t total_ubos_size;
@@ -144,6 +153,7 @@ public:
 	struct ResourceLayout {
 		struct DescriptorSetLayout {
 			uint32_t uniform_buffer_mask = 0;
+			uint32_t sampled_image_mask = 0;
 			uint32_t descriptorCount[VULKAN_NUM_BINDINGS] = { 0 };
 			uint32_t stages[VULKAN_NUM_BINDINGS] = { 0 };
 		};

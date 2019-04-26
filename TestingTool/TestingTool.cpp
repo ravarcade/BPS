@@ -260,7 +260,7 @@ void AddToWnd(BAMS::CEngine &en, int wnd, int i)
 {
 	static PADD_MESH c[] = {
 //		{ 0, "realcubename", "Mesh_1", "basic" },
-		{ 0, "realcubename", "Mesh_10", "basic" },
+		{ 0, "realcubename", "Mesh_2", "deferred" },
 		{ 0, "cubename", "Mesh_2", "basic" },
 		{ 0, "realcubename", "Mesh_4", "basic" },
 		{ 0, "realcubename", "Mesh_5", "basic" },
@@ -361,7 +361,10 @@ int main()
 			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 			
 			// default shader program ... not needed any more
-//			auto s = rm.GetShaderByName("default");
+			auto s = rm.GetShaderByName("deferred");
+			s.AddProgram(L"/Shaders/deferred/deferred.vert.glsl");
+			s.AddProgram(L"/Shaders/deferred/deferred.frag.glsl");
+			//			auto s = rm.GetShaderByName("default");
 //			s.AddProgram(L"/Shaders/default.vert.glsl");
 //			s.AddProgram(L"/Shaders/default.frag.glsl");
 
