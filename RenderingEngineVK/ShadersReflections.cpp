@@ -6,27 +6,21 @@ using namespace spirv_cross;
 using namespace BAMS::RENDERINENGINE;
 const char *SharedUniformBufferObject = "UniformBufferObject";
 
-/*
-enum {
-	UNKNOWN = -1,
-	VERTEX = 0,
-	NORMAL,
-	TANGENT,
-	BITANGENT,
-	TEXCOORD,
-	TEXCOORD2,
-	TEXCOORD3,
-	TEXCOORD4,
-	COLOR,
-	COLOR2,
-	COLOR3,
-	COLOR4,
-	BONEWEIGHT,
-	BONEWEIGHT2,
-	BONEID,
-	BONEID2
+enum ShaderReflectionType {
+	UNKNOWN = 0,
+	Int32 = 1,
+	UInt32 = 2,
+	Int16 = 3,
+	UInt16 = 4,
+	Int8 = 5,
+	UInt8 = 6,
+	Float32 = 7,
+	Vec2 = 8,
+	Vec3 = 9,
+	Vec4 = 10,
+	Mat3 = 11,
+	Mat4 = 12
 };
-*/
 
 uint32_t FindVertexAttribType(const std::string &name)
 {
@@ -82,6 +76,8 @@ void SetSimplifiedType(ValMemberDetails &mem)
 
 void GetDetails(CompilerGLSL &comp, SPIRType &type, ValMemberDetails &ent)
 {
+	using BAMS::CORE::Property;
+
 	static ShaderReflectionType typeConv[] = {
 			ShaderReflectionType::UNKNOWN, // BaseType::Unknown
 			ShaderReflectionType::UNKNOWN, // BaseType::Void
@@ -111,6 +107,42 @@ void GetDetails(CompilerGLSL &comp, SPIRType &type, ValMemberDetails &ent)
 		0
 	};
 
+	uint32_t toPropType[] = {
+		uint32_t(Property::PT_UNKNOWN),
+		Property::PT_I32,
+		Property::PT_U32,
+		Property::PT_I16,
+		Property::PT_U16,
+		Property::PT_I8,
+		Property::PT_U8,
+		Property::PT_F32,
+
+		Property::PT_F32, // Vec2,3,4
+		Property::PT_F32,
+		Property::PT_F32,
+
+		Property::PT_F32, // Mat3, 4
+		Property::PT_F32
+	};
+
+	uint32_t toPropCount[] = {
+		0,
+		1, // i32
+		1, // u32
+		1, // i16
+		1, // u16
+		1, // i8
+		1, // u8
+		1, // f32
+
+		2, // vec2
+		3, // vec3
+		4, // vec4
+
+		9, // mat3
+		16, // mat4
+	};
+
 	ent.array = type.array.size() == 1 ? type.array[0] : 1;
 	ent.vecsize = type.vecsize;
 	ent.colsize = type.columns;
@@ -125,7 +157,7 @@ void GetDetails(CompilerGLSL &comp, SPIRType &type, ValMemberDetails &ent)
 			SPIRType member_type = comp.get_type(members[i]);
 			ValMemberDetails mem;
 			mem.name = comp.get_member_name(type.self, i);
-			mem.typenName = comp.get_name(members[i]);
+			mem.rootTypeName = comp.get_name(members[i]);
 			mem.offset = comp.type_struct_member_offset(type, i);
 			mem.size = static_cast<uint32_t>(comp.get_declared_struct_member_size(type, i));
 			mem.array = !member_type.array.empty() ? member_type.array[0] : 1;
@@ -135,9 +167,13 @@ void GetDetails(CompilerGLSL &comp, SPIRType &type, ValMemberDetails &ent)
 			mem.matrix_stride = comp.has_decoration(i, spv::DecorationMatrixStride) ? comp.type_struct_member_matrix_stride(type, i) : 0;
 			mem.type = typeConv[member_type.basetype];
 			SetSimplifiedType(mem);
+			mem.propertyType = toPropType[mem.type];
+			mem.propertyCount = toPropCount[mem.type];
 			if (member_type.basetype == SPIRType::BaseType::Struct && member_type.member_types.size())
+			{
 				GetDetails(comp, member_type, mem);
-
+			}
+		
 			ent.members.push_back(mem);
 		}
 	}
@@ -157,7 +193,7 @@ void GetDetails(CompilerGLSL &comp, Resource &res, ValDetails &det)
 	det.binding = comp.has_decoration(res.id, spv::DecorationBinding) ? comp.get_decoration(res.id, spv::DecorationBinding) : 0;
 
 	det.entry.name = comp.get_name(res.id);
-	det.entry.typenName = comp.get_name(res.base_type_id);
+	det.entry.rootTypeName = comp.get_name(res.base_type_id);
 	SPIRType type = comp.get_type(res.type_id);
 	if (type.basetype == SPIRType::BaseType::Struct && type.member_types.size())
 	{
@@ -175,7 +211,7 @@ CShadersReflections::CShadersReflections(const char *shaderName) { LoadProgram(s
 /// Loads shader program.
 /// </summary>
 /// <param name="shaderName">The shader program name from resource.</param>
-ShaderDataInfo CShadersReflections::LoadProgram(const char *shaderName)
+void CShadersReflections::LoadProgram(const char *shaderName)
 {
 	BAMS::CResourceManager rm;
 	m_shaderResource = rm.GetShaderByName(shaderName);
@@ -195,7 +231,6 @@ ShaderDataInfo CShadersReflections::LoadProgram(const char *shaderName)
 	}
 
 	_ParsePrograms();
-	return vi;
 }
 
 // ============================================================================ ShadersReflections private methods ===
@@ -241,9 +276,9 @@ VkFormat GetVkFormat(uint32_t streamFormat)
 	return f;
 }
 
-VertexAttribDesc GetVertexAttribDecription(CompilerGLSL &compiler, Resource &attrib, VertexDescription &vd)
+VertexAttribDetails GetVertexAttribDetails(CompilerGLSL &compiler, Resource &attrib, VertexDescription &vd)
 {
-	VertexAttribDesc vad = {
+	VertexAttribDetails vad = {
 		compiler.get_decoration(attrib.id, spv::DecorationBinding),
 		compiler.get_decoration(attrib.id, spv::DecorationLocation),
 		compiler.get_type(attrib.type_id).vecsize,
@@ -309,7 +344,7 @@ void CShadersReflections::_ParsePrograms()
 			GetDetails(compiler, buffer, vd);
 			vd.stage = prg.stage;
 			vi.params_in_ubos.push_back(vd);
-			if (vd.entry.typenName == SharedUniformBufferObject)
+			if (vd.entry.rootTypeName == SharedUniformBufferObject)
 			{
 				vi.shared_ubos_size += vd.entry.size;
 			}
@@ -370,12 +405,12 @@ void CShadersReflections::_ParsePrograms()
 		{
 			if (resources.stage_inputs.size() == 4)
 				TRACE("NOW");
-			vi.attribs.clear();
-			vi.descriptions = {}; // clear
+			vi.vertexAttribs.attribs.clear();
+			vi.vertexDescription = {}; // clear
 			for (auto attrib : resources.stage_inputs) 
 			{
-				VertexAttribDesc vad = GetVertexAttribDecription(compiler, attrib, vi.descriptions);
-				vi.attribs.push_back(vad);				
+				VertexAttribDetails vad = GetVertexAttribDetails(compiler, attrib, vi.vertexDescription);
+				vi.vertexAttribs.attribs.push_back(vad);
 			}
 		}
 
@@ -393,10 +428,10 @@ void CShadersReflections::_ParsePrograms()
 
 
 	// (1) build strides for every binding point
-	auto &strides = vi.strides;
+	auto &strides = vi.vertexAttribs.strides;
 	strides.clear();
-	vi.size = 0;
-	for (auto &attr : vi.attribs)
+	vi.vertexAttribs.size = 0;
+	for (auto &attr : vi.vertexAttribs.attribs)
 	{
 		if (attr.binding >= strides.size())
 		{
@@ -407,11 +442,11 @@ void CShadersReflections::_ParsePrograms()
 		}
 		attr.offset = strides[attr.binding];
 		strides[attr.binding] += attr.size;
-		vi.size += attr.size;
+		vi.vertexAttribs.size += attr.size;
 	}
 
 	// (2) copy calculated strides to vertex description
-	for (auto &attr : vi.attribs)
+	for (auto &attr : vi.vertexAttribs.attribs)
 	{
 		attr.pStream->m_stride = strides[attr.binding];
 	}
@@ -427,7 +462,7 @@ void CShadersReflections::_ParsePrograms()
 			pc.entry.size });
 		vi.push_constatns_size += pc.entry.size;
 	}
-	vi.descriptions = BAMS::RENDERINENGINE::GetOptimize()->OptimizeVertexDescription(vi.descriptions);
+	vi.vertexDescription = BAMS::RENDERINENGINE::GetOptimize()->OptimizeVertexDescription(vi.vertexDescription);
 	
 }
 

@@ -34,9 +34,13 @@ private:
 		FrameBufferAttachment pbr;
 		FrameBufferAttachment depth;
 		VkFramebuffer frameBuffer;
+
 		VkRenderPass renderPass;
 		VkSampler colorSampler;
-
+		VkSemaphore deferredSemaphore;
+		VkSemaphore resolvingSemaphore;
+		std::vector<CShaderProgram*> shaders;
+		CShaderProgram *resolveShader;
 		template<typename T>
 		void ForEachFrameBuffer(T f) 
 		{
@@ -45,6 +49,7 @@ private:
 			f(pbr);
 			f(depth);
 		};
+		std::vector<VkDescriptorImageInfo>descriptionImageInfo;
 	};
 
 	VkInstance instance;				// required to: (1) create and destroy VkSurfaceKHR, (2) select physical device matching surface
@@ -131,6 +136,8 @@ private:
 	void _CleanupRenderPass();
 
 	void _CreateDescriptorPool();
+	void _CreateDeferredCommandBuffer(VkCommandBuffer & cb);
+	void _CreateForwardCommandBuffer(VkCommandBuffer & cb, VkFramebuffer & frameBuffer);
 	void _CreateCommandBuffers();
 	void _RecreateCommandBuffers();
 	void _CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples);
@@ -145,7 +152,10 @@ private:
 	CShaderProgram *_GetShader(const char *shader);
 	ObjectInfo *_GetObject(const char *name);
 
-
+	bool _SimpleAcquireNextImage(uint32_t & imageIndex);
+	void _SimpleQueueSubmit(VkSemaphore & waitSemaphore, VkSemaphore & signalSemaphore, VkCommandBuffer & commandBuffer);
+	void _SimplePresent(VkSemaphore & waitSemaphore, uint32_t imageIndex);
+	
 	static void _OnWindowSize(GLFWwindow *wnd, int width, int height);
 
 public:
@@ -191,6 +201,7 @@ public:
 	void vkFree(VkCommandPool &v1, std::vector<VkCommandBuffer> &v2) { if (v1 && v2.size()) { vkFreeCommandBuffers(device, v1, static_cast<uint32_t>(v2.size()), v2.data()); v2.clear(); } }
 	void vkFree(VkDescriptorPool &v1, std::vector<VkDescriptorSet> &v2) { if (v1 && v2.size()) { vkFreeDescriptorSets(device, v1, static_cast<uint32_t>(v2.size()), v2.data()); v2.clear(); } }
 
+	std::vector<CShaderProgram*> forwardRenderingShaders;
 	BAMS::CORE::CStringHastable<CShaderProgram> shaders;
 	BAMS::CORE::CStringHastable<ObjectInfo> objects;
 
@@ -201,11 +212,14 @@ public:
 	void GetShaderParams(const char *shader, BAMS::CORE::Properties **params);
 	void GetObjectParams(const char * objectName, BAMS::CORE::Properties ** props);
 	void UpdateDrawCommands();
+	VkDescriptorImageInfo *GetDescriptionImageInfo(const char *attachmentName);
 
 	// ------------------------ for deferred rendering -----------
 
 	template<> void vkDestroy(DeferredFrameBuffers &fb)
 	{
+		vkDestroy(fb.deferredSemaphore);
+		vkDestroy(fb.resolvingSemaphore);
 		vkDestroy(fb.colorSampler);
 		vkDestroy(fb.frameBuffer);
 		vkDestroy(fb.renderPass);
@@ -213,8 +227,16 @@ public:
 		vkDestroy(fb.normals);
 		vkDestroy(fb.pbr);
 		vkDestroy(fb.depth);
+		fb.shaders.clear();
+		fb.resolveShader = nullptr;
 	}
 	
+	template<> void vkDestroy(UniformBuffer &ub)
+	{
+		vkDestroy(ub.buffer);
+		vkFree(ub.memory);
+	}
+
 	// DrawObjectInfo *GetModel(const char *name);
 	//	CShaderProgram cubeShader;
 	friend CShaderProgram;

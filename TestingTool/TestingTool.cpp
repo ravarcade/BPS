@@ -180,7 +180,9 @@ uint32_t propIdxBaseColor = -1;
 
 void SetPropIdx(Properties *pprop)
 {
-	static bool once = true;
+	propIdxModel = -1;
+	propIdxBaseColor = -1;
+	bool once = true; /// always
 	if (once) {
 		once = false;
 		for (uint32_t i = 0; i<pprop->count; ++i)
@@ -196,6 +198,8 @@ void SetPropIdx(Properties *pprop)
 
 void SetObjParams(Properties *pprop, int num)
 {
+	if (propIdxBaseColor == -1 || propIdxModel == -1)
+		return;
 	static float colors[][4] = {
 		{ 0.1f, 1, 1, 1 },
 		{ 1, 0.1f, 1, 1 },
@@ -276,8 +280,11 @@ void AddToWnd(BAMS::CEngine &en, int wnd, int i)
 	en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, obj);
 	if (pprop) {
 		SetPropIdx(pprop);
-		SetObjParams(pprop, (int)onWnd[wnd].size());
-		onWnd[wnd].push_back(*pprop);
+		if (propIdxModel != -1)
+		{
+			SetObjParams(pprop, (int)onWnd[wnd].size());
+			onWnd[wnd].push_back(*pprop);
+		}
 	}
 }
 

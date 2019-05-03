@@ -470,7 +470,7 @@ void OutputWindow::_CreateAttachment(VkFormat format, VkImageUsageFlags usage, V
 	attachment.usage = usage;
 	if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
 	{
-		usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+//		usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
 		aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 		imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	}
@@ -817,7 +817,7 @@ void OutputWindow::_CreateRenderPass()
 void OutputWindow::_CleanupRenderPass()
 {
 	vkDestroy(deferredFrameBuf);
-	vkDestroy(renderPass);
+	vkDestroy(renderPass);	
 }
 
 void OutputWindow::_CreateDescriptorPool()
@@ -859,11 +859,71 @@ void OutputWindow::_CreateDescriptorPool()
 
 // ------------------------------------------------------------------------
 
+void OutputWindow::_CreateDeferredCommandBuffer(VkCommandBuffer &cb)
+{
+	std::array<VkClearValue, 4> clearValues = {};
+	clearValues[0].color = { 0.5f, 0.5f, 0.0f, 0.0f };
+	clearValues[1].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+	clearValues[2].color = { 0.0f, 0.0f, 0.0f, 0.0f };
+	clearValues[3].depthStencil = { 1.0f, 0 };
+
+	VkRenderPassBeginInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.renderPass = deferredFrameBuf.renderPass;
+	renderPassInfo.framebuffer = deferredFrameBuf.frameBuffer;
+
+	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.extent = { deferredFrameBuf.width, deferredFrameBuf.height };
+	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+	renderPassInfo.pClearValues = clearValues.data();
+
+	vkCmdBeginRenderPass(cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdSetViewport(cb, 0, 1, &viewport);
+	vkCmdSetScissor(cb, 0, 1, &scissor);
+
+	for (auto &shader : deferredFrameBuf.shaders) 
+	{
+		shader->DrawObjects(cb);
+	}
+
+	vkCmdEndRenderPass(cb);
+}
+
+void OutputWindow::_CreateForwardCommandBuffer(VkCommandBuffer &cb, VkFramebuffer &frameBuffer)
+{
+	// clear values
+	std::array<VkClearValue, 2> clearValues = {};
+	clearValues[0].color = { 0.2f, 0.2f, 0.2f, 1.0f };
+	clearValues[1].depthStencil = { 1.0f, 0 };
+
+	VkRenderPassBeginInfo renderPassInfo = {};
+	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+	renderPassInfo.renderPass = renderPass;
+	renderPassInfo.framebuffer = frameBuffer;
+
+	renderPassInfo.renderArea.offset = { 0, 0 };
+	renderPassInfo.renderArea.extent = swapChainExtent;
+	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+	renderPassInfo.pClearValues = clearValues.data();
+
+	vkCmdBeginRenderPass(cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	vkCmdSetViewport(cb, 0, 1, &viewport);
+	vkCmdSetScissor(cb, 0, 1, &scissor);
+
+	for (auto &shader : forwardRenderingShaders)
+	{
+		shader->DrawObjects(cb);
+	}
+
+	vkCmdEndRenderPass(cb);
+}
+
+// ------------------------------------------------------------------------
 
 void OutputWindow::_CreateCommandBuffers()
 {
-	commandBuffers.resize(swapChainFramebuffers.size());
-
+	// allocate command buffero (one for every swap-chain-frame-buffer)
+	commandBuffers.resize(swapChainFramebuffers.size()+1);
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 	allocInfo.commandPool = commandPool;
@@ -872,93 +932,40 @@ void OutputWindow::_CreateCommandBuffers()
 
 	if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS) {
 		throw std::runtime_error("failed to allocate command buffers!");
-	}
+	}	
+
+	auto &deferredCommandBuffer = commandBuffers[swapChainFramebuffers.size()];
+
+	// viewport
+	scissor = { { 0, 0 }, swapChainExtent };
+	viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	viewport.width = (float)swapChainExtent.width;
+	viewport.height = (float)swapChainExtent.height;
+
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+	beginInfo.pInheritanceInfo = nullptr; // Optional
+
 	currentDescriptorSet = nullptr;
 
-	for (size_t i = 0; i < commandBuffers.size(); i++) {
-		VkCommandBufferBeginInfo beginInfo = {};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-		beginInfo.pInheritanceInfo = nullptr; // Optional
+	vkBeginCommandBuffer(deferredCommandBuffer, &beginInfo);
+	_CreateDeferredCommandBuffer(deferredCommandBuffer);
+	if (vkEndCommandBuffer(deferredCommandBuffer) != VK_SUCCESS) {
+		throw std::runtime_error("failed to record command buffer!");
+	}
 
-		vkBeginCommandBuffer(commandBuffers[i], &beginInfo);
-
-		VkRenderPassBeginInfo renderPassInfo = {};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = renderPass;
-		renderPassInfo.framebuffer = swapChainFramebuffers[i];
-
-		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = swapChainExtent;
-		std::array<VkClearValue, 2> clearValues = {};
-		clearValues[0].color = { 0.2f, 0.2f, 0.2f, 1.0f };
-		clearValues[1].depthStencil = { 1.0f, 0 };
-		renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-		renderPassInfo.pClearValues = clearValues.data();
-
-		// viewport
-		scissor = { { 0, 0 }, swapChainExtent };
-		viewport = {};
-		viewport.x = 0.0f;
-		viewport.y = 0.0f;
-		viewport.minDepth = 0.0f;
-		viewport.maxDepth = 1.0f;
-
-		scissor.extent = swapChainExtent;
-		viewport.width = (float)swapChainExtent.width;
-		viewport.height = (float)swapChainExtent.height;
-
-		vkCmdBeginRenderPass(commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-
-		shaders.foreach([&](CShaderProgram *&shader) {
-			shader->DrawObjects(commandBuffers[i]);
-			//shader->GetPipelineLayout();
-		});
-//		TRACE("\n");
-
-
-
-		//		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-				//		vkCmdBindIndexBuffer(_commandBuffers[i], _indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-		//		vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-				/*
-				switch (vertexBufferMode)
-				{
-				case ONE_BUFFER_ONE_BINDING:
-				{
-				VkBuffer vertexBuffers[] = { vertexBuffer };
-				VkDeviceSize offsets[] = { 0 };
-				vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
-				vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-				}
-				break;
-
-				case TWO_BUFFERS_TWO_BINDINGS:
-				{
-				VkBuffer vertexBuffers2[] = { vertexBufferPos, vertexBufferColor };
-				VkDeviceSize offsets2[] = { 0, 0 };
-				vkCmdBindVertexBuffers(commandBuffers[i], 0, 2, vertexBuffers2, offsets2);
-				vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-				}
-				break;
-
-				case ONE_BUFFER_TWO_BINDINGS:
-				{
-				VkBuffer vertexBuffers2[] = { vertexBuffer, vertexBuffer };
-				VkDeviceSize offsets2[] = { offsetof(Vertex, pos), offsetof(Vertex, color) };
-				vkCmdBindVertexBuffers(commandBuffers[i], 0, 2, vertexBuffers2, offsets2);
-				vkCmdBindIndexBuffer(commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
-				}
-				break;
-
-				}
-				*/
-				//		vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
-
-		vkCmdEndRenderPass(commandBuffers[i]);
-
-		if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
+	for (size_t i = 0; i < swapChainFramebuffers.size(); i++)
+	{
+		auto &cb = commandBuffers[i];
+		currentDescriptorSet = nullptr;
+		vkBeginCommandBuffer(cb, &beginInfo);
+		_CreateForwardCommandBuffer(cb, swapChainFramebuffers[i]);
+		if (vkEndCommandBuffer(cb) != VK_SUCCESS) {
 			throw std::runtime_error("failed to record command buffer!");
 		}
 	}
@@ -1052,10 +1059,10 @@ void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagB
 
 	samples = VK_SAMPLE_COUNT_1_BIT;
 
-	_CreateAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, winExtent, deferredFrameBuf.albedo);
-	_CreateAttachment(VK_FORMAT_R16G16_SNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, winExtent, deferredFrameBuf.normals);
-	_CreateAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, winExtent, deferredFrameBuf.pbr);
-	_CreateAttachment(_FindDepthFormat(), VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, winExtent, deferredFrameBuf.depth);
+	_CreateAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, winExtent, deferredFrameBuf.albedo);
+	_CreateAttachment(VK_FORMAT_R16G16_SNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, winExtent, deferredFrameBuf.normals);
+	_CreateAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, winExtent, deferredFrameBuf.pbr);
+	_CreateAttachment(_FindDepthFormat(), VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, winExtent, deferredFrameBuf.depth);
 
 	std::vector<VkAttachmentDescription> attachmentDescs;
 	std::vector<VkAttachmentReference> colorReferences;
@@ -1154,14 +1161,27 @@ void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagB
 	sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
 	if (vkCreateSampler(device, &sampler, nullptr, &deferredFrameBuf.colorSampler) != VK_SUCCESS)
 		throw std::runtime_error("failed to sampler!");
+
+	deferredFrameBuf.descriptionImageInfo.push_back({ deferredFrameBuf.colorSampler, deferredFrameBuf.albedo.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+	deferredFrameBuf.descriptionImageInfo.push_back({ deferredFrameBuf.colorSampler, deferredFrameBuf.normals.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+	deferredFrameBuf.descriptionImageInfo.push_back({ deferredFrameBuf.colorSampler, deferredFrameBuf.pbr.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+	deferredFrameBuf.descriptionImageInfo.push_back({ VK_NULL_HANDLE, deferredFrameBuf.depth.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+
+	VkSemaphoreCreateInfo semaphoreInfo = {};
+	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+	if (vkCreateSemaphore(device, &semaphoreInfo, allocator, &deferredFrameBuf.deferredSemaphore) != VK_SUCCESS ||
+		vkCreateSemaphore(device, &semaphoreInfo, allocator, &deferredFrameBuf.resolvingSemaphore) != VK_SUCCESS)
+	{
+		throw std::runtime_error("failed to create semaphores!");
+	}
 }
 
 void OutputWindow::_LoadShaderPrograms()
 {
-
 	_CreateDescriptorPool();                            // create descriptor pool for all used shader programs
 
-	shaders.foreach([&](CShaderProgram *&s) {
+	shaders.foreach([&](CShaderProgram *&s) 
+	{
 		auto outputNames = s->GetOutputNames();			// select renderPass base on names of output attachments in fragment shader
 		if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
 		{
@@ -1179,6 +1199,7 @@ void OutputWindow::_CleanupShaderPrograms()
 	shaders.foreach([&](CShaderProgram *&s) {
 		s->Release();
 	});
+	forwardRenderingShaders.clear();
 }
 
 void OutputWindow::UpdateUniformBuffer()
@@ -1227,11 +1248,11 @@ void OutputWindow::_RecreateCommandBuffers()
 	recreateCommandBuffers = false;
 }
 
-void OutputWindow::DrawFrame()
+bool OutputWindow::_SimpleAcquireNextImage(uint32_t &imageIndex)
 {
 	if (!swapChain || resizeWindow) {
 		RecreateSwapChain();
-		return;
+		return false;
 	}
 
 	if (recreateCommandBuffers)
@@ -1239,44 +1260,59 @@ void OutputWindow::DrawFrame()
 		_RecreateCommandBuffers();
 	}
 
-	uint32_t imageIndex;
+
 	VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
 		RecreateSwapChain();
-		return;
+		return false;
 	}
-	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+	{
 		throw std::runtime_error("failed to acquire swap chain image!");
 	}
 	if (!sharedUboData)
-		return;
+	{
+		return false;
+	}
+
+	return true;
+}
+
+void OutputWindow::_SimpleQueueSubmit(VkSemaphore &waitSemaphore, VkSemaphore &signalSemaphore, VkCommandBuffer &commandBuffer)
+{
 
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-	VkSemaphore waitSemaphores[] = { imageAvailableSemaphore };
+	VkSemaphore waitSemaphores[] = { waitSemaphore };
 	VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	VkSemaphore signalSemaphores[] = { signalSemaphore };
+
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitSemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 
-	submitInfo.commandBufferCount = 1;
-	submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
-
-	VkSemaphore signalSemaphores[] = { renderFinishedSemaphore };
 	submitInfo.signalSemaphoreCount = 1;
 	submitInfo.pSignalSemaphores = signalSemaphores;
+
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
 
 	if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
 		throw std::runtime_error("failed to submit draw command buffer!");
 	}
+}
+
+void OutputWindow::_SimplePresent(VkSemaphore &waitSemaphore, uint32_t imageIndex)
+{
+	VkSemaphore waitSemaphores[] = { waitSemaphore };
 
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 
 	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = signalSemaphores;
+	presentInfo.pWaitSemaphores = waitSemaphores;
 
 	VkSwapchainKHR swapChains[] = { swapChain };
 	presentInfo.swapchainCount = 1;
@@ -1285,13 +1321,25 @@ void OutputWindow::DrawFrame()
 
 	presentInfo.pResults = nullptr; // Optional
 
-	result = vkQueuePresentKHR(presentQueue, &presentInfo);
+	VkResult result = vkQueuePresentKHR(presentQueue, &presentInfo);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 		RecreateSwapChain();
 	}
 	else if (result != VK_SUCCESS) {
 		throw std::runtime_error("failed to present swap chain image!");
 	}
+}
+
+void OutputWindow::DrawFrame()
+{
+	uint32_t imageIndex;
+	if (!_SimpleAcquireNextImage(imageIndex))
+		return;
+	bool deferredPresent = true;
+
+	_SimpleQueueSubmit(imageAvailableSemaphore, deferredFrameBuf.deferredSemaphore, *commandBuffers.rbegin());
+	_SimpleQueueSubmit(deferredFrameBuf.deferredSemaphore, renderFinishedSemaphore, commandBuffers[imageIndex]);
+	_SimplePresent(renderFinishedSemaphore, imageIndex);
 
 	vkQueueWaitIdle(presentQueue);
 }
@@ -1305,10 +1353,21 @@ CShaderProgram * OutputWindow::AddShader(const char * shader)
 	sh = shaders.add(shader, this);
 	sh->LoadProgram(shader); 
 
+	auto outputNames = sh->GetOutputNames();			// select renderPass base on names of output attachments in fragment shader
+	if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
+	{
+		forwardRenderingShaders.push_back(sh);
+		sh->SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
+	}
+	else 
+	{ // deferred
+		deferredFrameBuf.shaders.push_back(sh);
+		sh->SetRenderPassAndMsaaSamples(deferredFrameBuf.renderPass, msaaSamples);
+	}
+	
 	if (renderPass != nullptr)
 	{
 		// prepare shader to be used.
-		sh->SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
 		sh->CreateGraphicsPipeline();
 		sh->CreateDescriptorSets();
 		sh->UpdateDescriptorSets();
@@ -1356,6 +1415,27 @@ void OutputWindow::UpdateDrawCommands()
 	BufferRecreationNeeded();
 }
 
+VkDescriptorImageInfo *OutputWindow::GetDescriptionImageInfo(const char * attachmentName)
+{
+	if (strcmp(attachmentName, "samplerAlbedo") == 0)
+	{
+		return &deferredFrameBuf.descriptionImageInfo[0];
+	}
+	else if (strcmp(attachmentName, "samplerNormal") == 0)
+	{
+		return &deferredFrameBuf.descriptionImageInfo[1];
+	}
+	else if (strcmp(attachmentName, "samplerPbr") == 0)
+	{
+		return &deferredFrameBuf.descriptionImageInfo[2];
+	}
+	else if (strcmp(attachmentName, "samplerDepth") == 0)
+	{
+		return &deferredFrameBuf.descriptionImageInfo[3];
+	}
+	return nullptr;
+}
+
 CShaderProgram * OutputWindow::_GetShader(const char *shader)
 {
 	return AddShader(shader);
@@ -1399,10 +1479,3 @@ bool OutputWindow::IsBufferFeatureSupported(VkFormat format, VkFormatFeatureFlag
 	vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &pr);
 	return pr.bufferFeatures & features;
 }
-
-/*
-DrawObjectInfo * OutputWindow::GetModel(const char *name)
-{
-	return meshes.find(name);
-}
-*/
