@@ -70,20 +70,23 @@ public:
 		size(_size),
 		used(0),
 		tresholdLevel(_tresholdLevel),
-		treshold(static_cast<U32>(_tresholdLevel * _size))
+		treshold(static_cast<U32>(_tresholdLevel * _size)),
+		data(nullptr)
 	{
 		alloc = Allocators::GetMemoryAllocator(allocId);
-		SIZE_T s = size * sizeof(data[0]);
-		data = reinterpret_cast<TEntry*>(alloc->allocate(s));
-		memset(data, 0, s); // we clear values, becasue we store inside info, if slot is used or not.
+//		SIZE_T s = size * sizeof(data[0]);
+//		data = reinterpret_cast<TEntry*>(alloc->allocate(s));
+//		memset(data, 0, s); // we clear values, becasue we store inside info, if slot is used or not.
 	}
 
 	~hashtable()
 	{
-		alloc->deallocate(data);
+		if (data)
+			alloc->deallocate(data);
 	}
 
-	void clear() { memset(data, 0, size * sizeof(data[0])); }
+	void clear() { if (data) memset(data, 0, size * sizeof(data[0])); used = 0; }
+	void reset() { alloc->deallocate(data); data = nullptr; }
 
 	TVal & operator[] (const TKey &key)
 	{
@@ -104,6 +107,13 @@ public:
 	TVal *add(const TKey &key) { return add(key, getHash(key)); }
 	TVal *add(const TKey &key, hash_t h)
 	{
+		if (!data)
+		{
+			SIZE_T s = size * sizeof(data[0]);
+			data = reinterpret_cast<TEntry*>(alloc->allocate(s));
+			memset(data, 0, s); // we clear values, becasue we store inside info, if slot is used or not.
+		}
+
 		++used;
 		if (used > treshold)
 			rehash(size * 2);
@@ -126,6 +136,9 @@ public:
 	TVal *find(const TKey &key) { return find(key, getHash(key)); }
 	TVal *find(const TKey &key, hash_t h)
 	{
+		if (!data)
+			return nullptr;
+
 		U32 i = h % size;
 
 		while (data[i].hash != EMPTY)
@@ -143,6 +156,9 @@ public:
 
 	void remove(const TKey &key)
 	{
+		if (!data)
+			return;
+
 		hash_t h = getHash(key);
 		U32 i = h % size;
 
@@ -163,6 +179,9 @@ public:
 	template<typename Callback>
 	void foreach(Callback &f) 
 	{
+		if (!data)
+			return;
+
 		for (uint32_t i = 0; i < size; ++i)
 		{
 			if (data[i].hash >= RESERVED)
@@ -172,6 +191,12 @@ public:
 };
 
 
+/// Properties of cstringhashtable
+/// - objects are not moved after creation (until table is cleared), so pointer to object is valid always
+/// - c-string (name of object) is copied
+/// - when object is created, you will get index of object [uint32_t]
+/// - you can use index of object to get access to object
+/// - you can use name of object to find index of object or object itself
 template <typename K, typename T>
 class cstringhastable
 {
@@ -179,7 +204,7 @@ class cstringhastable
 	typename std::enable_if<std::is_trivially_destructible<X>::value == false>::type
 		deleteObjects()
 	{
-		ht.foreach([&](T *o) {
+		foreach([&](T *o) {
 			o->~T();
 		});
 	}
@@ -191,58 +216,89 @@ class cstringhastable
 		// Trivially destructible objects can be reused without using the destructor.
 	}
 
-public:
-	IMemoryAllocator *alloc;
-	BAMS::CORE::hashtable<const K *, T *> ht;
+	SIZE_T keyLength(const char *s) { return strlen(s) + 1; }
+	SIZE_T keyLength(const wchar_t *s) { return (wcslen(s) + 1) * sizeof(wchar_t); }
 
-	cstringhastable()
-	{
-		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);
-	}
+	IMemoryAllocator *alloc;
+	BAMS::CORE::hashtable<const K *, SIZE_T> ht;
+	BAMS::CORE::basic_array<T *> table;
+
+public:
+
+	cstringhastable() : alloc(nullptr) {}
 
 	~cstringhastable()
 	{
 		deleteObjects<T>();
-		delete alloc;
+		ht.clear();
+		table.reset(); // reset, not clear, clear will not release memory
+		if (alloc)
+			delete alloc;
 	}
 
 	void clear()
 	{
 		deleteObjects<T>();                                                     // call destructors of objects if needed
 		ht.clear();                                                             // clear hashtable data
-		delete alloc;                                                           // delete allocated memory for strings (all at once)
+		table.clear();
+		if (alloc)
+			delete alloc;                                                       // delete allocated memory for strings (all at once)
 		alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);  // create new allocator for strings (with empty buffer)
 	}
 
-	T * find(const K *s) { auto p = ht.find(s); return p ? *p : nullptr; }
+	void reset()
+	{
+		deleteObjects<T>();                                                     // call destructors of objects if needed
+		ht.reset();                                                             // clear hashtable data
+		table.reset();
+		if (alloc)
+			delete alloc;                                                           // delete allocated memory for strings (all at once)
+		alloc = nullptr;
+	}
 
-	SIZE_T keyLength(const char *s) { return strlen(s)+1; }
-	SIZE_T keyLength(const wchar_t *s) { return (wcslen(s) + 1) * sizeof(wchar_t); }
+	T * find(const K *s) { auto pIdx = ht.find(s); return pIdx ? table[*pIdx] : nullptr; }
+	SIZE_T * findIdx(const K *s) { return ht.find(s); }
+
 
 	template<class... Args>
-	T * add(const K *s, Args &&...args)
+	T * add(const K *s, Args &&...args) 
+	{ 
+		auto idx = addIdx(s, std::forward<Args>(args)...);
+		return table[idx]; 
+	}
+
+	template<class... Args>
+	SIZE_T addIdx(const K *s, Args &&...args)
 	{
+		if (!alloc)
+			alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);  // create new allocator for strings (with empty buffer)
+
 		auto h = ht.getHash(s);
-		auto pV = ht.find(s, h);
-		if (!pV)
+		auto pIdx = ht.find(s, h);
+		if (!pIdx)
 		{
 			SIZE_T l = keyLength(s);
 			K *newS = static_cast<K *>(alloc->allocate(l));
 			memcpy_s(newS, l, s, l);
 			s = newS;
-			pV = ht.add(s, h);
+			pIdx = ht.add(s, h);
+			*pIdx = table.size();
+
+
+			auto *pV = table.add_empty();
 			*pV = new (alloc->allocate(sizeof(T))) T(std::forward<Args>(args)...);
 		}
-		return *pV;
+		return *pIdx;
 	}
 
-	T & operator[] (const K *s)
-	{
-		return *add(s);
-	}
+	T & operator[] (const K *s) { return *add(s); }
+	T & operator[] (SIZE_T idx) { return *table[idx]; }
 
 	template<typename Callback>
-	void foreach(Callback &f) { ht.foreach(f); }
+	void foreach(Callback &f) 
+	{ 
+		table.foreach(f);
+	}
 };
 
 template<typename T>

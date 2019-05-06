@@ -2,9 +2,10 @@
 
 using namespace BAMS;
 using namespace BAMS::RENDERINENGINE;
+using BAMS::CORE::Property;
+
 const uint32_t ALWAYS_RESERVE_VERTICES = 16 * 1024; // <- 256kB for 16bytes / per vertice
 const uint32_t ALWAYS_RESERVE_INDICES = ALWAYS_RESERVE_VERTICES;
-const char *SHAREDUBOTYPENAME = "SharedUBO";
 
 /// <summary>
 /// Loads the program.
@@ -18,7 +19,6 @@ void CShaderProgram::LoadProgram(const char *program)
 	// to do: add support for loading program description from manifest
 	m_reflection.LoadProgram(program);
 	_BuildProperties();
-	_BuindShaderDataBuffers();
 }
 
 void CShaderProgram::Release()
@@ -26,7 +26,7 @@ void CShaderProgram::Release()
 	for (auto &ubo : m_uniformBuffers)
 	{
 		// we don't want to destroy shared ubo
-		if (ubo.buffer != vk->sharedUniformBuffer && ubo.memory != vk->sharedUniformBufferMemory)
+		if (!ubo.isSharedUbo)
 			vk->vkDestroy(ubo);
 	}
 	m_uniformBuffers.clear();
@@ -100,6 +100,7 @@ void CShaderProgram::CreateGraphicsPipeline()
 
 	// other stuffs use by shader program
 	_CreateUniformBuffers();
+	_BuildShaderDataBuffers();
 }
 
 // ============================================================================ CShaderProgram private methods ===
@@ -259,17 +260,23 @@ VkPipelineColorBlendStateCreateInfo CShaderProgram::_GetColorBlendState()
 
 	/* TODO: Add support for multiple attachment. Right now all works only with one. */
 
-	VkPipelineColorBlendAttachmentState colorBlendAttachment;
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachment.blendEnable = VK_FALSE;
-	colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD; // Optional
-	colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
-	colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	colorBlendAttachments.push_back(colorBlendAttachment);
+	static VkPipelineColorBlendAttachmentState noBlending;
+	noBlending.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+	noBlending.blendEnable = VK_FALSE;
+
+	noBlending.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+	noBlending.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+	noBlending.colorBlendOp = VK_BLEND_OP_ADD; // Optional
+
+	noBlending.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
+	noBlending.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
+	noBlending.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
+
+	auto &outputNames = m_reflection.GetOutputNames();
+	for (auto &name : outputNames)
+	{
+		colorBlendAttachments.push_back(noBlending);
+	}
 
 	/* alpha blending
 	colorBlendAttachment.blendEnable = VK_TRUE;
@@ -466,8 +473,6 @@ void CShaderProgram::_CreateNewBufferSet(uint32_t numVertices, uint32_t numIndec
 	m_bufferSets.emplace_back(set);
 }
 
-VertexDescription *GetDemoCube();
-
 VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
 {
 	// TODO: Load mesh from resources
@@ -483,7 +488,7 @@ VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
 			return &vd;
 		}
 	}
-	return GetDemoCube();
+	return nullptr;
 }
 
 uint32_t CShaderProgram::AddMesh(const char *name)
@@ -492,16 +497,18 @@ uint32_t CShaderProgram::AddMesh(const char *name)
 		return *pMeshId;
 
 	auto &va = _GetVertexAttribs();
+
+	// if this shader don't use any geometry (like deferred resolve shader) we don'y need to load any mesh
 	if (!va.size)
 	{
-		Mesh m = { 0, 0, 0, 0, 0 }; // empty mesh
-		m.numIndex = 3; // one triangle
+		Mesh m = { 0, 0, 0, 0, 3 }; // empty mesh with 3 indices (they are not readed from mem, they are computed in shader)
 
 		uint32_t meshId = static_cast<uint32_t>(m_meshes.size());
 		m_meshes.push_back(m);
 		*m_meshNames.add(name) = meshId;
 		return meshId;
 	}
+
 	const VertexDescription *vd = _GetMeshVertexDescription(name);
 	if (!vd)
 		return -1;
@@ -576,14 +583,16 @@ void CShaderProgram::_CreateUniformBuffers()
 	auto &uboParams = m_reflection.GetParamsInUBO();
 	for (auto &ubo : uboParams)
 	{
-		if (ubo.entry.rootTypeName == SHAREDUBOTYPENAME) // "ubo" is global/shared ubo and we do not create it here... only separate ones used in this shader
+		if (ubo.isSharedUBO) // "ubo" is global/shared ubo and we do not create it here... only separate ones used in this shader
 		{
 			m_uniformBuffers.push_back({
 				ubo.binding,
 				ubo.stage,
 				ubo.entry.size,
 				vk->sharedUniformBuffer,
-				vk->sharedUniformBufferMemory });
+				vk->sharedUniformBufferMemory,
+				vk->sharedUboData,
+				true});
 			continue;
 		}
 
@@ -591,23 +600,33 @@ void CShaderProgram::_CreateUniformBuffers()
 		// Allocate buffers to store give number of objects, there is no reason to have all buffers same size
 		// Right now we allocate space for only one object in UBO. All is passed with push_constants.
 
-		uint32_t numObjects = 10;
+		uint32_t numObjects = 1;
 		VkDeviceSize bufferSize = ubo.entry.size * numObjects;
-		VkBuffer buf;
-		VkDeviceMemory mem;
+		VkBuffer buf = VK_NULL_HANDLE;
+		VkDeviceMemory mem = VK_NULL_HANDLE;
+		VkMemoryPropertyFlags memProp = ubo.isHostVisibleUBO ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		void *mappedBuffer = nullptr;
 
 		vk->_CreateBuffer(
 			bufferSize,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			memProp,
 			buf, mem);
 		
+		if (ubo.isHostVisibleUBO)
+		{
+			vkMapMemory(vk->device, mem, 0, bufferSize, 0, &mappedBuffer);
+		}
+
 		m_uniformBuffers.push_back({
 			ubo.binding, 
 			ubo.stage, 
 			static_cast<uint32_t>(bufferSize), 
 			buf,
-			mem });
+			mem,
+			mappedBuffer,
+			false});
+
 	}
 }
 
@@ -627,38 +646,24 @@ void CShaderProgram::_BuildProperties()
 	for (auto &p : m_shaderProgramParamNames)
 	{
 		++paramIdx;
-		if (strcmp(p.rootTypeName, SHAREDUBOTYPENAME) == 0)
+		if (p.root->isSharedUBO)
 			continue;
 
+		p.propertyParentIdx = paramIdx;
 		uint32_t parentId = -1;
-		if (p.parent)
+		if (p.parentIdx < m_shaderProgramParamNames.size())
 		{
-			bool isParentMissing = true;
-			for (auto &e : m_properties)
-			{
-				++parentId;
-				if (strcmp(e.name, p.parent) == 0)
-				{
-					isParentMissing = false;
-					break;
-				}
-			}
-			if (isParentMissing)
-			{
-				// add parent
-				parentId = m_properties.size();
-				m_properties.add(p.parent);
-			}
+			parentId = m_shaderProgramParamNames[p.parentIdx].propertyParentIdx;
 		}
 
 		// add entry
 		auto pr = m_properties.add();
-		pr->name = p.name;
+		pr->name = p.mem->name.c_str();
 		pr->parent = parentId;
 		pr->idx = paramIdx;
-		pr->type = p.propertyType;
-		pr->count = p.propertyCount;
-//		ShaderReflectionType2PropertyType(p.type, pr);
+		pr->type = p.mem->propertyType;
+		pr->count = p.mem->propertyCount;
+		pr->array_stride = p.mem->array_stride;
 	}
 }
 
@@ -672,29 +677,18 @@ void CShaderProgram::_BuindShaderProgramParamsDesc()
 	_BuindShaderProgramParamsDesc(&pcParams, dataBufferId);
 	_BuindShaderProgramParamsDesc(&uboParams, dataBufferId);
 
-	if (pcParams.size() && m_shaderProgramParamNames.size())
-	{
-		m_pushConstantsStride   = m_shaderProgramParamNames[0].stride;
-		m_pushConstantsBufferId = m_shaderProgramParamNames[0].dataBufferId;
-		m_pushConstantsStages   = pcParams[0].stage;
-	}
-	else
-	{
-		m_pushConstantsStride   = 0;
-		m_pushConstantsBufferId = 0;
-		m_pushConstantsStages   = 0;
-	}
+	m_isPushConstantsUsed = pcParams.size() && m_shaderProgramParamNames.size();
 }
 
 void CShaderProgram::_BuindShaderProgramParamsDesc(const std::vector<ValDetails>* vals, uint32_t &dataBufferId)
 {
 	for (auto &vd : *vals) {
-		_BuindShaderProgramParamsDesc(vd.entry, vd.entry, vd.entry, dataBufferId);
+		_BuindShaderProgramParamsDesc(vd.entry, -1, vd, dataBufferId);
 		++dataBufferId;
 	}
 }
 
-void CShaderProgram::_BuindShaderProgramParamsDesc(const ValMemberDetails &entry, const ValMemberDetails &parent, const ValMemberDetails &root, uint32_t dataBufferId)
+void CShaderProgram::_BuindShaderProgramParamsDesc(const ValMemberDetails &entry, uint32_t parentIdx, const ValDetails &root, uint32_t dataBufferId)
 {
 	assert(entry.members.size() > 0);
 
@@ -702,46 +696,98 @@ void CShaderProgram::_BuindShaderProgramParamsDesc(const ValMemberDetails &entry
 	{
 		if (mem.members.size())
 		{
-			_BuindShaderProgramParamsDesc(mem, entry, root, dataBufferId);
+			// add parent?
+			if (mem.propertyType == Property::PT_ARRAY) // it is array! add parrent
+			{
+				m_shaderProgramParamNames.push_back({
+					&root,
+					&mem,
+					parentIdx,
+					dataBufferId,
+					static_cast<uint32_t>(-1)
+				});
+				parentIdx = static_cast<uint32_t>(m_shaderProgramParamNames.size() - 1);
+			}
+			_BuindShaderProgramParamsDesc(mem, parentIdx, root, dataBufferId);
 		}
 		else if (mem.propertyType != BAMS::CORE::Property::PT_UNKNOWN)
 		{
 			m_shaderProgramParamNames.push_back({
-				mem.type,
-				mem.name.c_str(),
-				&parent != &root ? parent.name.c_str() : "",
-				root.rootTypeName.c_str(),
-				mem.offset,
-				mem.size,
-				root.size,
+				&root,
+				&mem,
+				parentIdx,
 				dataBufferId,
-				mem.propertyType,
-				mem.propertyCount
-				});
+				static_cast<uint32_t>(-1)
+			});
 		}
 	}
 }
 
-uint32_t MAXBUFFERCHUNKSIZE = 32 * 1024;
+const uint32_t MAXBUFFERCHUNKSIZE = 32 * 1024;
+const uint32_t MAXNUMOBJCTS = 1000;
 
-void CShaderProgram::_BuindShaderDataBuffers()
+void CShaderProgram::_BuildShaderDataBuffers()
 {
-	auto &uboParams = m_reflection.GetParamsInUBO();
 	auto &pcParams = m_reflection.GetParamsInPushConstants();
-	uint32_t maxPerObject = m_reflection.GetMaxUBOSize();
-	if (maxPerObject < m_reflection.GetMaxPCSize())
-		maxPerObject = m_reflection.GetMaxPCSize();
-	uint32_t maxObjects = MAXBUFFERCHUNKSIZE / (maxPerObject > 0 ? maxPerObject : 1);
+	auto &uboParams = m_reflection.GetParamsInUBO(); 
+	// I can't use m_uniformBuffers :( It is not initialized yet. 
+	// I have to make all decision base on uboParams
+	
+	// calc required memory to store own data
+	uint32_t localMemorySize = 0;
+	for (auto &pc : pcParams)
+		localMemorySize += pc.entry.size;
 
-	// TODO: make memory allocation sensible... now it allocs a lot of unused memory, so:
-	// - calc all requred mem, and alloc it at once, dont forget about requirments for memory alignment
-	// - sprlit that memory to blocks (for different buffers).
+	for (auto &ub : m_uniformBuffers)
+		if (!ub.isSharedUbo && ub.mappedBuffer)
+			localMemorySize += ub.size;
 
-	m_paramsBuffer.resize(pcParams.size() + uboParams.size());
-	for (auto &buf : m_paramsBuffer)
+	uint32_t maxObjects = MAXNUMOBJCTS;
+	if (localMemorySize)
+		maxObjects = MAXBUFFERCHUNKSIZE / localMemorySize;
+
+	if (maxObjects > MAXNUMOBJCTS)
+		maxObjects = MAXNUMOBJCTS;
+
+	m_paramsLocalBuffer.resize(localMemorySize*maxObjects);
+	auto localBuf = m_paramsLocalBuffer.data();
+	
+	m_paramsBuffers.clear();
+	for (auto &pc : pcParams)
 	{
-		buf.resize(MAXBUFFERCHUNKSIZE);
+		m_paramsBuffers.push_back({
+			PUSH_CONSTANTS,
+			localBuf,
+			pc.entry.size,
+			false
+			});
+		localBuf += pc.entry.size * maxObjects;
 	}
+
+	for (auto &ub : m_uniformBuffers)
+	{
+		if (ub.mappedBuffer)
+		{
+			m_paramsBuffers.push_back({
+				HOSTVISIBLE_UBO,
+				reinterpret_cast<uint8_t*>(ub.mappedBuffer),
+				ub.size,
+				false
+				});
+
+		}
+		else
+		{
+			m_paramsBuffers.push_back({
+				UBO,
+				localBuf,
+				ub.size,
+				false
+				});
+
+			localBuf += ub.size * maxObjects;
+		}
+	}	
 }
 
 void CShaderProgram::_ImportMeshData(const VertexDescription *srcVD, void *dstBuf)
@@ -863,12 +909,22 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 
 //	TRACE("[" << m_drawObjectData.size() << "]");
 
-	uint8_t *pushConstantsData = m_pushConstantsStride ? m_paramsBuffer[m_pushConstantsBufferId].data() : nullptr;
+	uint8_t *pcBuffer = nullptr;
+	uint32_t pcStride = 0;
+	uint32_t pcStage = 0;
+	if (m_isPushConstantsUsed)
+	{
+		uint32_t pcBufferId = m_shaderProgramParamNames[0].dataBufferId;
+		pcBuffer = m_paramsBuffers[pcBufferId].buffer;
+		pcStride = m_paramsBuffers[pcBufferId].size;
+		pcStage = m_shaderProgramParamNames[0].root->stage;
+	}
 	for (auto &dod : m_drawObjectData)
 	{
 		auto &m = m_meshes[dod.meshIdx];
 		if (m.numVertex > 0 && m.bufferSetIdx != lastBufferSetIdx)
 		{
+			lastBufferSetIdx = m.bufferSetIdx;
 			auto &bs = m_bufferSets[m.bufferSetIdx];
 			VkBuffer vertexBuffers[] = { bs.vertexBuffer };
 			VkDeviceSize offsets[] = { 0 };
@@ -877,10 +933,10 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 		}
 
 		// TODO:
-		if (pushConstantsData)
+		if (m_isPushConstantsUsed)
 		{
-			vkCmdPushConstants(cb, m_pipelineLayout, m_pushConstantsStages, 0, m_pushConstantsStride, pushConstantsData);
-			pushConstantsData += m_pushConstantsStride;
+			vkCmdPushConstants(cb, m_pipelineLayout, pcStage, 0, pcStride, pcBuffer);
+			pcBuffer += pcStride;
 		}
 		if (m.numVertex == 0)
 		{

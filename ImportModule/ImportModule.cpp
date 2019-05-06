@@ -254,7 +254,7 @@ public:
 
 	void Finalize()
 	{
-		m_modelRepoName2modelRepo.clear();
+		m_modelRepoName2modelRepo.reset();
 		m_importedModelRepos.clear();
 		BAMS::CORE::WSTR::Finalize();
 		BAMS::CORE::STR::Finalize();

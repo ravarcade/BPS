@@ -136,6 +136,13 @@ public:
 	}
 
 	void resize(SIZE_T newSize) { _Realocate(newSize); }
+
+	template<typename Callback>
+	void foreach(Callback &callback) 
+	{
+		for (auto f = begin(), e = end(); f != e; ++f)
+			callback(*f);
+	}
 };
 
 template <typename T, MemoryAllocator _allocator = Allocators::default, SIZE_T minReservedSize = 48>

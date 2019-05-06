@@ -4,7 +4,7 @@
 
 using namespace spirv_cross;
 using namespace BAMS::RENDERINENGINE;
-const char *SharedUniformBufferObject = "UniformBufferObject";
+//const char *SharedUniformBufferObject = "UniformBufferObject";
 
 enum ShaderReflectionType {
 	UNKNOWN = 0,
@@ -169,11 +169,24 @@ void GetDetails(CompilerGLSL &comp, SPIRType &type, ValMemberDetails &ent)
 			SetSimplifiedType(mem);
 			mem.propertyType = toPropType[mem.type];
 			mem.propertyCount = toPropCount[mem.type];
+			mem.propertyArrayStride = mem.size;
+
 			if (member_type.basetype == SPIRType::BaseType::Struct && member_type.member_types.size())
 			{
 				GetDetails(comp, member_type, mem);
 			}
 		
+			// finetune for arrays:
+			if (mem.members.size() > 0 && 
+				mem.array > 0 && 
+				mem.array_stride > 0) // it is array! so mark it as array
+			{
+				mem.propertyType  = Property::PT_ARRAY;
+				mem.propertyCount = mem.array;
+				mem.propertyArrayStride = mem.array_stride;
+//				mem.size          = mem.array_stride; //(?check it)
+			}
+
 			ent.members.push_back(mem);
 		}
 	}
@@ -313,13 +326,12 @@ void CShadersReflections::_ParsePrograms()
 	};
 
 	m_enableAlpha = false;
-	vi.params_in_ubos.clear();
-	vi.params_in_push_constants.clear();
+	m_params_in_ubos.clear();
+	m_params_in_push_constants.clear();
 
-	vi.total_ubos_size = 0;
-	vi.shared_ubos_size = 0;
-	vi.max_single_ubo_size = 0;
-	vi.ubo_sizes.clear();
+	m_total_ubos_size = 0;
+	m_shared_ubos_size = 0;
+	m_ubo_sizes.clear();
 
 	for (auto &prg : m_programs) 
 	{		
@@ -343,24 +355,25 @@ void CShadersReflections::_ParsePrograms()
 			ValDetails vd;
 			GetDetails(compiler, buffer, vd);
 			vd.stage = prg.stage;
-			vi.params_in_ubos.push_back(vd);
-			if (vd.entry.rootTypeName == SharedUniformBufferObject)
+			vd.isSharedUBO = vd.entry.rootTypeName == SHAREDUBOTYPENAME;
+			vd.isHostVisibleUBO = ForceHostVisibleUBOS || vd.isSharedUBO;
+			m_params_in_ubos.push_back(vd);
+
+			if (vd.isSharedUBO)
 			{
-				vi.shared_ubos_size += vd.entry.size;
+				m_shared_ubos_size += vd.entry.size;
 			}
 			else {
-				vi.total_ubos_size += vd.entry.size;
-				if (vi.max_single_ubo_size < vd.entry.size)
-					vi.max_single_ubo_size = vd.entry.size;
+				m_total_ubos_size += vd.entry.size;
 
-				if (vi.ubo_sizes.size() <= vd.binding)
+				if (m_ubo_sizes.size() <= vd.binding)
 				{
-					size_t i = vi.ubo_sizes.size();
-					vi.ubo_sizes.resize(vd.binding + 1);
+					size_t i = m_ubo_sizes.size();
+					m_ubo_sizes.resize(vd.binding + 1);
 					for (; i < vd.binding; ++i)
-						vi.ubo_sizes[i] = 0;
+						m_ubo_sizes[i] = 0;
 				}
-				vi.ubo_sizes[vd.binding] = vd.entry.size;
+				m_ubo_sizes[vd.binding] = vd.entry.size;
 			}
 
 			auto name = compiler.get_name(buffer.id);
@@ -379,7 +392,7 @@ void CShadersReflections::_ParsePrograms()
 			ValDetails vd;
 			GetDetails(compiler, pushConst, vd);
 			vd.stage = prg.stage;
-			vi.params_in_push_constants.push_back(vd);
+			m_params_in_push_constants.push_back(vd);
 		}
 
 		// sampled_images
@@ -393,7 +406,7 @@ void CShadersReflections::_ParsePrograms()
 			assert(type.basetype == SPIRType::SampledImage);
 			if (type.basetype == SPIRType::SampledImage)
 			{
-				vi.sampled_images.push_back({set, binding, name, static_cast<uint32_t>(type.image.dim), static_cast<uint32_t>(prg.stage)});
+				m_sampled_images.push_back({set, binding, name, static_cast<uint32_t>(type.image.dim), static_cast<uint32_t>(prg.stage)});
 				m_layout.descriptorSets[set].sampled_image_mask |= 1u << binding;
 				m_layout.descriptorSets[set].descriptorCount[binding] = descriptorCount;
 				m_layout.descriptorSets[set].stages[binding] |= prg.stage;
@@ -403,14 +416,12 @@ void CShadersReflections::_ParsePrograms()
 		// for vertex stage get attributes
 		if (prg.stage == VK_SHADER_STAGE_VERTEX_BIT)
 		{
-			if (resources.stage_inputs.size() == 4)
-				TRACE("NOW");
-			vi.vertexAttribs.attribs.clear();
-			vi.vertexDescription = {}; // clear
+			m_vertexAttribs.attribs.clear();
+			m_vertexDescription = {}; // clear
 			for (auto attrib : resources.stage_inputs) 
 			{
-				VertexAttribDetails vad = GetVertexAttribDetails(compiler, attrib, vi.vertexDescription);
-				vi.vertexAttribs.attribs.push_back(vad);
+				VertexAttribDetails vad = GetVertexAttribDetails(compiler, attrib, m_vertexDescription);
+				m_vertexAttribs.attribs.push_back(vad);
 			}
 		}
 
@@ -420,7 +431,7 @@ void CShadersReflections::_ParsePrograms()
 			m_outputNames.clear();
 			for (uint32_t i = 0; i < resources.stage_outputs.size(); ++i)
 			{
-				m_outputNames.push_back(compiler.get_name(resources.stage_outputs[0].id));
+				m_outputNames.push_back(compiler.get_name(resources.stage_outputs[i].id));
 			}
 			m_enableAlpha = resources.stage_outputs.size() == 1 && Utils::icasecmp(compiler.get_name(resources.stage_outputs[0].id), "outColor");
 		}
@@ -428,10 +439,10 @@ void CShadersReflections::_ParsePrograms()
 
 
 	// (1) build strides for every binding point
-	auto &strides = vi.vertexAttribs.strides;
+	auto &strides = m_vertexAttribs.strides;
 	strides.clear();
-	vi.vertexAttribs.size = 0;
-	for (auto &attr : vi.vertexAttribs.attribs)
+	m_vertexAttribs.size = 0;
+	for (auto &attr : m_vertexAttribs.attribs)
 	{
 		if (attr.binding >= strides.size())
 		{
@@ -442,27 +453,25 @@ void CShadersReflections::_ParsePrograms()
 		}
 		attr.offset = strides[attr.binding];
 		strides[attr.binding] += attr.size;
-		vi.vertexAttribs.size += attr.size;
+		m_vertexAttribs.size += attr.size;
 	}
 
 	// (2) copy calculated strides to vertex description
-	for (auto &attr : vi.vertexAttribs.attribs)
+	for (auto &attr : m_vertexAttribs.attribs)
 	{
 		attr.pStream->m_stride = strides[attr.binding];
 	}
 
 	// push constants
 	m_layout.pushConstants.clear();
-	vi.push_constatns_size = 0;
-	for (auto &pc : vi.params_in_push_constants)
+	for (auto &pc : m_params_in_push_constants)
 	{
 		m_layout.pushConstants.push_back({
 			pc.stage,
 			0,
 			pc.entry.size });
-		vi.push_constatns_size += pc.entry.size;
 	}
-	vi.vertexDescription = BAMS::RENDERINENGINE::GetOptimize()->OptimizeVertexDescription(vi.vertexDescription);
+	m_vertexDescription = BAMS::RENDERINENGINE::GetOptimize()->OptimizeVertexDescription(m_vertexDescription);
 	
 }
 

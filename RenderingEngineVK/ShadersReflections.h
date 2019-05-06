@@ -3,6 +3,7 @@
 
 static const unsigned VULKAN_NUM_DESCRIPTOR_SETS = 4;
 static const unsigned VULKAN_NUM_BINDINGS = 16;
+const char * const SHAREDUBOTYPENAME = "SharedUBO";
 
 struct VertexAttribDetails {
 	uint32_t binding;
@@ -34,8 +35,9 @@ struct ValMemberDetails {
 	uint32_t offset = 0;
 	uint32_t size = 0;
 	std::vector<ValMemberDetails> members;
-	uint32_t propertyType;
-	uint32_t propertyCount;
+	uint32_t propertyType = 0;
+	uint32_t propertyCount = 0;
+	uint32_t propertyArrayStride = 0;
 };
 
 struct SampledImageDesc {
@@ -50,24 +52,26 @@ struct ValDetails {
 	uint32_t set = 0;
 	uint32_t binding = 0;
 	uint32_t stage = VK_SHADER_STAGE_VERTEX_BIT;
+	bool isSharedUBO = false;
+	bool isHostVisibleUBO = false;
 	ValMemberDetails entry;
 };
 
 
-struct ShaderDataInfo {
-	BAMS::RENDERINENGINE::VertexDescription vertexDescription;
-
-	VertexAttribs vertexAttribs;
-
-	std::vector<ValDetails> params_in_ubos;
-	std::vector<ValDetails> params_in_push_constants;
-	std::vector<SampledImageDesc> sampled_images;
-	uint32_t push_constatns_size;
-	uint32_t shared_ubos_size;
-	uint32_t total_ubos_size;
-	uint32_t max_single_ubo_size;
-	std::vector<uint32_t> ubo_sizes;
-};
+//struct ShaderDataInfo {
+//	BAMS::RENDERINENGINE::VertexDescription vertexDescription;
+//
+//	VertexAttribs vertexAttribs;
+//
+//	std::vector<ValDetails> params_in_ubos;
+//	std::vector<ValDetails> params_in_push_constants;
+//	std::vector<SampledImageDesc> sampled_images;
+//	uint32_t push_constatns_size;
+//	uint32_t shared_ubos_size;
+//	uint32_t total_ubos_size;
+//	uint32_t max_single_ubo_size;
+//	std::vector<uint32_t> ubo_sizes;
+//};
 
 class CShadersReflections
 {
@@ -101,16 +105,24 @@ public:
 
 	const std::vector<ShaderProgramInfo> &GetPrograms() { return m_programs; }
 	const ResourceLayout &GetLayout() { return m_layout; }
-	const VertexAttribs &GetVertexAttribs() { return vi.vertexAttribs; }
-	const BAMS::RENDERINENGINE::VertexDescription &GetVertexDescription() { return vi.vertexDescription; }
-	const std::vector<ValDetails> &GetParamsInUBO() { return vi.params_in_ubos; }
-	const std::vector<ValDetails> &GetParamsInPushConstants() { return vi.params_in_push_constants; }
-	const std::vector<SampledImageDesc> &GetSampledImages() { return vi.sampled_images; }
-	uint32_t GetMaxUBOSize() { return vi.max_single_ubo_size; }
-	uint32_t GetMaxPCSize() { return vi.push_constatns_size; }
+	const VertexAttribs &GetVertexAttribs() { return m_vertexAttribs; }
+	const BAMS::RENDERINENGINE::VertexDescription &GetVertexDescription() { return m_vertexDescription; }
+	const std::vector<ValDetails> &GetParamsInUBO() { return m_params_in_ubos; }
+	const std::vector<ValDetails> &GetParamsInPushConstants() { return m_params_in_push_constants; }
+	const std::vector<SampledImageDesc> &GetSampledImages() { return m_sampled_images; }
+
 
 private:
-	ShaderDataInfo vi;
+	BAMS::RENDERINENGINE::VertexDescription m_vertexDescription;
+
+	VertexAttribs m_vertexAttribs;
+
+	std::vector<ValDetails> m_params_in_ubos;
+	std::vector<ValDetails> m_params_in_push_constants;
+	std::vector<SampledImageDesc> m_sampled_images;
+	uint32_t m_shared_ubos_size;
+	uint32_t m_total_ubos_size;
+	std::vector<uint32_t> m_ubo_sizes;
 
 	std::vector<ShaderProgramInfo> m_programs;
 	ResourceLayout m_layout;

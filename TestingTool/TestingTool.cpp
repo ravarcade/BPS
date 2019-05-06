@@ -8,6 +8,8 @@
 #include "../3rdParty/glm/gtc/matrix_transform.hpp"
 
 using namespace BAMS;
+using BAMS::CORE::Properties;
+using BAMS::CORE::Property;
 
 void LoadModule(const wchar_t *module)
 {
@@ -173,125 +175,194 @@ static PCREATE_WINDOW w2 = { 2, 500, 200, 1310, 620 };
 using BAMS::CORE::MProperties;
 using BAMS::CORE::Properties;
 std::vector<MProperties> onWnd[3];
-bool wndState[3] = { true, false, false };
+bool wndState[3] = { false, false, false };
+std::vector<MProperties> deferredProp(3);
 
-uint32_t propIdxModel = -1;
-uint32_t propIdxBaseColor = -1;
 
-void SetPropIdx(Properties *pprop)
+
+void SetModel(Property &p, uint32_t num)
 {
-	propIdxModel = -1;
-	propIdxBaseColor = -1;
-	bool once = true; /// always
-	if (once) {
-		once = false;
-		for (uint32_t i = 0; i<pprop->count; ++i)
-		{
-			auto &p = pprop->properties[i];
-			if (strcmp(p.name, "model") == 0)
-				propIdxModel = i;
-			if (strcmp(p.name, "baseColor") == 0)
-				propIdxBaseColor = i;
-		}
-	}
-}
-
-void SetObjParams(Properties *pprop, int num)
-{
-	if (propIdxBaseColor == -1 || propIdxModel == -1)
-		return;
-	static float colors[][4] = {
-		{ 0.1f, 1, 1, 1 },
-		{ 1, 0.1f, 1, 1 },
-		{ 1, 1, 0.1f, 1 }
-	};
-	auto &b = pprop->properties[propIdxBaseColor];
-	auto &m = pprop->properties[propIdxModel];
-	memcpy_s(b.val, 4 * sizeof(float), colors[num % 3], 4 * sizeof(float));
-
-
 	static auto startTime = std::chrono::high_resolution_clock::now();
-
 	auto currentTime = std::chrono::high_resolution_clock::now();
 	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
 
 	uint32_t i = num;
 	int pos = ((i & 1) ? 1 : -1) * ((i + 1) & 0xfffe);
-//	static float s = 0.02f;
+
 	static float s = 1.0f;
 	glm::mat4 I(1.0f);
 	auto S = glm::scale(I, glm::vec3(s));
-//	auto R = glm::rotate(I, time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	auto R = glm::rotate(I, pos * glm::radians(90.0f/4), glm::vec3(0.0f, 0.0f, 1.0f));
+	auto R = glm::rotate(I, time * glm::radians(90.0f / 4), glm::vec3(0.0f, 0.0f, 1.0f));
 	auto T = glm::translate(I, glm::vec3(pos * 15, 0, 0));
 	auto model = T * R * S;
-	
-	memcpy_s(m.val, 16 * sizeof(float), &model[0][0], 16 * sizeof(float));
 
+	memcpy_s(p.val, 16 * sizeof(float), &model[0][0], 16 * sizeof(float));
 }
+
+void SetBaseColor(Property &p, uint32_t num)
+{
+	static float colors[][4] = {
+		{ 0.1f, 1, 1, 1 },
+		{ 1, 0.1f, 1, 1 },
+		{ 1, 1, 0.1f, 1 }
+	};
+
+	memcpy_s(p.val, 4 * sizeof(float), colors[num % 3], 4 * sizeof(float));
+}
+
+Property *FindProp(MProperties &prop, const char *name)
+{
+	for (uint32_t i = 0; i < prop.size(); ++i)
+	{
+		if (strcmp(prop[i].name, name) == 0)
+			return &prop[i];
+	}
+	return nullptr;
+}
+
+void SetParams(Properties *pprop, uint32_t num)
+{
+	for (uint32_t i = 0; i < pprop->count; ++i)
+	{
+		auto &p = pprop->properties[i];
+		if (strcmp(p.name, "model") == 0)
+		{
+			SetModel(p, num);
+		}
+			
+		else if (strcmp(p.name, "baseColor") == 0)
+		{
+			SetBaseColor(p, num);
+		}
+	}
+}
+
+const float lr = 30;
+
+struct Light {
+	float position[4];
+	float color[3];
+	float radius;
+} GlobalLights[6] = {
+	{ { lr, 0, 0, 0}, { 1, 1, 1 }, 2 * lr },
+	{ {0,  lr, 0, 0}, { 0, 0, 1 }, 2 * lr  },
+	{ {-lr, 0, 0, 0}, { 0, 1, 0 }, 2 * lr  },
+	{ {0, -lr, 0, 0}, { 1, 0, 0 }, 2 * lr  },
+	{ {0, 0,  lr, 0}, { 1, 1, 0 }, 2 * lr  },
+	{ {0, 0, -lr, 0}, { 0, 1, 1 }, 2 * lr  },
+
+};
+
+
+void SetLightPosition(Property &p, uint32_t i, uint32_t stride)
+{
+	memcpy_s(
+		reinterpret_cast<uint8_t *>(p.val) + i * stride, 
+		4 * sizeof(float), 
+		GlobalLights[i].position,
+		4 * sizeof(float));
+}
+
+void SetLightColor(Property &p, uint32_t i, uint32_t stride)
+{
+	memcpy_s(
+		reinterpret_cast<uint8_t *>(p.val) + i * stride,
+		3 * sizeof(float),
+		GlobalLights[i].color,
+		3 * sizeof(float));
+}
+
+
+void SetLightRadius(Property &p, uint32_t i, uint32_t stride)
+{
+	memcpy_s(
+		reinterpret_cast<uint8_t *>(p.val) + i * stride,
+		1 * sizeof(float),
+		&GlobalLights[i].radius,
+		1 * sizeof(float));
+}
+
+
+void SetDeferredParams(Properties *pprop)
+{
+	uint32_t stride = 0;
+	uint32_t count = 0;
+	for (uint32_t i = 0; i < pprop->count; ++i)
+	{
+		auto &p = pprop->properties[i];
+		if (strcmp(p.name, "lights") == 0 && p.type == Property::PT_ARRAY)
+		{
+			stride = p.array_stride;
+			count = p.count;
+		}
+
+		else if (strcmp(p.name, "position") == 0)
+		{
+			for (uint32_t i = 0; i < count; ++i)
+			{
+				SetLightPosition(p, i, stride);
+			}
+		}
+
+		else if (strcmp(p.name, "color") == 0)
+		{
+			for (uint32_t i = 0; i < count; ++i)
+			{
+				SetLightColor(p, i, stride);
+			}
+		}
+		else if (strcmp(p.name, "radius") == 0)
+		{
+			for (uint32_t i = 0; i < count; ++i)
+			{
+				SetLightRadius(p, i, stride);
+			}
+		}
+	}
+}
+
 
 void Spin(BAMS::CEngine &en)
 {
-	static auto startTime = std::chrono::high_resolution_clock::now();
-	auto currentTime = std::chrono::high_resolution_clock::now();
-	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
-
 	for (uint32_t i = 0; i < COUNT_OF(onWnd); ++i)
 	{
-		auto &wnd = onWnd[i];
-		if (wnd.size())
+		if (onWnd[i].size())
 		{
-			static float s = 1.0f;
-			auto &prop = wnd[0];
-			auto &m = prop[propIdxModel];
-			glm::mat4 I(1.0f);
-			auto S = glm::scale(I, glm::vec3(1,1,0.1));
-			auto R = glm::rotate(I, time * glm::radians(90.0f / 4), glm::vec3(0.0f, 0.0f, 1.0f));
-			auto T = glm::translate(I, glm::vec3(0, 0, 0));
-			auto model = T * R * S;
-			TRACEM(model);
-			auto m2 = glm::transpose(glm::inverse(model));
-			TRACEM(m2);
-
-			memcpy_s(m.val, 16 * sizeof(float), &model[0][0], 16 * sizeof(float));
-			PUPDATE_DRAW_COMMANDS cw = { i };
-			en.SendMsg(UPDATE_DRAW_COMMANDS, RENDERING_ENGINE, 0, &cw);
+			auto p = FindProp(onWnd[i][0], "model");
+			if (p)
+			{
+				SetModel(*p, 0);
+				PUPDATE_DRAW_COMMANDS cw = { i };
+				en.SendMsg(UPDATE_DRAW_COMMANDS, RENDERING_ENGINE, 0, &cw);
+			}
 		}
 	}
 }
 
-void AddToWnd(BAMS::CEngine &en, int wnd, int i)
+void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
 {
-	static PADD_MESH c[] = {
-//		{ 0, "realcubename", "Mesh_1", "basic" },
-		{ 0, "realcubename", "Mesh_2", "deferred" },
-		{ 0, "cubename", "Mesh_2", "basic" },
-		{ 0, "realcubename", "Mesh_4", "basic" },
-		{ 0, "realcubename", "Mesh_5", "basic" },
-		{ 0, "realcubename", "Mesh_6", "basic" },
-		{ 0, "realcubename", "Mesh_7", "basic" },
-	};
+	static const char *meshes[] = { "Mesh_1", "Mesh_2", "Mesh_4", "Mesh_5", "Mesh_6", "Mesh_7" };
 	uint32_t oid = -1;
 	Properties *pprop = nullptr;
-	PADD_MESH *obj = &c[i];
-	obj->wnd = wnd;
-	obj->pProperties = &pprop;
-	obj->pId = &oid;
-	en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, obj);
-	if (pprop) {
-		SetPropIdx(pprop);
-		if (propIdxModel != -1)
-		{
-			SetObjParams(pprop, (int)onWnd[wnd].size());
-			onWnd[wnd].push_back(*pprop);
-		}
+	PADD_MESH addMeshParams = { wnd, "name is irrelevant", meshes[i], "basic", &pprop, &oid };
+
+	en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &addMeshParams);
+
+	if (pprop) 
+	{
+		int num = static_cast<int>(onWnd[wnd].size());
+		SetParams(pprop, num);
+		onWnd[wnd].push_back(*pprop);
 	}
 }
 
-void TogleWnd(BAMS::CEngine &en, int wnd)
+void ToggleWnd(BAMS::CEngine &en, int wnd)
 {
 	static PCLOSE_WINDOW cw = { 0 };
 	static PCREATE_WINDOW *wn[3] = { &w0, &w1, &w2 };
+	Properties *pprop = nullptr;
+	PADD_MESH deferredResolveShader = { 0, "", "", "deferred", &pprop, nullptr };
+
 	cw.wnd = wnd;
 	if (wndState[wnd])
 	{
@@ -301,6 +372,10 @@ void TogleWnd(BAMS::CEngine &en, int wnd)
 	else
 	{
 		en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, wn[wnd]);
+		deferredResolveShader.wnd = wnd;
+		en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &deferredResolveShader);
+		deferredProp[wnd] = *pprop;
+		SetDeferredParams(pprop);
 	}
 	wndState[wnd] = !wndState[wnd];
 }
@@ -329,7 +404,7 @@ void testloop(BAMS::CEngine &en)
 				case '1':
 				case '2':
 				case '3':
-					TogleWnd(en, i - '1');
+					ToggleWnd(en, i - '1');
 					break;
 
 				case 'Q': AddToWnd(en, 0, 0);	break;
@@ -360,7 +435,7 @@ int main()
 			BAMS::CResourceManager rm;
 			rm.RootDir(L"C:\\Work\\test");
 			rm.LoadSync();
-			en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, &w0, sizeof(w0));
+			ToggleWnd(en,0); // show first window
 
 
 			CMesh m1 = rm.Find("Mesh_1", RESID_MESH);
@@ -433,6 +508,8 @@ int main()
 	BAMS::Finalize();
 	for (auto &w : onWnd)
 		w.clear();
+	deferredProp.clear();
+
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
 
 	DumpRAM();

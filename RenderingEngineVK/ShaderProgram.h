@@ -21,24 +21,18 @@ struct UniformBuffer
 	uint32_t size;
 	VkBuffer buffer;
 	VkDeviceMemory memory;	
+	void *mappedBuffer;
+	bool isSharedUbo;
 };
 
 class CShaderProgram
 {
 	struct ShaderProgramParamDesc {
-		uint32_t type;
-
-		const char *name;
-		const char *parent;
-		const char *rootTypeName;
-
-		uint32_t offset;
-		uint32_t size;
-		uint32_t stride;
+		const ValDetails *root;
+		const ValMemberDetails *mem;
+		uint32_t parentIdx;
 		uint32_t dataBufferId;
-
-		uint32_t propertyType;
-		uint32_t propertyCount;
+		uint32_t propertyParentIdx;
 	};
 
 public:
@@ -74,8 +68,8 @@ public:
 				if (p.type != BAMS::CORE::Property::PT_EMPTY)
 				{
 					auto pb = m_shaderProgramParamNames[p.idx];
-					auto &buf = m_paramsBuffer[pb.dataBufferId];
-					p.val = buf.data() + pb.stride * drawObjectId + pb.offset;
+					auto buf = m_paramsBuffers[pb.dataBufferId].buffer;
+					p.val = buf + pb.root->entry.size * drawObjectId + pb.mem->offset;
 				}
 			}
 		}
@@ -83,6 +77,9 @@ public:
 	}
 
 	uint32_t GetObjectCount() { return static_cast<uint32_t>(m_drawObjectData.size()); }
+
+	void SetDrawOrder(uint32_t order) { m_drawOrder = order; }
+	uint32_t GetDrawOrder() { return m_drawOrder; }
 
 private:
 	std::vector<VkPipelineShaderStageCreateInfo> _Compile();
@@ -103,8 +100,8 @@ private:
 
 	void _BuindShaderProgramParamsDesc();
 	void _BuindShaderProgramParamsDesc(const std::vector<ValDetails> *vals, uint32_t &dataBufferId);
-	void _BuindShaderProgramParamsDesc(const ValMemberDetails &entry, const ValMemberDetails &parent, const ValMemberDetails &root, uint32_t dataBufferId);
-	void _BuindShaderDataBuffers();
+	void _BuindShaderProgramParamsDesc(const ValMemberDetails & entry, uint32_t parentIdx, const ValDetails & root, uint32_t dataBufferId);
+	void _BuildShaderDataBuffers();
 
 	void _CreateNewBufferSet(uint32_t numVertices, uint32_t numIndeces);
 
@@ -125,14 +122,26 @@ private:
 
 	std::vector<VkVertexInputBindingDescription>   m_bindingDescription;		// <- info about: [1] binding point, [2] data stride (in bytes), [3] input rate: per vertex or per instance
 	std::vector<VkVertexInputAttributeDescription> m_attributeDescriptions;		// <- info about: [1] location (see vert-shader program), [2] binding (bufer from where data are read), [3] format (flota/int/bool // single val/no. of elements in vector), [4] offset in buffer
-	std::vector<std::vector<uint8_t>>              m_paramsBuffer;
+//	std::vector<std::vector<uint8_t>>              m_paramsBuffer;
+	enum {
+		PUSH_CONSTANTS,
+		HOSTVISIBLE_UBO,
+		UBO
+	};
+	struct PropertiesBufferInfo
+	{
+		uint32_t type;
+		uint8_t *buffer;
+		uint32_t size;
+		bool isUpdated;
+	};
+
+	std::vector<PropertiesBufferInfo>              m_paramsBuffers;
+	std::vector<uint8_t>                           m_paramsLocalBuffer;
 
 	BAMS::CORE::MProperties                        m_properties;
 	std::vector<ShaderProgramParamDesc>            m_shaderProgramParamNames;
-	uint32_t                                       m_pushConstantsStride;
-	uint32_t                                       m_pushConstantsBufferId;
-	uint32_t                                       m_pushConstantsStages;
-
+	bool                                           m_isPushConstantsUsed;
 
 	VkDescriptorSet              m_descriptorSet = nullptr;
 	std::vector<UniformBuffer> m_uniformBuffers;
@@ -165,5 +174,5 @@ private:
 	std::vector<Mesh> m_meshes;
 	std::vector<DrawObjectData> m_drawObjectData;
 	BAMS::CORE::hashtable<const char *, uint32_t> m_meshNames;
-
+	uint32_t m_drawOrder;
 };

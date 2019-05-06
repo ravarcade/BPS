@@ -1,4 +1,10 @@
 
+enum EDrawOrder {
+	DEFERRED = 0,
+	FORWARD,
+	MAX_DRAWORDER
+};
+
 struct ObjectInfo {
 	CShaderProgram *shader;
 	uint32_t mid;
@@ -10,6 +16,17 @@ struct ObjectInfo {
 class OutputWindow
 {
 private:
+	struct UpdateInfo {
+		bool updateRequired;
+		VkBuffer UBO = VK_NULL_HANDLE;
+		
+	};
+	struct UpdateFlags {
+		bool commandBuffers[MAX_DRAWORDER];
+//		std::vector<
+	};
+	UpdateFlags updateFlags;
+
 	struct SharedUniformBufferObject
 	{
 		//glm::mat4 model; // is push constant now
@@ -29,8 +46,8 @@ private:
 	struct DeferredFrameBuffers
 	{
 		uint32_t width, height;
-		FrameBufferAttachment albedo;
 		FrameBufferAttachment normals;
+		FrameBufferAttachment albedo;
 		FrameBufferAttachment pbr;
 		FrameBufferAttachment depth;
 		VkFramebuffer frameBuffer;
@@ -44,8 +61,8 @@ private:
 		template<typename T>
 		void ForEachFrameBuffer(T f) 
 		{
-			f(albedo);
 			f(normals);
+			f(albedo);
 			f(pbr);
 			f(depth);
 		};
@@ -100,7 +117,6 @@ private:
 	VkDescriptorPool descriptorPool;
 	VkDescriptorSet currentDescriptorSet;
 	std::vector<VkCommandBuffer> commandBuffers;
-	bool recreateCommandBuffers = false;
 	bool resizeWindow = false;
 
 	bool _IsDeviceSuitable(VkPhysicalDevice device);
@@ -110,6 +126,7 @@ private:
 	// image functions
 	void _CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage & image, VkDeviceMemory & imageMemory);
 	VkImageView _CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+	void _CreateAttachment(VkExtent2D extent, FrameBufferAttachment & attachment);
 	void _CreateAttachment(VkFormat format, VkImageUsageFlags usage, VkExtent2D extent, FrameBufferAttachment &attachment);
 
 	void _TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
@@ -141,6 +158,8 @@ private:
 	void _CreateCommandBuffers();
 	void _RecreateCommandBuffers();
 	void _CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples);
+	void _CleanupDeferredFramebuffer();
+	void _CreateDeferredFramebuffer();
 	void _CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagBits samples);
 
 	SharedUniformBufferObject *sharedUboData = nullptr;
@@ -155,6 +174,8 @@ private:
 	bool _SimpleAcquireNextImage(uint32_t & imageIndex);
 	void _SimpleQueueSubmit(VkSemaphore & waitSemaphore, VkSemaphore & signalSemaphore, VkCommandBuffer & commandBuffer);
 	void _SimplePresent(VkSemaphore & waitSemaphore, uint32_t imageIndex);
+
+	bool _UpdateBeforeDrawFrame();
 	
 	static void _OnWindowSize(GLFWwindow *wnd, int width, int height);
 
@@ -167,12 +188,15 @@ public:
 	void Close(GLFWwindow *wnd = nullptr);
 
 	void UpdateUniformBuffer();
-	void RecreateSwapChain();
+	void _RecreateSwapChain();
 	void DrawFrame();
+	void PrepareShader(CShaderProgram * sh);
 	bool Exist() { return device != VK_NULL_HANDLE; }
-	void BufferRecreationNeeded() { recreateCommandBuffers = true; }
+	void BufferRecreationNeeded() { updateFlags.commandBuffers[FORWARD] = true; updateFlags.commandBuffers[DEFERRED] = true; }
 	bool IsValid() { return window != nullptr; }
 	bool IsBufferFeatureSupported(VkFormat format, VkFormatFeatureFlagBits features);
+	
+	void CopyBuffer(VkBuffer dstBuf, VkDeviceSize offset, VkDeviceSize size, void *srcData);
 
 	template<typename T> void vkDestroy(T &v) { if (v) { vkDestroyDevice(v, allocator); v = VK_NULL_HANDLE; } }
 
@@ -205,7 +229,6 @@ public:
 	BAMS::CORE::CStringHastable<CShaderProgram> shaders;
 	BAMS::CORE::CStringHastable<ObjectInfo> objects;
 
-	uint32_t AddMesh(const char *mesh, const char *shader);
 	ObjectInfo * AddObject(const char * name, const char * mesh, const char * shader);
 	CShaderProgram *AddShader(const char * shader);
 	CShaderProgram *ReloadShader(const char *shader);
@@ -229,10 +252,17 @@ public:
 		vkDestroy(fb.depth);
 		fb.shaders.clear();
 		fb.resolveShader = nullptr;
+		fb.descriptionImageInfo.clear();
 	}
 	
 	template<> void vkDestroy(UniformBuffer &ub)
 	{
+		if (ub.mappedBuffer)
+		{
+			vkUnmapMemory(device, ub.memory);
+			ub.mappedBuffer = nullptr;
+		}
+
 		vkDestroy(ub.buffer);
 		vkFree(ub.memory);
 	}

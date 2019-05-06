@@ -249,11 +249,7 @@ void ire::CreateWnd(const void * params)
 	glfwSetWindowPos(window, p->x, p->y);
 
 	auto ow = outputWindows[p->wnd];
-	ow->AddShader("default");
-
 	ow->Prepare(_instance, window, _allocator);
-
-	ow->AddShader("cube");
 }
 
 void ire::CloseWnd(GLFWwindow* window)

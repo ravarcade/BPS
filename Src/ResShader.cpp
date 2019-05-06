@@ -191,7 +191,7 @@ void ResShader::Update(ResourceBase * res)
 		if (src.IsEmpty() && bin.IsEmpty())
 			continue; // nothing to do with empty source and binary at i-stage
 
-		if (!src.IsEmpty() && bin.IsEmpty())
+		if (!src.IsEmpty() && (bin.IsEmpty() || src.Timestamp > bin.Timestamp) )
 		{
 			Compile(&src);
 		}

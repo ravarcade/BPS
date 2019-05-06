@@ -99,10 +99,11 @@ halfsiphash(const unsigned char key[16], const unsigned char *m, size_t len) {
 /// <returns></returns>
 inline U32 JSHash(const U8 *str, SIZE_T len, U32 hash = 1315423911)
 {
-	while (--len)
+	while (len)
 	{
 		hash ^= ((hash << 5) + *str + (hash >> 2));
 		++str;
+		--len;
 	}
 
 	return hash;

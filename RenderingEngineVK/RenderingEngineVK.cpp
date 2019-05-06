@@ -7,46 +7,6 @@
 using namespace BAMS;
 using namespace BAMS::RENDERINENGINE;
 
-VertexDescription *GetDemoCube()
-{
-	// demo cube
-	struct Vertex {
-		glm::vec3 pos;
-		DWORD color;
-	};
-
-	static const std::vector<Vertex> vertices = {
-		{ { -0.5f, -0.5f,  0.5f }, 0x0000000ff },
-		{ { 0.5f, -0.5f,  0.5f },  0x0000ff00 },
-		{ { 0.5f,  0.5f,  0.5f },  0x00ff0000},
-		{ { -0.5f,  0.5f,  0.5f }, 0x00ffffff },
-
-		{ { -0.5f, -0.5f, -0.5f }, 0x00ff0000 },
-		{ { 0.5f, -0.5f, -0.5f },  0x00ffffff },
-		{ { 0.5f,  0.5f, -0.5f },  0x000000ff },
-		{ { -0.5f,  0.5f, -0.5f }, 0x0000ff00 }
-	};
-
-	static const std::vector<uint16_t> indices = {
-		0, 1, 2,  2, 3, 0,
-		0, 4, 5,  1, 0, 5,
-		1, 5, 6,  2, 1, 6,
-		2, 6, 7,  3, 2, 7,
-		3, 7, 4,  0, 3, 4,
-		5, 4, 6,  7, 6, 4
-	};
-	static VertexDescription vd;
-	static bool initOnce = true;
-	if (initOnce) {
-		vd.m_numVertices = static_cast<U32>(vertices.size());
-		vd.m_numIndices = static_cast<U32>(indices.size());
-		vd.m_vertices = Stream(VAT_FLOAT_3D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(Vertex, pos));
-		vd.m_colors[0] = Stream(VAT_COL_UINT8_4D, sizeof(vertices[0]), false, (U8 *)vertices.data() + offsetof(Vertex, color));
-		vd.m_indices = Stream(VAT_IDX_UINT16_1D, sizeof(indices[0]), false, (U8 *)indices.data());
-		initOnce = false;
-	}
-	return &vd;
-}
 
 // ============================================================================
 

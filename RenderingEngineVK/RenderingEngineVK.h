@@ -36,6 +36,9 @@ enum {
 	DMDWND = 2,
 	MAX_WINDOWS
 };
+
+const bool ForceHostVisibleUBOS = true;
+
 #include "Utils.h"
 #include "ShadersReflections.h"
 #include "ShaderProgram.h"

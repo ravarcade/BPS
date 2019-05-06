@@ -4,7 +4,6 @@
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
 
-
 OutputWindow::OutputWindow() :
 	instance(VK_NULL_HANDLE),
 	window(nullptr),
@@ -457,7 +456,7 @@ VkImageView OutputWindow::_CreateImageView(VkImage image, VkFormat format, VkIma
 	return imageView;
 }
 
-void OutputWindow::_CreateAttachment(VkFormat format, VkImageUsageFlags usage, VkExtent2D extent, FrameBufferAttachment &attachment)
+void OutputWindow::_CreateAttachment(VkExtent2D extent, FrameBufferAttachment &attachment)
 {
 	VkImageAspectFlags aspectFlags = 0;
 	VkImageLayout imageLayout;
@@ -466,24 +465,28 @@ void OutputWindow::_CreateAttachment(VkFormat format, VkImageUsageFlags usage, V
 	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
 	VkMemoryPropertyFlags properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-	attachment.format = format;
-	attachment.usage = usage;
-	if (usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+	if (attachment.usage & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
 	{
-//		usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+		//		usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
 		aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
 		imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 	}
-	if (usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+	if (attachment.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
 	{
 		aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 	}
 
-	_CreateImage(extent.width, extent.height, mipLevels, numSamples, format, tiling, usage, properties, attachment.image, attachment.memory);
-	attachment.view = _CreateImageView(attachment.image, format, aspectFlags);
-	_TransitionImageLayout(attachment.image, format, VK_IMAGE_LAYOUT_UNDEFINED, imageLayout);
+	_CreateImage(extent.width, extent.height, mipLevels, numSamples, attachment.format, tiling, attachment.usage, properties, attachment.image, attachment.memory);
+	attachment.view = _CreateImageView(attachment.image, attachment.format, aspectFlags);
+	_TransitionImageLayout(attachment.image, attachment.format, VK_IMAGE_LAYOUT_UNDEFINED, imageLayout);
+}
 
+void OutputWindow::_CreateAttachment(VkFormat format, VkImageUsageFlags usage, VkExtent2D extent, FrameBufferAttachment &attachment)
+{
+	attachment.format = format;
+	attachment.usage = usage;
+	_CreateAttachment(extent, attachment);
 }
 
 /// <summary>
@@ -792,7 +795,8 @@ void OutputWindow::_CreateSharedUniform()
 		memoryProperties,
 		sharedUniformBuffer, sharedUniformBufferMemory);
 
-	vkMapMemory(device, sharedUniformBufferMemory, 0, sizeof(bufferSize), 0, (void **)&sharedUboData);
+	vkMapMemory(device, sharedUniformBufferMemory, 0, bufferSize, 0, (void **)&sharedUboData);
+
 }
 
 void OutputWindow::_CleanupSharedUniform()
@@ -832,6 +836,7 @@ void OutputWindow::_CreateDescriptorPool()
 
 	if (true)  // force add 5 descriptors to pool
 	{
+		pools.resize(VK_DESCRIPTOR_TYPE_RANGE_SIZE);
 		for (auto &x : pools)
 			x += 5;
 		numShaderPrograms += 5;
@@ -1050,26 +1055,69 @@ void OutputWindow::_CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBit
 		throw std::runtime_error("failed to create render pass!");
 }
 
-void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagBits samples)
+void OutputWindow::_CleanupDeferredFramebuffer()
 {
-	// create render passes
+	vkDestroy(deferredFrameBuf.frameBuffer);
+	deferredFrameBuf.ForEachFrameBuffer([&](FrameBufferAttachment &fba) {
+		vkDestroy(fba.view);
+		vkDestroy(fba.image);
+		vkFree(fba.memory);
+	});
+	deferredFrameBuf.descriptionImageInfo.clear();
+}
+
+void OutputWindow::_CreateDeferredFramebuffer()
+{
 	VkExtent2D winExtent = _GetVkExtentSize();
 	deferredFrameBuf.width = winExtent.width;
 	deferredFrameBuf.height = winExtent.height;
 
+	std::vector<VkImageView> attachments;
+	deferredFrameBuf.descriptionImageInfo.clear();
+
+	deferredFrameBuf.ForEachFrameBuffer([&](FrameBufferAttachment &fba) {
+		_CreateAttachment(winExtent, fba);
+		attachments.push_back(fba.view);
+		deferredFrameBuf.descriptionImageInfo.push_back({
+			//			fba.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT ? VK_NULL_HANDLE : deferredFrameBuf.colorSampler,
+						deferredFrameBuf.colorSampler,
+						fba.view,
+						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+
+	});
+
+
+	VkFramebufferCreateInfo fbufCreateInfo = {};
+	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fbufCreateInfo.pNext = NULL;
+	fbufCreateInfo.renderPass = deferredFrameBuf.renderPass;
+	fbufCreateInfo.pAttachments = attachments.data();
+	fbufCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+	fbufCreateInfo.width = deferredFrameBuf.width;
+	fbufCreateInfo.height = deferredFrameBuf.height;
+	fbufCreateInfo.layers = 1;
+	if (vkCreateFramebuffer(device, &fbufCreateInfo, nullptr, &deferredFrameBuf.frameBuffer) != VK_SUCCESS)
+		throw std::runtime_error("failed to create frame buffer!");
+}
+
+void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagBits samples)
+{
+	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_R16G16_SNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, _FindDepthFormat() };
+	VkImageUsageFlags deferredAttachmentUsage[] = { VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT };
+
 	samples = VK_SAMPLE_COUNT_1_BIT;
-
-	_CreateAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, winExtent, deferredFrameBuf.albedo);
-	_CreateAttachment(VK_FORMAT_R16G16_SNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, winExtent, deferredFrameBuf.normals);
-	_CreateAttachment(VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, winExtent, deferredFrameBuf.pbr);
-	_CreateAttachment(_FindDepthFormat(), VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, winExtent, deferredFrameBuf.depth);
-
+	
+	// create render passes
+	
 	std::vector<VkAttachmentDescription> attachmentDescs;
 	std::vector<VkAttachmentReference> colorReferences;
 	VkAttachmentReference depthReference;
-	std::vector<VkImageView> attachments;
+	
+	deferredFrameBuf.ForEachFrameBuffer( [&] (FrameBufferAttachment &fba) {
+		uint32_t attachmentIndex = static_cast<uint32_t>(attachmentDescs.size());
+		fba.format = deferredAttachmentFormats[attachmentIndex];
+		fba.usage = deferredAttachmentUsage[attachmentIndex];
 
-	deferredFrameBuf.ForEachFrameBuffer([&](FrameBufferAttachment &fba) {
 		VkAttachmentDescription desc;
 		desc.flags = 0;
 		desc.samples = samples;
@@ -1077,20 +1125,18 @@ void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagB
 		desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;		
+		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		desc.format = fba.format;
 		if (fba.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
 		{
 			desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-			depthReference = { static_cast<uint32_t>(attachmentDescs.size()), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+			depthReference = { attachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 		}
 		else {
 			desc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			colorReferences.push_back({ static_cast<uint32_t>(attachmentDescs.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+			colorReferences.push_back({ attachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 		}
 		attachmentDescs.push_back(desc);
-		attachments.push_back(fba.view);
-		
 	});
 
 	VkSubpassDescription subpass = {};
@@ -1098,7 +1144,7 @@ void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagB
 	subpass.pColorAttachments = colorReferences.data();
 	subpass.colorAttachmentCount = static_cast<uint32_t>(colorReferences.size());
 	subpass.pDepthStencilAttachment = &depthReference;
-//	subpass.pResolveAttachments = samples != VK_SAMPLE_COUNT_1_BIT ? &colorAttachmentResolveRef : nullptr;
+	//	subpass.pResolveAttachments = samples != VK_SAMPLE_COUNT_1_BIT ? &colorAttachmentResolveRef : nullptr;
 
 	std::array<VkSubpassDependency, 2> dependencies;
 
@@ -1131,19 +1177,6 @@ void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagB
 	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &deferredFrameBuf.renderPass) != VK_SUCCESS)
 		throw std::runtime_error("failed to create render pass!");
 
-
-	VkFramebufferCreateInfo fbufCreateInfo = {};
-	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-	fbufCreateInfo.pNext = NULL;
-	fbufCreateInfo.renderPass = deferredFrameBuf.renderPass;
-	fbufCreateInfo.pAttachments = attachments.data();
-	fbufCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	fbufCreateInfo.width = deferredFrameBuf.width;
-	fbufCreateInfo.height = deferredFrameBuf.height;
-	fbufCreateInfo.layers = 1;
-	if (vkCreateFramebuffer(device, &fbufCreateInfo, nullptr, &deferredFrameBuf.frameBuffer) != VK_SUCCESS)
-		throw std::runtime_error("failed to create frame buffer!");
-
 	// sampler 
 	VkSamplerCreateInfo sampler{};
 	sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1162,10 +1195,6 @@ void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagB
 	if (vkCreateSampler(device, &sampler, nullptr, &deferredFrameBuf.colorSampler) != VK_SUCCESS)
 		throw std::runtime_error("failed to sampler!");
 
-	deferredFrameBuf.descriptionImageInfo.push_back({ deferredFrameBuf.colorSampler, deferredFrameBuf.albedo.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
-	deferredFrameBuf.descriptionImageInfo.push_back({ deferredFrameBuf.colorSampler, deferredFrameBuf.normals.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
-	deferredFrameBuf.descriptionImageInfo.push_back({ deferredFrameBuf.colorSampler, deferredFrameBuf.pbr.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
-	deferredFrameBuf.descriptionImageInfo.push_back({ VK_NULL_HANDLE, deferredFrameBuf.depth.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
 
 	VkSemaphoreCreateInfo semaphoreInfo = {};
 	semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -1174,6 +1203,8 @@ void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagB
 	{
 		throw std::runtime_error("failed to create semaphores!");
 	}
+
+	_CreateDeferredFramebuffer();
 }
 
 void OutputWindow::_LoadShaderPrograms()
@@ -1182,14 +1213,7 @@ void OutputWindow::_LoadShaderPrograms()
 
 	shaders.foreach([&](CShaderProgram *&s) 
 	{
-		auto outputNames = s->GetOutputNames();			// select renderPass base on names of output attachments in fragment shader
-		if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
-		{
-			s->SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
-			s->CreateGraphicsPipeline();
-			s->CreateDescriptorSets();
-			s->UpdateDescriptorSets();
-		}
+		PrepareShader(s);
 	});
 
 }
@@ -1206,6 +1230,7 @@ void OutputWindow::UpdateUniformBuffer()
 {
 	if (!sharedUboData)
 		return;
+
 	static auto startTime = std::chrono::high_resolution_clock::now();
 
 	auto currentTime = std::chrono::high_resolution_clock::now();
@@ -1227,14 +1252,19 @@ void OutputWindow::UpdateUniformBuffer()
 	ubo.proj[1][1] *= -1;
 }
 
-void OutputWindow::RecreateSwapChain()
+void OutputWindow::_RecreateSwapChain()
 {
 	vkDeviceWaitIdle(device);
 
 	_CleanupSwapChain();
+	_CleanupDeferredFramebuffer();
 
 	if (_CreateSwapChain())
 	{
+		_CreateDeferredFramebuffer();
+		shaders.foreach([&](CShaderProgram *&sh) {
+			sh->UpdateDescriptorSets();
+		});
 		_CreateCommandBuffers();
 	}
 }
@@ -1245,35 +1275,21 @@ void OutputWindow::_RecreateCommandBuffers()
 
 	vkFree(commandPool, commandBuffers);
 	_CreateCommandBuffers();
-	recreateCommandBuffers = false;
+	updateFlags.commandBuffers[DEFERRED] = false;
+	updateFlags.commandBuffers[FORWARD] = false;
 }
 
 bool OutputWindow::_SimpleAcquireNextImage(uint32_t &imageIndex)
 {
-	if (!swapChain || resizeWindow) {
-		RecreateSwapChain();
-		return false;
-	}
-
-	if (recreateCommandBuffers)
-	{
-		_RecreateCommandBuffers();
-	}
-
-
 	VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR)
 	{
-		RecreateSwapChain();
+		_RecreateSwapChain();
 		return false;
 	}
 	else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
 	{
 		throw std::runtime_error("failed to acquire swap chain image!");
-	}
-	if (!sharedUboData)
-	{
-		return false;
 	}
 
 	return true;
@@ -1323,25 +1339,74 @@ void OutputWindow::_SimplePresent(VkSemaphore &waitSemaphore, uint32_t imageInde
 
 	VkResult result = vkQueuePresentKHR(presentQueue, &presentInfo);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-		RecreateSwapChain();
+		_RecreateSwapChain();
 	}
 	else if (result != VK_SUCCESS) {
 		throw std::runtime_error("failed to present swap chain image!");
 	}
 }
 
+bool OutputWindow::_UpdateBeforeDrawFrame()
+{
+	if (!swapChain || resizeWindow) {
+		_RecreateSwapChain();
+		return false;
+	}
+
+	if (updateFlags.commandBuffers[FORWARD] || 
+		updateFlags.commandBuffers[DEFERRED])
+	{
+		_RecreateCommandBuffers();
+	}
+
+	if (!sharedUboData)
+	{
+		return false;
+	}
+
+	return true;
+}
+
 void OutputWindow::DrawFrame()
 {
 	uint32_t imageIndex;
+
+	if (!_UpdateBeforeDrawFrame())
+		return;
+
 	if (!_SimpleAcquireNextImage(imageIndex))
 		return;
-	bool deferredPresent = true;
 
 	_SimpleQueueSubmit(imageAvailableSemaphore, deferredFrameBuf.deferredSemaphore, *commandBuffers.rbegin());
 	_SimpleQueueSubmit(deferredFrameBuf.deferredSemaphore, renderFinishedSemaphore, commandBuffers[imageIndex]);
 	_SimplePresent(renderFinishedSemaphore, imageIndex);
 
 	vkQueueWaitIdle(presentQueue);
+}
+
+void OutputWindow::PrepareShader(CShaderProgram *sh)
+{
+	auto outputNames = sh->GetOutputNames();			// select renderPass base on names of output attachments in fragment shader
+	if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
+	{
+		forwardRenderingShaders.push_back(sh);
+		sh->SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
+		sh->SetDrawOrder(FORWARD);
+	}
+	else
+	{ // deferred
+		deferredFrameBuf.shaders.push_back(sh);
+		sh->SetRenderPassAndMsaaSamples(deferredFrameBuf.renderPass, msaaSamples);
+		sh->SetDrawOrder(DEFERRED);
+	}
+
+	if (renderPass != nullptr)
+	{
+		// prepare shader to be used.
+		sh->CreateGraphicsPipeline();
+		sh->CreateDescriptorSets();
+		sh->UpdateDescriptorSets();
+	}
 }
 
 CShaderProgram * OutputWindow::AddShader(const char * shader)
@@ -1352,26 +1417,7 @@ CShaderProgram * OutputWindow::AddShader(const char * shader)
 
 	sh = shaders.add(shader, this);
 	sh->LoadProgram(shader); 
-
-	auto outputNames = sh->GetOutputNames();			// select renderPass base on names of output attachments in fragment shader
-	if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
-	{
-		forwardRenderingShaders.push_back(sh);
-		sh->SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
-	}
-	else 
-	{ // deferred
-		deferredFrameBuf.shaders.push_back(sh);
-		sh->SetRenderPassAndMsaaSamples(deferredFrameBuf.renderPass, msaaSamples);
-	}
-	
-	if (renderPass != nullptr)
-	{
-		// prepare shader to be used.
-		sh->CreateGraphicsPipeline();
-		sh->CreateDescriptorSets();
-		sh->UpdateDescriptorSets();
-	}
+	PrepareShader(sh);
 	return sh;
 }
 
@@ -1417,11 +1463,11 @@ void OutputWindow::UpdateDrawCommands()
 
 VkDescriptorImageInfo *OutputWindow::GetDescriptionImageInfo(const char * attachmentName)
 {
-	if (strcmp(attachmentName, "samplerAlbedo") == 0)
+	if (strcmp(attachmentName, "samplerNormal") == 0)
 	{
 		return &deferredFrameBuf.descriptionImageInfo[0];
 	}
-	else if (strcmp(attachmentName, "samplerNormal") == 0)
+	else if (strcmp(attachmentName, "samplerAlbedo") == 0)
 	{
 		return &deferredFrameBuf.descriptionImageInfo[1];
 	}
@@ -1446,15 +1492,6 @@ ObjectInfo * OutputWindow::_GetObject(const char * name)
 	return objects.find(name);
 }
 
-uint32_t OutputWindow::AddMesh(const char * mesh, const char * shader)
-{
-	auto sh = _GetShader(shader);
-	if (!sh)
-		return -1;
-
-	return sh->AddMesh(mesh);
-}
-
 ObjectInfo * OutputWindow::AddObject(const char * name, const char * mesh, const char * shader)
 {
 	auto sh = _GetShader(shader);
@@ -1468,7 +1505,9 @@ ObjectInfo * OutputWindow::AddObject(const char * name, const char * mesh, const
 	auto oid = sh->AddObject(mid);
 	auto ret = objects.add(name, sh, mid, oid);
 	ret->oid = oid;
+
 	BufferRecreationNeeded();
+
 	return ret;
 }
 
@@ -1478,4 +1517,34 @@ bool OutputWindow::IsBufferFeatureSupported(VkFormat format, VkFormatFeatureFlag
 	static VkFormatProperties pr;
 	vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &pr);
 	return pr.bufferFeatures & features;
+}
+
+
+/// <summary>
+/// Copies data to the buffer.
+/// Naive version. It creates staging buffer. Copy data to it. Create transfer command queue..... All is not optimized.
+/// </summary>
+/// <param name="dstBuf">The destination buffer (UBO).</param>
+/// <param name="offset">The offset.</param>
+/// <param name="size">The size.</param>
+/// <param name="src">The source data.</param>
+void OutputWindow::CopyBuffer(VkBuffer dstBuf, VkDeviceSize offset, VkDeviceSize size, void * srcData)
+{
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	_CreateBuffer(
+		size,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer, stagingBufferMemory);
+
+	void* data;
+	vkMapMemory(device, stagingBufferMemory, 0, size, 0, &data);
+	memcpy_s(data, size, srcData, size);
+	vkUnmapMemory(device, stagingBufferMemory);
+
+	_CopyBuffer(stagingBuffer, dstBuf, size, 0, offset);
+
+	vkDestroy(stagingBuffer);
+	vkFree(stagingBufferMemory);
 }
