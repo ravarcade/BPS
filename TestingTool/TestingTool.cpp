@@ -380,6 +380,22 @@ void ToggleWnd(BAMS::CEngine &en, int wnd)
 	wndState[wnd] = !wndState[wnd];
 }
 
+void ChangeDebugView(BAMS::CEngine &en)
+{
+	for (MProperties &prop : deferredProp)
+	{
+		for (uint32_t i = 0; i < prop.count; ++i)
+		{
+			auto &p = prop.properties[i];
+			if (strcmp(p.name, "debugSwitch") == 0 )
+			{
+				auto pVal = reinterpret_cast<uint32_t *>(p.val);
+				*pVal = ((*pVal) + 1) % 4;
+			}
+		}
+	}
+}
+
 void testloop(BAMS::CEngine &en)
 {
 	for (bool isRunning = true; isRunning;)
@@ -413,6 +429,7 @@ void testloop(BAMS::CEngine &en)
 				case 'S': AddToWnd(en, 1, 3);	break;
 				case 'E': AddToWnd(en, 2, 4);	break;
 				case 'D': AddToWnd(en, 2, 5);	break;
+				case '4': ChangeDebugView(en);	break;
 				}
 			}
 		}
