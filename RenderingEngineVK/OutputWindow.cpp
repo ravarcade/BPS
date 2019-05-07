@@ -1063,6 +1063,7 @@ void OutputWindow::_CleanupDeferredFramebuffer()
 		vkDestroy(fba.image);
 		vkFree(fba.memory);
 	});
+	vkDestroy(deferredFrameBuf.depthView);
 	deferredFrameBuf.descriptionImageInfo.clear();
 }
 
@@ -1078,11 +1079,20 @@ void OutputWindow::_CreateDeferredFramebuffer()
 	deferredFrameBuf.ForEachFrameBuffer([&](FrameBufferAttachment &fba) {
 		_CreateAttachment(winExtent, fba);
 		attachments.push_back(fba.view);
+
+		// .... but for depth we need another image view ....
+		if (fba.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+		{
+			// create different view for "read only"
+			deferredFrameBuf.depthView = fba.view;
+			fba.view = _CreateImageView(fba.image, fba.format, VK_IMAGE_ASPECT_DEPTH_BIT);
+		}
+
 		deferredFrameBuf.descriptionImageInfo.push_back({
-			//			fba.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT ? VK_NULL_HANDLE : deferredFrameBuf.colorSampler,
-						deferredFrameBuf.colorSampler,
-						fba.view,
-						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
+			deferredFrameBuf.colorSampler,
+			fba.view,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		});
 
 	});
 
@@ -1102,8 +1112,14 @@ void OutputWindow::_CreateDeferredFramebuffer()
 
 void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagBits samples)
 {
-	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_R16G16_SNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, _FindDepthFormat() };
-	VkImageUsageFlags deferredAttachmentUsage[] = { VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT };
+//	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_R16G16_SNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, _FindDepthFormat() };
+	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_R16G16_SNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32G32B32A32_SFLOAT, _FindDepthFormat() };
+	
+	VkImageUsageFlags deferredAttachmentUsage[] = {	
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT };
 
 	samples = VK_SAMPLE_COUNT_1_BIT;
 	
@@ -1129,7 +1145,8 @@ void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagB
 		desc.format = fba.format;
 		if (fba.usage & VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
 		{
-			desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+//			desc.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // we will read depth buffor, so mark "finalLayout" as read only
+			desc.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			depthReference = { attachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 		}
 		else {
@@ -1231,25 +1248,7 @@ void OutputWindow::UpdateUniformBuffer()
 	if (!sharedUboData)
 		return;
 
-	static auto startTime = std::chrono::high_resolution_clock::now();
-
-	auto currentTime = std::chrono::high_resolution_clock::now();
-	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
-	time = fmod(time, 2.0f);
-	if (time > 1.0f)
-		time = 2.0f - time;
-	//	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		//	ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-	//	UniformBufferObject ubo = {};
-	auto &ubo = *sharedUboData;
-	time = 0;
-//	ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f + time, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	ubo.view = glm::lookAt(glm::vec3(100.0f, 100.0f + time*50.0f, 100.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	
-	TRACEM(ubo.view);
-	ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 550.0f);
-	ubo.proj[1][1] *= -1;
+	SetCamera(&cameraSettings);
 }
 
 void OutputWindow::_RecreateSwapChain()
@@ -1459,6 +1458,27 @@ void OutputWindow::GetObjectParams(const char *objectName, BAMS::CORE::Propertie
 void OutputWindow::UpdateDrawCommands()
 {
 	BufferRecreationNeeded();
+}
+
+void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)
+{
+	cameraSettings = *cam;
+	if (!sharedUboData)
+		return;
+
+	auto &ubo = *sharedUboData;
+	ubo.view = glm::lookAt(
+		glm::vec3(cam->camera[0], cam->camera[1], cam->camera[2]), 
+		glm::vec3(cam->lookAt[0], cam->lookAt[1], cam->lookAt[2]), 
+		glm::vec3(cam->up[0], cam->up[1], cam->up[2]));
+
+	TRACEM(ubo.view);
+	ubo.proj = glm::perspective(
+		glm::radians(cam->fov), 
+		swapChainExtent.width / (float)swapChainExtent.height, 
+		cam->zNear,
+		cam->zFar);
+	ubo.proj[1][1] *= -1;
 }
 
 VkDescriptorImageInfo *OutputWindow::GetDescriptionImageInfo(const char * attachmentName)

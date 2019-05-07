@@ -376,19 +376,20 @@ enum { // msgId
 	RESOURCE_MANIFEST_PARSED = 0x10003,
 
 	// to RENDERING_ENGINE
-	CREATE_WINDOW        = 0x20001,
-	CLOSE_WINDOW         = 0x20002,
-	ADD_MESH             = 0x20003, // mesh_name_in_shader + mesh_name_as_resource + shader_program
-	ADD_SHADER           = 0x20004,
-	RELOAD_SHADER        = 0x20005,
-	GET_SHADER_PARAMS    = 0x20006,
-	GET_OBJECT_PARAMS    = 0x20007,
+	CREATE_WINDOW         = 0x20001,
+	CLOSE_WINDOW          = 0x20002,
+	ADD_MESH              = 0x20003, // mesh_name_in_shader + mesh_name_as_resource + shader_program
+	ADD_SHADER            = 0x20004,
+	RELOAD_SHADER         = 0x20005,
+	GET_SHADER_PARAMS     = 0x20006,
+	GET_OBJECT_PARAMS     = 0x20007,
 	UPDATE_DRAW_COMMANDS  = 0x20008,
+	SET_CAMERA            = 0x20009,
 
 	// to IMPORT_MODULE (or everyone?)
-	IDENTIFY_RESOURCE    = 0x40001,
-	IMPORTMODEL_UPDATE   = 0x40002,
-	IMPORTMODEL_LOADMESH = 0x40003,
+	IDENTIFY_RESOURCE     = 0x40001,
+	IMPORTMODEL_UPDATE    = 0x40002,
+	IMPORTMODEL_LOADMESH  = 0x40003,
 };
 
 struct PCREATE_WINDOW {
@@ -443,4 +444,14 @@ struct PIDETIFY_RESOURCE {
 
 struct PUPDATE_DRAW_COMMANDS {
 	uint32_t wnd;
+};
+
+struct PSET_CAMERA {
+	uint32_t wnd;
+	float camera[3];
+	float lookAt[3];
+	float up[3];
+	float fov;
+	float zNear;
+	float zFar;
 };

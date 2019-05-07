@@ -341,6 +341,13 @@ void ire::UpdateDrawCommands(const void *params)
 	ow->UpdateDrawCommands();
 }
 
+void ire::SetCamera(const void *params)
+{
+	CASTMSGPARAMS(PSET_CAMERA);
+	ow->SetCamera(p);
+}
+
+
 // ============================================================================ ire : Rendering Engine - protected methods ===
 
 /// <summary>

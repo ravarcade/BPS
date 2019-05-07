@@ -4,30 +4,24 @@
 #include "stdafx.h"
 #include "BAMEngine.h"
 #include <chrono>
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "../3rdParty/glm/glm.hpp"
 #include "../3rdParty/glm/gtc/matrix_transform.hpp"
+#include "../3rdParty/glm/gtc/quaternion.hpp"
+#include "../3rdParty/glm/gtc/constants.hpp"
+#include "../3rdParty/glm/gtc/matrix_inverse.hpp"
+
+#include <vector>
+#pragma comment(lib, "Winmm.lib")
 
 using namespace BAMS;
+using BAMS::CORE::MProperties;
 using BAMS::CORE::Properties;
 using BAMS::CORE::Property;
+using std::vector;
 
-void LoadModule(const wchar_t *module)
-{
-	auto hm = LoadLibrary(module);
-
-	typedef void func(void);
-
-	func *RegisterModule = (func *)GetProcAddress(hm, "RegisterModule");
-	if (RegisterModule)
-		RegisterModule();
-}
-
-void LoadModules()
-{
-	LoadModule(L"RenderingEngineVK.dll");
-	LoadModule(L"ImportModule.dll");
-}
-
+extern PSET_CAMERA defaultCam;
 
 const char * UUID2String(GUID &g)
 {
@@ -52,12 +46,12 @@ void DumpHex(BYTE *data, size_t s)
 		txt[1] = hex[c & 0xf];
 		printf(txt);
 		if ((i % 4) == 3)
-			printf(" ");		
+			printf(" ");
 	}
 	printf("| ");
 	for (size_t i = 0; i < s; ++i)
 	{
-		static char txt[2] = { 0, 0};
+		static char txt[2] = { 0, 0 };
 		int c = data[i];
 		txt[0] = isprint(c) ? c : '.';
 		printf(txt);
@@ -76,7 +70,7 @@ void DumpRAM()
 	size_t size, counter;
 	void *current = nullptr;
 	void *data = nullptr;
-	
+
 	while (BAMS::GetMemoryBlocks(&current, &size, &counter, &data))
 	{
 		if (current == nullptr)
@@ -91,25 +85,22 @@ void DumpRAM()
 	MemStat();
 }
 
-#include <vector>
-using std::vector;
-
 BYTE AllKeyboardStates[256] = { 0 };
 DWORD AllKeyboardRepeatTime[256];
 BYTE currentKeyState[256];
-#pragma comment(lib, "Winmm.lib")
+BYTE KeyStates[256];
 
 void updateAllKeysScan()
 {
 	const DWORD rep_first = 300;
 	const DWORD rep_next = 50;
-	BYTE ks[256];
+
 	DWORD ct = timeGetTime();
-	GetKeyboardState(ks);
+	GetKeyboardState(KeyStates);
 
 	for (int i = 0; i < 256; ++i)
 	{
-//		auto r = ks[i];
+		//		auto r = ks[i];
 		auto r = GetAsyncKeyState(i) >> 8;
 		auto o = AllKeyboardStates[i];
 		r = r & 0x80 ? 0x80 : 0;
@@ -135,11 +126,35 @@ bool GetKeyPressed(DWORD key)
 	return currentKeyState[key];
 }
 
+bool IsKeyPressed(DWORD key)
+{
+	return KeyStates[key] & 0x80;
+}
+// ====================================================================
+
+void LoadModule(const wchar_t *module)
+{
+	auto hm = LoadLibrary(module);
+
+	typedef void func(void);
+
+	func *RegisterModule = (func *)GetProcAddress(hm, "RegisterModule");
+	if (RegisterModule)
+		RegisterModule();
+}
+
+void LoadModules()
+{
+	LoadModule(L"RenderingEngineVK.dll");
+	LoadModule(L"ImportModule.dll");
+}
+
+// ==================================================================
+
 void wait_for_esc()
 {
 	for (;;)
 	{
-//		Sleep(100);
 		BAMS::CEngine::Update(25.0f);
 		SleepEx(25, TRUE);
 		updateAllKeysScan();
@@ -148,6 +163,8 @@ void wait_for_esc()
 
 	}
 }
+
+// ================================================================= 
 
 BAMS::CORE::Properties *GetShaderParams(BAMS::CEngine &en, uint32_t wnd, const char *shaderName)
 {
@@ -168,17 +185,24 @@ BAMS::CORE::Properties * GetObjectParams(BAMS::CEngine &en, uint32_t wnd, const 
 }
 
 
+Property *FindProp(MProperties &prop, const char *name)
+{
+	for (uint32_t i = 0; i < prop.size(); ++i)
+	{
+		if (strcmp(prop[i].name, name) == 0)
+			return &prop[i];
+	}
+	return nullptr;
+}
+
+// starting window positions
 static PCREATE_WINDOW w0 = { 0, 1200, 800, 10, 20 };
 static PCREATE_WINDOW w1 = { 1, 500, 500, 1310, 20 };
 static PCREATE_WINDOW w2 = { 2, 500, 200, 1310, 620 };
 
-using BAMS::CORE::MProperties;
-using BAMS::CORE::Properties;
-std::vector<MProperties> onWnd[3];
 bool wndState[3] = { false, false, false };
-std::vector<MProperties> deferredProp(3);
-
-
+vector<MProperties> onWnd[3];			// properties of 1st model on window
+vector<MProperties> deferredProp(3);    // properties for deferred resolve shader (ligth positions, debugSwitch)
 
 void SetModel(Property &p, uint32_t num)
 {
@@ -208,16 +232,6 @@ void SetBaseColor(Property &p, uint32_t num)
 	};
 
 	memcpy_s(p.val, 4 * sizeof(float), colors[num % 3], 4 * sizeof(float));
-}
-
-Property *FindProp(MProperties &prop, const char *name)
-{
-	for (uint32_t i = 0; i < prop.size(); ++i)
-	{
-		if (strcmp(prop[i].name, name) == 0)
-			return &prop[i];
-	}
-	return nullptr;
 }
 
 void SetParams(Properties *pprop, uint32_t num)
@@ -282,11 +296,14 @@ void SetLightRadius(Property &p, uint32_t i, uint32_t stride)
 		1 * sizeof(float));
 }
 
+const float deg2rad = 0.01745329251994329576923690768489f;
 
 void SetDeferredParams(Properties *pprop)
 {
 	uint32_t stride = 0;
 	uint32_t count = 0;
+	float n = defaultCam.zNear;
+	float f = defaultCam.zFar;
 	for (uint32_t i = 0; i < pprop->count; ++i)
 	{
 		auto &p = pprop->properties[i];
@@ -295,7 +312,6 @@ void SetDeferredParams(Properties *pprop)
 			stride = p.array_stride;
 			count = p.count;
 		}
-
 		else if (strcmp(p.name, "position") == 0)
 		{
 			for (uint32_t i = 0; i < count; ++i)
@@ -303,7 +319,6 @@ void SetDeferredParams(Properties *pprop)
 				SetLightPosition(p, i, stride);
 			}
 		}
-
 		else if (strcmp(p.name, "color") == 0)
 		{
 			for (uint32_t i = 0; i < count; ++i)
@@ -317,6 +332,30 @@ void SetDeferredParams(Properties *pprop)
 			{
 				SetLightRadius(p, i, stride);
 			}
+		}
+		else if (strcmp(p.name, "zNear") == 0)
+		{
+			*reinterpret_cast<float *>(p.val) = n;
+		}
+		else if (strcmp(p.name, "zFar") == 0)
+		{
+			*reinterpret_cast<float *>(p.val) = f;
+		}
+		else if (strcmp(p.name, "m22") == 0)
+		{
+			*reinterpret_cast<float *>(p.val) = -f/(f-n);
+		}
+		else if (strcmp(p.name, "m32") == 0)
+		{
+			*reinterpret_cast<float *>(p.val) = -f*n/(f-n);
+		}
+		else if (strcmp(p.name, "vFar") == 0)
+		{
+			*reinterpret_cast<float *>(p.val) = 0.5f*tanf(defaultCam.fov*deg2rad)*800.0f/1200.0f;
+		}
+		else if (strcmp(p.name, "hFar") == 0)
+		{
+			*reinterpret_cast<float *>(p.val) = 0.5f*tanf(defaultCam.fov*deg2rad);
 		}
 	}
 }
@@ -376,6 +415,8 @@ void ToggleWnd(BAMS::CEngine &en, int wnd)
 		en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &deferredResolveShader);
 		deferredProp[wnd] = *pprop;
 		SetDeferredParams(pprop);
+		defaultCam.wnd = wnd;
+		en.SendMsg(SET_CAMERA, RENDERING_ENGINE, 0, &defaultCam);
 	}
 	wndState[wnd] = !wndState[wnd];
 }
@@ -390,12 +431,165 @@ void ChangeDebugView(BAMS::CEngine &en)
 			if (strcmp(p.name, "debugSwitch") == 0 )
 			{
 				auto pVal = reinterpret_cast<uint32_t *>(p.val);
-				*pVal = ((*pVal) + 1) % 4;
+				*pVal = ((*pVal) + 1) % 5;
 			}
 		}
 	}
 }
 
+// ========================================================================
+#define DIRECTINPUT_VERSION 0x0800
+#include <dinput.h>
+
+#pragma comment(lib, "dinput8.lib")
+#pragma comment(lib, "dxguid.lib")
+
+bool InitMouse();
+bool ReadMouse(int &xPosRelative, int &yPosRelative);
+
+int mouseX, mouseY;
+LPDIRECTINPUT8 pDI;
+LPDIRECTINPUTDEVICE8 pMouse;
+bool isInitialized = false;
+bool bImmediate = false;
+HDC last_HDC = NULL;
+
+
+bool InitMouse()
+{
+	isInitialized = false;
+	DWORD hr = DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION,
+		IID_IDirectInput8, (VOID**)&pDI, NULL);
+	if (FAILED(hr)) return false;
+
+	hr = pDI->CreateDevice(GUID_SysMouse, &pMouse, NULL);
+	if (FAILED(hr)) return false;
+
+	hr = pMouse->SetDataFormat(&c_dfDIMouse2);
+	if (FAILED(hr)) return false;
+
+	if (!bImmediate)
+	{
+		DIPROPDWORD dipdw;
+		dipdw.diph.dwSize = sizeof(DIPROPDWORD);
+		dipdw.diph.dwHeaderSize = sizeof(DIPROPHEADER);
+		dipdw.diph.dwObj = 0;
+		dipdw.diph.dwHow = DIPH_DEVICE;
+		dipdw.dwData = 16; // Arbitrary buffer size
+
+		if (FAILED(hr = pMouse->SetProperty(DIPROP_BUFFERSIZE, &dipdw.diph)))
+			return false;
+	}
+
+	pMouse->Acquire();
+	isInitialized = true;
+	return true;
+}
+
+bool ReadMouse(int &xPosRelative, int &yPosRelative)
+{
+	DIMOUSESTATE2 dims2;
+	ZeroMemory(&dims2, sizeof(dims2));
+
+	DWORD hr = pMouse->GetDeviceState(sizeof(DIMOUSESTATE2),
+		&dims2);
+	if (FAILED(hr))
+	{
+		hr = pMouse->Acquire();
+		while (hr == DIERR_INPUTLOST)
+			hr = pMouse->Acquire();
+
+		// no mouse data
+		return false;
+	}
+
+	xPosRelative = dims2.lX;
+	yPosRelative = dims2.lY;
+
+	return true;
+}
+
+// ========================================================================
+// Camera
+PSET_CAMERA defaultCam = {
+	0, // first window
+	{ 0.0f, 100.0f, 0.0f },
+	{ 0, 0, 0 },
+	{ 0, 0, 1},
+	60.0f,   // fov
+	1.0f,   // z-near
+	1000.0f, // z-far
+};
+
+const float mouseScale = 0.001f;
+const float moveScale = 5.0f;
+
+void ProcessCam(CEngine &en)
+{
+	if (!wndState[0] || !onWnd[0].size())
+		return;
+
+	PSET_CAMERA cam = defaultCam;
+	cam.wnd = 0;
+
+	int mx = 0, my = 0;
+	ReadMouse(mx, my);
+
+	static glm::vec3 static_target(
+		defaultCam.lookAt[0] - defaultCam.camera[0],
+		defaultCam.lookAt[1] - defaultCam.camera[1],
+		defaultCam.lookAt[2] - defaultCam.camera[2]);
+
+	static glm::vec3 rot(0);
+	static glm::vec3 pos(
+		defaultCam.camera[0],
+		defaultCam.camera[1],
+		defaultCam.camera[2]);
+
+	static_target = glm::normalize(static_target);
+	static_target = glm::vec3(0, -1, 0);
+	rot.z -= float(mx)*mouseScale;
+	rot.x += float(my)*mouseScale;
+
+	glm::mat3 r = glm::mat3_cast(glm::quat(rot));
+	auto lookAt = r * static_target;
+	glm::vec3 right = r * glm::vec3(-1, 0, 0);
+
+	if (IsKeyPressed('W'))
+	{
+		pos += lookAt * moveScale;
+	}
+	if (IsKeyPressed('S'))
+	{
+		pos -= lookAt * moveScale;
+	}
+	if (IsKeyPressed('A'))
+	{
+		pos -= right * moveScale;
+	}
+	if (IsKeyPressed('D'))
+	{
+		pos += right * moveScale;
+	}
+	if (GetKeyPressed('R'))
+	{
+		pos = glm::vec3(
+			defaultCam.camera[0],
+			defaultCam.camera[1],
+			defaultCam.camera[2]);
+		rot = glm::vec3(0);
+	}
+
+	cam.camera[0] = pos.x;
+	cam.camera[1] = pos.y;
+	cam.camera[2] = pos.z;
+	cam.lookAt[0] = cam.camera[0] + lookAt.x;
+	cam.lookAt[1] = cam.camera[1] + lookAt.y;
+	cam.lookAt[2] = cam.camera[2] + lookAt.z;
+	en.SendMsg(SET_CAMERA, RENDERING_ENGINE, 0, &cam);
+}
+
+// ========================================================================
 void testloop(BAMS::CEngine &en)
 {
 	for (bool isRunning = true; isRunning;)
@@ -404,6 +598,8 @@ void testloop(BAMS::CEngine &en)
 		Spin(en);
 		BAMS::CEngine::Update(25.0f);
 		SleepEx(25, TRUE);
+		ProcessCam(en);
+
 		updateAllKeysScan();
 		for (uint16_t i = 0; i < sizeof(currentKeyState); ++i)
 		{
@@ -413,23 +609,22 @@ void testloop(BAMS::CEngine &en)
 				case VK_ESCAPE:
 					isRunning = false;
 						break;
-				case VK_ADD:
-					en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, nullptr);
+
+				case VK_NUMPAD7:
+				case VK_NUMPAD8:
+				case VK_NUMPAD9:
+					ToggleWnd(en, i - VK_NUMPAD7);
 					break;
 
-				case '1':
-				case '2':
-				case '3':
-					ToggleWnd(en, i - '1');
-					break;
+				case VK_NUMPAD4: AddToWnd(en, 0, 0);	break;
+				case VK_NUMPAD1: AddToWnd(en, 0, 1);	break;
+				case VK_NUMPAD5: AddToWnd(en, 1, 2);	break;
+				case VK_NUMPAD2: AddToWnd(en, 1, 3);	break;
+				case VK_NUMPAD6: AddToWnd(en, 2, 4);	break;
+				case VK_NUMPAD3: AddToWnd(en, 2, 5);	break;
+				case VK_NUMPAD0: ChangeDebugView(en);	break;
 
-				case 'Q': AddToWnd(en, 0, 0);	break;
-				case 'A': AddToWnd(en, 0, 1);	break;
-				case 'W': AddToWnd(en, 1, 2);	break;
-				case 'S': AddToWnd(en, 1, 3);	break;
-				case 'E': AddToWnd(en, 2, 4);	break;
-				case 'D': AddToWnd(en, 2, 5);	break;
-				case '4': ChangeDebugView(en);	break;
+//				default:					TRACE("KEY: " << i << "\n");
 				}
 			}
 		}
@@ -438,6 +633,7 @@ void testloop(BAMS::CEngine &en)
 
 int main()
 {
+	InitMouse();
 	uint64_t Max, Current, Counter;
 
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);

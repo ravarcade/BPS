@@ -52,12 +52,15 @@ private:
 		FrameBufferAttachment depth;
 		VkFramebuffer frameBuffer;
 
+		VkImageView depthView;
+
 		VkRenderPass renderPass;
 		VkSampler colorSampler;
 		VkSemaphore deferredSemaphore;
 		VkSemaphore resolvingSemaphore;
 		std::vector<CShaderProgram*> shaders;
 		CShaderProgram *resolveShader;
+
 		template<typename T>
 		void ForEachFrameBuffer(T f) 
 		{
@@ -235,6 +238,9 @@ public:
 	void GetShaderParams(const char *shader, BAMS::CORE::Properties **params);
 	void GetObjectParams(const char * objectName, BAMS::CORE::Properties ** props);
 	void UpdateDrawCommands();
+	void SetCamera(const BAMS::PSET_CAMERA * cam);
+	BAMS::PSET_CAMERA cameraSettings;
+
 	VkDescriptorImageInfo *GetDescriptionImageInfo(const char *attachmentName);
 
 	// ------------------------ for deferred rendering -----------
@@ -249,6 +255,7 @@ public:
 		vkDestroy(fb.albedo);
 		vkDestroy(fb.normals);
 		vkDestroy(fb.pbr);
+		vkDestroy(fb.depthView);
 		vkDestroy(fb.depth);
 		fb.shaders.clear();
 		fb.resolveShader = nullptr;
