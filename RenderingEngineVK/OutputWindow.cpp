@@ -1478,7 +1478,59 @@ void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)
 		swapChainExtent.width / (float)swapChainExtent.height, 
 		cam->zNear,
 		cam->zFar);
+
 	ubo.proj[1][1] *= -1;
+
+	// Set Params for deferred resolve shader.... we need one ;)
+	if (!deferredFrameBuf.resolveShader)
+	{
+		if (forwardRenderingShaders.size())
+			deferredFrameBuf.resolveShader = forwardRenderingShaders[0];
+		else
+			return;
+	}
+
+	auto prop = deferredFrameBuf.resolveShader->GetProperties(0);
+	float *m22 = nullptr;
+	float *m32 = nullptr;
+	float *viewRayStart = nullptr;
+	float *viewRayDelta = nullptr;
+	for (uint32_t i=0; i< prop->count; ++i)
+	{
+		auto p = prop->properties[i];
+		if (strcmp(p.name, "m22") == 0)
+			m22 = reinterpret_cast<float *>(p.val);
+		else if (strcmp(p.name, "m32") == 0)
+			m32 = reinterpret_cast<float *>(p.val);
+		else if (strcmp(p.name, "viewRayStart") == 0)
+			viewRayStart = reinterpret_cast<float *>(p.val);
+		else if (strcmp(p.name, "viewRayDelta") == 0)
+			viewRayDelta = reinterpret_cast<float *>(p.val);
+	}
+	// in vulkan left/top have coords (-1, -1), right/bottom (1,1)
+
+	// write params base on what we know
+	if (m22)
+		*m22 = ubo.proj[2][2];
+	if (m32)
+		*m32 = ubo.proj[3][2]; // ? or [2][3]
+
+	// We do math in double. That are few simple steps and we want to minimize errors.
+	double vFar = tan(glm::radians(double(cam->fov*0.5)));
+	double aspect = static_cast<double>(swapChainExtent.width) / static_cast<double>(swapChainExtent.height);
+	double hFar = vFar * aspect;
+	if (viewRayStart)
+	{
+		viewRayStart[0] = static_cast<float>(-hFar );
+		viewRayStart[1] = static_cast<float>(+vFar);
+		viewRayStart[2] = -1.0f;
+	}
+	if (viewRayDelta)
+	{
+		viewRayDelta[0] = static_cast<float>(+2 * hFar);
+		viewRayDelta[1] = static_cast<float>(-2 * vFar);
+		viewRayDelta[2] = 0.0f;
+	}
 }
 
 VkDescriptorImageInfo *OutputWindow::GetDescriptionImageInfo(const char * attachmentName)

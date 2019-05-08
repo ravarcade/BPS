@@ -333,30 +333,6 @@ void SetDeferredParams(Properties *pprop)
 				SetLightRadius(p, i, stride);
 			}
 		}
-		else if (strcmp(p.name, "zNear") == 0)
-		{
-			*reinterpret_cast<float *>(p.val) = n;
-		}
-		else if (strcmp(p.name, "zFar") == 0)
-		{
-			*reinterpret_cast<float *>(p.val) = f;
-		}
-		else if (strcmp(p.name, "m22") == 0)
-		{
-			*reinterpret_cast<float *>(p.val) = -f/(f-n);
-		}
-		else if (strcmp(p.name, "m32") == 0)
-		{
-			*reinterpret_cast<float *>(p.val) = -f*n/(f-n);
-		}
-		else if (strcmp(p.name, "vFar") == 0)
-		{
-			*reinterpret_cast<float *>(p.val) = 0.5f*tanf(defaultCam.fov*deg2rad)*800.0f/1200.0f;
-		}
-		else if (strcmp(p.name, "hFar") == 0)
-		{
-			*reinterpret_cast<float *>(p.val) = 0.5f*tanf(defaultCam.fov*deg2rad);
-		}
 	}
 }
 
@@ -516,9 +492,9 @@ PSET_CAMERA defaultCam = {
 	{ 0.0f, 100.0f, 0.0f },
 	{ 0, 0, 0 },
 	{ 0, 0, 1},
-	60.0f,   // fov
-	1.0f,   // z-near
-	1000.0f, // z-far
+	80.0f,   // fov
+	1.0f,    // z-near
+	10000.0f, // z-far
 };
 
 const float mouseScale = 0.001f;

@@ -59,7 +59,7 @@ private:
 		VkSemaphore deferredSemaphore;
 		VkSemaphore resolvingSemaphore;
 		std::vector<CShaderProgram*> shaders;
-		CShaderProgram *resolveShader;
+		CShaderProgram *resolveShader = nullptr;
 
 		template<typename T>
 		void ForEachFrameBuffer(T f) 
@@ -238,6 +238,9 @@ public:
 	void GetShaderParams(const char *shader, BAMS::CORE::Properties **params);
 	void GetObjectParams(const char * objectName, BAMS::CORE::Properties ** props);
 	void UpdateDrawCommands();
+
+
+	// ------------------------ camera stuffs -------------------
 	void SetCamera(const BAMS::PSET_CAMERA * cam);
 	BAMS::PSET_CAMERA cameraSettings;
 
