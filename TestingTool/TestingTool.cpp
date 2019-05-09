@@ -226,9 +226,9 @@ void SetModel(Property &p, uint32_t num)
 void SetBaseColor(Property &p, uint32_t num)
 {
 	static float colors[][4] = {
-		{ 0.1f, 1, 1, 1 },
-		{ 1, 0.1f, 1, 1 },
-		{ 1, 1, 0.1f, 1 }
+		{ 0.5f, 1, 1, 1 },
+		{ 1, 0.5f, 1, 1 },
+		{ 1, 1, 0.5f, 1 }
 	};
 
 	memcpy_s(p.val, 4 * sizeof(float), colors[num % 3], 4 * sizeof(float));
@@ -251,19 +251,21 @@ void SetParams(Properties *pprop, uint32_t num)
 	}
 }
 
-const float lr = 30;
+const float lr = 1350;
+const float ld = 100;// lr * 0.5;
+const float ld2 = 100;// lr * 0.3;
 
 struct Light {
 	float position[4];
 	float color[3];
 	float radius;
 } GlobalLights[6] = {
-	{ { lr, 0, 0, 0}, { 1, 1, 1 }, 2 * lr },
-	{ {0,  lr, 0, 0}, { 0, 0, 1 }, 2 * lr  },
-	{ {-lr, 0, 0, 0}, { 0, 1, 0 }, 2 * lr  },
-	{ {0, -lr, 0, 0}, { 1, 0, 0 }, 2 * lr  },
-	{ {0, 0,  lr, 0}, { 1, 1, 0 }, 2 * lr  },
-	{ {0, 0, -lr, 0}, { 0, 1, 1 }, 2 * lr  },
+	{ {   0,  ld,  0, 0}, { 1, 1, 1 }, 2 * lr },
+	{ {-ld2,  ld,  0, 0}, { 0.3, 0.3, 1 }, 2 * lr  },
+	{ { ld2,  ld,  0, 0}, { 0.3, 1, 0.3 }, 2 * lr  },
+	{ {   0, -ld, ld, 0}, { 1, 0.3, 0.3 }, 2 * lr  },
+	{ {-ld2, -ld, ld, 0}, { 1, 1, 0.3 }, 2 * lr  },
+	{ { ld2, -ld, ld, 0}, { 0.3, 1, 1 }, 2 * lr  },
 
 };
 
@@ -407,7 +409,7 @@ void ChangeDebugView(BAMS::CEngine &en)
 			if (strcmp(p.name, "debugSwitch") == 0 )
 			{
 				auto pVal = reinterpret_cast<uint32_t *>(p.val);
-				*pVal = ((*pVal) + 1) % 5;
+				*pVal = ((*pVal) + 1) % 6;
 			}
 		}
 	}
@@ -492,9 +494,9 @@ PSET_CAMERA defaultCam = {
 	{ 0.0f, 100.0f, 0.0f },
 	{ 0, 0, 0 },
 	{ 0, 0, 1},
-	80.0f,   // fov
+	45.0f,   // fov
 	1.0f,    // z-near
-	10000.0f, // z-far
+	1000.0f, // z-far
 };
 
 const float mouseScale = 0.001f;
@@ -512,15 +514,15 @@ void ProcessCam(CEngine &en)
 	ReadMouse(mx, my);
 
 	static glm::vec3 static_target(
-		defaultCam.lookAt[0] - defaultCam.camera[0],
-		defaultCam.lookAt[1] - defaultCam.camera[1],
-		defaultCam.lookAt[2] - defaultCam.camera[2]);
+		defaultCam.lookAt[0] - defaultCam.eye[0],
+		defaultCam.lookAt[1] - defaultCam.eye[1],
+		defaultCam.lookAt[2] - defaultCam.eye[2]);
 
 	static glm::vec3 rot(0);
 	static glm::vec3 pos(
-		defaultCam.camera[0],
-		defaultCam.camera[1],
-		defaultCam.camera[2]);
+		defaultCam.eye[0],
+		defaultCam.eye[1],
+		defaultCam.eye[2]);
 
 	static_target = glm::normalize(static_target);
 	static_target = glm::vec3(0, -1, 0);
@@ -550,18 +552,18 @@ void ProcessCam(CEngine &en)
 	if (GetKeyPressed('R'))
 	{
 		pos = glm::vec3(
-			defaultCam.camera[0],
-			defaultCam.camera[1],
-			defaultCam.camera[2]);
+			defaultCam.eye[0],
+			defaultCam.eye[1],
+			defaultCam.eye[2]);
 		rot = glm::vec3(0);
 	}
 
-	cam.camera[0] = pos.x;
-	cam.camera[1] = pos.y;
-	cam.camera[2] = pos.z;
-	cam.lookAt[0] = cam.camera[0] + lookAt.x;
-	cam.lookAt[1] = cam.camera[1] + lookAt.y;
-	cam.lookAt[2] = cam.camera[2] + lookAt.z;
+	cam.eye[0] = pos.x;
+	cam.eye[1] = pos.y;
+	cam.eye[2] = pos.z;
+	cam.lookAt[0] = cam.eye[0] + lookAt.x;
+	cam.lookAt[1] = cam.eye[1] + lookAt.y;
+	cam.lookAt[2] = cam.eye[2] + lookAt.z;
 	en.SendMsg(SET_CAMERA, RENDERING_ENGINE, 0, &cam);
 }
 

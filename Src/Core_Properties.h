@@ -23,6 +23,7 @@ public:
 	U32 idx;
 	CSTR name;
 	void *val;
+	U32 array_size;
 	U32 array_stride;
 	
 	Property()                                 : type(PT_EMPTY), parent(-1), count(0),   name(nullptr), val(nullptr), idx(-1), array_stride(0) {}

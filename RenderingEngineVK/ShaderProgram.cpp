@@ -663,6 +663,7 @@ void CShaderProgram::_BuildProperties()
 		pr->idx = paramIdx;
 		pr->type = p.mem->propertyType;
 		pr->count = p.mem->propertyCount;
+		pr->array_size = p.mem->array;
 		pr->array_stride = p.mem->array_stride;
 	}
 }
@@ -932,12 +933,12 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 			vkCmdBindIndexBuffer(cb, bs.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 		}
 
-		// TODO:
 		if (m_isPushConstantsUsed)
 		{
 			vkCmdPushConstants(cb, m_pipelineLayout, pcStage, 0, pcStride, pcBuffer);
 			pcBuffer += pcStride;
 		}
+
 		if (m.numVertex == 0)
 		{
 			vkCmdDraw(cb, 3, 1, 0, 0);

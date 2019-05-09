@@ -1113,8 +1113,10 @@ void OutputWindow::_CreateDeferredFramebuffer()
 void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagBits samples)
 {
 //	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_R16G16_SNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, _FindDepthFormat() };
-	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_R16G16_SNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32G32B32A32_SFLOAT, _FindDepthFormat() };
-	
+//	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_R16G16_SNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32G32B32A32_SFLOAT, _FindDepthFormat() };
+	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32G32B32A32_SFLOAT, _FindDepthFormat() };
+	//VK_FORMAT_A2B10G10R10_UNORM_PACK32
+
 	VkImageUsageFlags deferredAttachmentUsage[] = {	
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
@@ -1468,14 +1470,14 @@ void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)
 
 	auto &ubo = *sharedUboData;
 	ubo.view = glm::lookAt(
-		glm::vec3(cam->camera[0], cam->camera[1], cam->camera[2]), 
-		glm::vec3(cam->lookAt[0], cam->lookAt[1], cam->lookAt[2]), 
+		glm::vec3(cam->eye[0], cam->eye[1], cam->eye[2]),
+		glm::vec3(cam->lookAt[0], cam->lookAt[1], cam->lookAt[2]),
 		glm::vec3(cam->up[0], cam->up[1], cam->up[2]));
 
 	TRACEM(ubo.view);
 	ubo.proj = glm::perspective(
-		glm::radians(cam->fov), 
-		swapChainExtent.width / (float)swapChainExtent.height, 
+		glm::radians(cam->fov),
+		swapChainExtent.width / (float)swapChainExtent.height,
 		cam->zNear,
 		cam->zFar);
 
@@ -1493,43 +1495,152 @@ void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)
 	auto prop = deferredFrameBuf.resolveShader->GetProperties(0);
 	float *m22 = nullptr;
 	float *m32 = nullptr;
-	float *viewRayStart = nullptr;
+	float *viewRays = nullptr;
+	size_t stride = 0;
+	float *eye = nullptr;
 	float *viewRayDelta = nullptr;
-	for (uint32_t i=0; i< prop->count; ++i)
+	float *view2world = nullptr;
+
+	for (uint32_t i = 0; i < prop->count; ++i)
 	{
 		auto p = prop->properties[i];
 		if (strcmp(p.name, "m22") == 0)
 			m22 = reinterpret_cast<float *>(p.val);
 		else if (strcmp(p.name, "m32") == 0)
 			m32 = reinterpret_cast<float *>(p.val);
-		else if (strcmp(p.name, "viewRayStart") == 0)
-			viewRayStart = reinterpret_cast<float *>(p.val);
+		else if (strcmp(p.name, "viewRays") == 0) {
+			viewRays = reinterpret_cast<float *>(p.val);
+			stride = p.array_stride;
+		}
+		else if (strcmp(p.name, "eye") == 0)
+			eye = reinterpret_cast<float *>(p.val);
 		else if (strcmp(p.name, "viewRayDelta") == 0)
 			viewRayDelta = reinterpret_cast<float *>(p.val);
+		else if (strcmp(p.name, "view2world") == 0)
+			view2world = reinterpret_cast<float *>(p.val);
 	}
-	// in vulkan left/top have coords (-1, -1), right/bottom (1,1)
 
 	// write params base on what we know
 	if (m22)
 		*m22 = ubo.proj[2][2];
 	if (m32)
-		*m32 = ubo.proj[3][2]; // ? or [2][3]
+		*m32 = ubo.proj[3][2];
 
-	// We do math in double. That are few simple steps and we want to minimize errors.
-	double vFar = tan(glm::radians(double(cam->fov*0.5)));
+
 	double aspect = static_cast<double>(swapChainExtent.width) / static_cast<double>(swapChainExtent.height);
+	double vFar = tan(glm::radians(double(cam->fov*0.5)));
 	double hFar = vFar * aspect;
-	if (viewRayStart)
+
+	// in vulkan left/top have coords (-1, -1), right/bottom (1,1)
+	glm::vec4 rays[3] = {
+		{ static_cast<float>(-hFar), static_cast<float>(+vFar), -1, 0 },
+		{ static_cast<float>(-hFar), static_cast<float>(-3*vFar), -1, 0 },
+		{ static_cast<float>(+3 * hFar), static_cast<float>(+vFar), -1, 0 },
+	};
+
+	bool useWorldSpace = true;
+	if (useWorldSpace)
 	{
-		viewRayStart[0] = static_cast<float>(-hFar );
-		viewRayStart[1] = static_cast<float>(+vFar);
-		viewRayStart[2] = -1.0f;
+		glm::mat4 iv = glm::inverse(ubo.view);
+		for (uint32_t i = 0; i < COUNT_OF(rays); ++i)
+		{
+			rays[i] = rays[i] * ubo.view;
+		}
 	}
-	if (viewRayDelta)
+
+	if (eye)
 	{
-		viewRayDelta[0] = static_cast<float>(+2 * hFar);
-		viewRayDelta[1] = static_cast<float>(-2 * vFar);
-		viewRayDelta[2] = 0.0f;
+		eye[0] = useWorldSpace ? cam->eye[0] : 0;
+		eye[1] = useWorldSpace ? cam->eye[1] : 0;
+		eye[2] = useWorldSpace ? cam->eye[2] : 0;
+	}
+
+	// write results
+	for (uint32_t i = 0; i < COUNT_OF(rays); ++i)
+	{
+		float *ray = reinterpret_cast<float *>(reinterpret_cast<uint8_t*>(viewRays) + i * stride);
+		ray[0] = rays[i].x;
+		ray[1] = rays[i].y;
+		ray[2] = rays[i].z;
+	}
+
+	// view 2 world normal transformation
+	if (view2world)
+	{
+		glm::mat3 view = glm::transpose(glm::inverse(ubo.view));
+		for (uint32_t i = 0; i < 3; ++i)
+		{
+			view2world[i * 4] = view[0][i];
+			view2world[i * 4+1] = view[1][i];
+			view2world[i * 4+2] = view[2][i];
+		}
+	}
+
+	// verify
+	if (false)
+	{
+		// We do math in double. That are few simple steps and we want to minimize errors.
+		double vFar = tan(glm::radians(double(cam->fov*0.5)));
+		double aspect = static_cast<double>(swapChainExtent.width) / static_cast<double>(swapChainExtent.height);
+		double hFar = vFar * aspect;
+
+		glm::mat4 iv = glm::inverse(ubo.view);
+		glm::vec4 vrs(static_cast<float>(-hFar), static_cast<float>(+vFar), -1, 0);
+		glm::vec4 vrdh(static_cast<float>(+2 * hFar), 0, 0, 0);
+		glm::vec4 vrdv(0, static_cast<float>(-2 * vFar), 0, 0);
+
+		vrs = vrs * ubo.view;
+		vrdh = vrdh * ubo.view;
+		vrdv = vrdv * ubo.view;
+		auto vrs2 = vrs + vrdh * glm::vec4(2);
+		auto vrs3 = vrs + vrdv * glm::vec4(2);
+
+		auto a1 = viewRays;
+		auto a2 = reinterpret_cast<float *>(reinterpret_cast<uint8_t*>(viewRays) + 1 * stride);
+		auto a3 = reinterpret_cast<float *>(reinterpret_cast<uint8_t*>(viewRays) + 2 * stride);
+		auto b1 = &(vrs.x);
+		auto b2 = &(vrs2.x);
+		auto b3 = &(vrs3.x);
+
+		float c1 = 0, c2 = 0, c3 = 0;
+		for (uint32_t i = 0; i < 3; ++i)
+		{
+			c1 += fabsf(a1[i] - b1[i]);
+			c2 += fabsf(a3[i] - b2[i]);
+			c3 += fabsf(a2[i] - b3[i]);
+		}
+		TRACE("comp: " <<  c1 * 1000 << ", " << c2 * 1000 << ", " << c3 * 1000 << "\n");
+
+		if (false)
+		for (uint32_t i = 0; i < 3; ++i)
+		{
+			a1[i] = b1[i];
+			a2[i] = b3[i];
+			a3[i] = b2[i];
+		}
+
+		//if (viewRayStart)
+		//{
+		//	viewRayStart[0] = vrs.x;
+		//	viewRayStart[1] = vrs.y;
+		//	viewRayStart[2] = vrs.z;
+		//}
+
+		//if (viewRayDelta)
+		//{
+		//	viewRayDelta[0] = vrdh.x;
+		//	viewRayDelta[1] = vrdh.y;
+		//	viewRayDelta[2] = vrdh.z;
+		//}
+
+		//if (viewRayDelta2)
+		//{
+		//	viewRayDelta2[0] = vrdv.x;
+		//	viewRayDelta2[1] = vrdv.y;
+		//	viewRayDelta2[2] = vrdv.z;
+		//}
+
+		
 	}
 }
 

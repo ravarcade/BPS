@@ -37,7 +37,6 @@ struct ValMemberDetails {
 	std::vector<ValMemberDetails> members;
 	uint32_t propertyType = 0;
 	uint32_t propertyCount = 0;
-	uint32_t propertyArrayStride = 0;
 };
 
 struct SampledImageDesc {

@@ -169,22 +169,19 @@ void GetDetails(CompilerGLSL &comp, SPIRType &type, ValMemberDetails &ent)
 			SetSimplifiedType(mem);
 			mem.propertyType = toPropType[mem.type];
 			mem.propertyCount = toPropCount[mem.type];
-			mem.propertyArrayStride = mem.size;
 
 			if (member_type.basetype == SPIRType::BaseType::Struct && member_type.member_types.size())
 			{
 				GetDetails(comp, member_type, mem);
 			}
 		
-			// finetune for arrays:
+			// finetune for array of structs:
 			if (mem.members.size() > 0 && 
 				mem.array > 0 && 
-				mem.array_stride > 0) // it is array! so mark it as array
+				mem.array_stride > 0) // it is array of struct! so mark it as array
 			{
 				mem.propertyType  = Property::PT_ARRAY;
 				mem.propertyCount = mem.array;
-				mem.propertyArrayStride = mem.array_stride;
-//				mem.size          = mem.array_stride; //(?check it)
 			}
 
 			ent.members.push_back(mem);

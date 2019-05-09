@@ -448,7 +448,7 @@ struct PUPDATE_DRAW_COMMANDS {
 
 struct PSET_CAMERA {
 	uint32_t wnd;
-	float camera[3];
+	float eye[3];
 	float lookAt[3];
 	float up[3];
 	float fov;
