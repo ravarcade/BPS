@@ -17,7 +17,6 @@ struct RegisteredClasses
 };
 
 // ============================================================================
-
 using namespace std::chrono_literals; // we want to use literals, like 50ms or 1h
 typedef std::chrono::steady_clock clock;
 typedef std::chrono::steady_clock::time_point time;

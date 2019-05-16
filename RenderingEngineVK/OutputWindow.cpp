@@ -1442,7 +1442,7 @@ CShaderProgram * OutputWindow::ReloadShader(const char * shader)
 	return sh;
 }
 
-void OutputWindow::GetShaderParams(const char *shader, BAMS::CORE::Properties **props)
+void OutputWindow::GetShaderParams(const char *shader, Properties **props)
 {
 	auto sh = shaders.find(shader);
 	if (!sh) return;
@@ -1450,7 +1450,7 @@ void OutputWindow::GetShaderParams(const char *shader, BAMS::CORE::Properties **
 }
 
 
-void OutputWindow::GetObjectParams(const char *objectName, BAMS::CORE::Properties **props)
+void OutputWindow::GetObjectParams(const char *objectName, Properties **props)
 {
 	auto oi = objects.find(objectName);
 	if (!oi) return;

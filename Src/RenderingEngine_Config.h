@@ -1,5 +1,3 @@
-#ifndef _RENDERINGENGINE_CONFIG_H_
-#define _RENDERINGENGINE_CONFIG_H_
 
 enum {
 	NONE = 0,
@@ -20,7 +18,7 @@ enum {
 
 struct VertexDescription;
 
-struct RE_EXPORT Optimize {
+struct BAMS_EXPORT Optimize {
 	Optimize();
 	VertexDescription OptimizeVertexDescription(VertexDescription &vd);
 	uint32_t GetOptimizedType(uint32_t type, uint32_t size, bool normalized = true);
@@ -43,6 +41,4 @@ struct RE_EXPORT Optimize {
 	float max_smoothing_angle;
 };
 
-Optimize RE_EXPORT *GetOptimize();
-
-#endif
+Optimize BAMS_EXPORT *GetOptimize();

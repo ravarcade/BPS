@@ -1,7 +1,7 @@
 #pragma once
 
 using namespace Assimp;
-using namespace BAMS::RENDERINENGINE;
+using namespace BAMS;
 
 class AssImp_Loader 
 {
@@ -48,7 +48,7 @@ public:
 	}
 
 private:
-	BAMS::CORE::U32 _JSHash(VertexDescription &vd, BAMS::CORE::U32 hash = 0);
+	U32 _JSHash(VertexDescription &vd, U32 hash = 0);
 	void AddMesh(aiMesh * mesh);
 	void AddMesh_broken(aiMesh * mesh);
 	void LoadBones();

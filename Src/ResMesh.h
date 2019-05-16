@@ -9,7 +9,7 @@
 class ResMesh : public ResoureImpl<ResMesh, RESID_MESH, Allocators::default, false> 
 {
 	ResourceBase *rb;
-	BAMS::RENDERINENGINE::VertexDescription vd;
+	VertexDescription vd;
 	U32 meshIdx;
 	U32 meshHash;
 	ResourceBase *meshSrc;
@@ -27,15 +27,15 @@ public:
 	void Update(ResourceBase *res) {}
 	void Release(ResourceBase *res) {}
 
-	bool IsSame(BAMS::RENDERINENGINE::VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx) { return _meshSrc == meshSrc && _meshIdx == meshIdx && meshHash == _meshHash && *pvd == vd; }
-	void SetVertexDescription(BAMS::RENDERINENGINE::VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx) { vd = *pvd; meshHash = _meshHash; meshSrc = _meshSrc; meshIdx = _meshIdx; SetVertexDescriptionData(); _SaveXML(); }
-	BAMS::RENDERINENGINE::VertexDescription *GetVertexDescription();
-	static STR BuildXML(BAMS::RENDERINENGINE::VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx);
+	void SetVertexDescription(VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx);
+
+	VertexDescription *GetVertexDescription(bool loadASAP = false);
 	ResourceBase *GetMeshSrc() { return meshSrc; }
 	U32 GetMeshIdx() { return meshIdx; }
-	U32 GetMeshHash() { return meshHash; }
 	void SetMeshIdx(U32 idx) { meshIdx = idx; }
-	void SetVertexDescriptionData() { isVertexDescriptionDataSet = true; }
+	U32 GetMeshHash() { return meshHash; }
+
+	static STR BuildXML(VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx);
 };
 
 class ResImportModel : public ResoureImpl<ResImportModel, RESID_IMPORTMODEL, Allocators::default, false>
@@ -55,7 +55,7 @@ public:
 		{
 			resourceSize = res->GetSize();
 			resourceTimestamp = res->GetTimestamp();
-			IEngine::PostMsg(IMPORTMODEL_UPDATE, IMPORT_MODULE, 0, rb);
+			IEngine::PostMsg(IMPORTMODULE_UPDATE, IMPORT_MODULE, 0, rb);
 		}
 	}
 

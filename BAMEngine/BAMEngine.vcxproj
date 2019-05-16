@@ -168,9 +168,7 @@
   <ItemGroup>
     <ClInclude Include="..\3rdParty\tinyxml2\tinyxml2.h" />
     <ClInclude Include="..\Src\BAMEngine.h" />
-    <ClInclude Include="..\Src\BAMEngineImport.h" />
     <ClInclude Include="..\Src\BAMEngineInternal.h" />
-    <ClInclude Include="..\Src\Core.h" />
     <ClInclude Include="..\Src\Core_Array.h" />
     <ClInclude Include="..\Src\Core_BasicTypes.h" />
     <ClInclude Include="..\Src\Core_DirectoryChangeNotifier.h" />
@@ -185,16 +183,15 @@
     <ClInclude Include="..\Src\Core_Properties.h" />
     <ClInclude Include="..\Src\Core_Queue.h" />
     <ClInclude Include="..\Src\RawData.h" />
+    <ClInclude Include="..\Src\RenderingEngine_Image.h" />
+    <ClInclude Include="..\Src\ResImage.h" />
     <ClInclude Include="..\Src\ResMesh.h" />
     <ClInclude Include="..\Src\ResourceManager.h" />
     <ClInclude Include="..\Src\Core_Strings.h" />
     <ClInclude Include="..\Src\Core_Tools.h" />
     <ClInclude Include="..\Src\Core_Types.h" />
-    <ClInclude Include="..\Src\DllInterface.h" />
     <ClInclude Include="..\Src\DllInterface_IResourceManager.h" />
-    <ClInclude Include="..\Src\RenderingEngine.h" />
     <ClInclude Include="..\Src\RenderingEngine_Config.h" />
-    <ClInclude Include="..\Src\RenderingEngine_DllInterface.h" />
     <ClInclude Include="..\Src\RenderingEngine_VertexData.h" />
     <ClInclude Include="..\Src\RenderingEngine_VertexDescription.h" />
     <ClInclude Include="..\Src\ResShader.h" />
@@ -213,7 +210,9 @@
     <ClCompile Include="..\Src\Core_Engine.cpp" />
     <ClCompile Include="..\Src\Core_MemoryAllocator.cpp" />
     <ClCompile Include="..\Src\Core_Module.cpp" />
+    <ClCompile Include="..\Src\RenderingEngine_Image.cpp" />
     <ClCompile Include="..\Src\RenderingEngine_VertexDescription.cpp" />
+    <ClCompile Include="..\Src\ResImage.cpp" />
     <ClCompile Include="..\Src\ResMesh.cpp" />
     <ClCompile Include="..\Src\ResourceManager.cpp" />
     <ClCompile Include="..\Src\Core_Tools.cpp" />
@@ -242,7 +241,17 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\glm.0.9.9.500\build\native\glm.targets" Condition="Exists('..\packages\glm.0.9.9.500\build\native\glm.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\glm.0.9.9.500\build\native\glm.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\glm.0.9.9.500\build\native\glm.targets'))" />
+  </Target>
 </Project>

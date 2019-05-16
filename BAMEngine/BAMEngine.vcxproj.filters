@@ -44,17 +44,8 @@
     <ClInclude Include="targetver.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\BAMEngineImport.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\DllInterface.h">
-      <Filter>DllInterface</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\DllInterface_IResourceManager.h">
       <Filter>DllInterface</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\Core.h">
-      <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\Core_Array.h">
       <Filter>Core</Filter>
@@ -107,12 +98,6 @@
     <ClInclude Include="..\Src\RenderingEngine_Config.h">
       <Filter>RenderingEngine</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\RenderingEngine.h">
-      <Filter>RenderingEngine</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\RenderingEngine_DllInterface.h">
-      <Filter>DllInterface</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\RenderingEngine_VertexData.h">
       <Filter>RenderingEngine</Filter>
     </ClInclude>
@@ -132,6 +117,12 @@
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\ResMesh.h">
+      <Filter>ResourceManager</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\RenderingEngine_Image.h">
+      <Filter>RenderingEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\ResImage.h">
       <Filter>ResourceManager</Filter>
     </ClInclude>
   </ItemGroup>
@@ -184,5 +175,14 @@
     <ClCompile Include="..\Src\RenderingEngine_VertexDescription.cpp">
       <Filter>RenderingEngine</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\RenderingEngine_Image.cpp">
+      <Filter>RenderingEngine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\ResImage.cpp">
+      <Filter>ResourceManager</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

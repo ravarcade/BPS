@@ -52,9 +52,9 @@ struct IEngine
 	static IModule *GetModule(U32 moduleId);
 
 	static void SendMsg(Message *msg);
-	static void SendMsg(uint32_t msgId, uint32_t msgDst, uint32_t msgSrc, const void *data, uint32_t dataLen = 0);
+	static void SendMsg(uint32_t msgId, uint32_t msgDst, uint32_t msgSrc, void *data, uint32_t dataLen = 0);
 	static void PostMsg(Message *msg, time::duration delay = 0ms);
-	static void PostMsg(uint32_t msgId, uint32_t msgDst, uint32_t msgSrc, const void *data, uint32_t dataLen = 0, time::duration delay = 0ms);
+	static void PostMsg(uint32_t msgId, uint32_t msgDst, uint32_t msgSrc, void *data, uint32_t dataLen = 0, time::duration delay = 0ms);
 
 	static void RegisterExternalModule(
 		uint32_t moduleId,

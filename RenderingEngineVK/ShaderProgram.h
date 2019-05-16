@@ -59,13 +59,13 @@ public:
 	void DrawObjects(VkCommandBuffer &cb);
 
 
-	BAMS::CORE::Properties *GetProperties(uint32_t drawObjectId = -1) 
+	Properties *GetProperties(uint32_t drawObjectId = -1) 
 	{
 		if (drawObjectId != -1)
 		{
 			for (auto &p : m_properties)
 			{
-				if (p.type != BAMS::CORE::Property::PT_EMPTY)
+				if (p.type != Property::PT_EMPTY)
 				{
 					auto pb = m_shaderProgramParamNames[p.idx];
 					auto buf = m_paramsBuffers[pb.dataBufferId].buffer;
@@ -105,8 +105,8 @@ private:
 
 	void _CreateNewBufferSet(uint32_t numVertices, uint32_t numIndeces);
 
-	BAMS::RENDERINENGINE::VertexDescription * _GetMeshVertexDescription(const char * name);
-	void _ImportMeshData(const BAMS::RENDERINENGINE::VertexDescription *vd, void *dst);
+	VertexDescription * _GetMeshVertexDescription(const char * name);
+	void _ImportMeshData(const VertexDescription *vd, void *dst);
 	const VertexAttribs &_GetVertexAttribs() { return m_reflection.GetVertexAttribs(); }
 
 	CShadersReflections          m_reflection;
@@ -139,7 +139,7 @@ private:
 	std::vector<PropertiesBufferInfo>              m_paramsBuffers;
 	std::vector<uint8_t>                           m_paramsLocalBuffer;
 
-	BAMS::CORE::MProperties                        m_properties;
+	MProperties                        m_properties;
 	std::vector<ShaderProgramParamDesc>            m_shaderProgramParamNames;
 	bool                                           m_isPushConstantsUsed;
 
@@ -173,6 +173,6 @@ private:
 	std::vector<BufferSet> m_bufferSets;
 	std::vector<Mesh> m_meshes;
 	std::vector<DrawObjectData> m_drawObjectData;
-	BAMS::CORE::hashtable<const char *, uint32_t> m_meshNames;
+	hashtable<const char *, uint32_t> m_meshNames;
 	uint32_t m_drawOrder;
 };

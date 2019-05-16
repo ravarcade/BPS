@@ -23,12 +23,12 @@
 #include <intrin.h> // _BitScanForward
 
 #define GLFW_INCLUDE_VULKAN
-#include "glfw\glfw3.h"
+#include <glfw\glfw3.h>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include "glm\vec4.hpp"
-#include "glm\mat4x4.hpp"
+#include <glm\vec4.hpp>
+#include <glm\mat4x4.hpp>
 
 enum {
 	MAINWND = 0,
@@ -39,9 +39,12 @@ enum {
 
 const bool ForceHostVisibleUBOS = true;
 
+using namespace BAMS;
+
 #include "Utils.h"
 #include "ShadersReflections.h"
 #include "ShaderProgram.h"
+#include "Texture2D.h"
 #include "iglfw.h"
 #include "OutputWindow.h"
 #include "ire.h"

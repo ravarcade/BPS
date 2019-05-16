@@ -6,19 +6,16 @@
 #include <chrono>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include "../3rdParty/glm/glm.hpp"
-#include "../3rdParty/glm/gtc/matrix_transform.hpp"
-#include "../3rdParty/glm/gtc/quaternion.hpp"
-#include "../3rdParty/glm/gtc/constants.hpp"
-#include "../3rdParty/glm/gtc/matrix_inverse.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 
 #include <vector>
 #pragma comment(lib, "Winmm.lib")
 
 using namespace BAMS;
-using BAMS::CORE::MProperties;
-using BAMS::CORE::Properties;
-using BAMS::CORE::Property;
 using std::vector;
 
 extern PSET_CAMERA defaultCam;
@@ -166,18 +163,18 @@ void wait_for_esc()
 
 // ================================================================= 
 
-BAMS::CORE::Properties *GetShaderParams(BAMS::CEngine &en, uint32_t wnd, const char *shaderName)
+Properties *GetShaderParams(BAMS::CEngine &en, uint32_t wnd, const char *shaderName)
 {
-	BAMS::CORE::Properties *prop;
+	Properties *prop;
 	PGET_SHADER_PARAMS p = { wnd, shaderName, &prop };
 	en.SendMsg(GET_SHADER_PARAMS, RENDERING_ENGINE, 0, &p);
 
 	return prop;
 }
 
-BAMS::CORE::Properties * GetObjectParams(BAMS::CEngine &en, uint32_t wnd, const char *objectName)
+Properties * GetObjectParams(BAMS::CEngine &en, uint32_t wnd, const char *objectName)
 {
-	BAMS::CORE::Properties *prop;
+	Properties *prop;
 	PGET_OBJECT_PARAMS p = { wnd, objectName, &prop };
 	en.SendMsg(GET_OBJECT_PARAMS, RENDERING_ENGINE, 0, &p);
 
@@ -630,7 +627,7 @@ int main()
 
 
 			CMesh m1 = rm.Find("Mesh_1", RESID_MESH);
-			auto vd = m1.GetVertexDescription();
+			auto vd = m1.GetVertexDescription(true);
 			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 			
 			// default shader program ... not needed any more

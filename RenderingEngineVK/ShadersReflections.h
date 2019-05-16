@@ -1,6 +1,5 @@
 #pragma once
 
-
 static const unsigned VULKAN_NUM_DESCRIPTOR_SETS = 4;
 static const unsigned VULKAN_NUM_BINDINGS = 16;
 const char * const SHAREDUBOTYPENAME = "SharedUBO";
@@ -13,7 +12,7 @@ struct VertexAttribDetails {
 	VkFormat format;	// vulkan vertex format
 	uint32_t size;		// 
 	uint32_t offset;	// offset in binding
-	BAMS::RENDERINENGINE::Stream *pStream;      // stream in VertexDescription...
+	Stream *pStream;      // stream in VertexDescription...
 };
 
 struct VertexAttribs {
@@ -58,7 +57,7 @@ struct ValDetails {
 
 
 //struct ShaderDataInfo {
-//	BAMS::RENDERINENGINE::VertexDescription vertexDescription;
+//	VertexDescription vertexDescription;
 //
 //	VertexAttribs vertexAttribs;
 //
@@ -105,14 +104,14 @@ public:
 	const std::vector<ShaderProgramInfo> &GetPrograms() { return m_programs; }
 	const ResourceLayout &GetLayout() { return m_layout; }
 	const VertexAttribs &GetVertexAttribs() { return m_vertexAttribs; }
-	const BAMS::RENDERINENGINE::VertexDescription &GetVertexDescription() { return m_vertexDescription; }
+	const VertexDescription &GetVertexDescription() { return m_vertexDescription; }
 	const std::vector<ValDetails> &GetParamsInUBO() { return m_params_in_ubos; }
 	const std::vector<ValDetails> &GetParamsInPushConstants() { return m_params_in_push_constants; }
 	const std::vector<SampledImageDesc> &GetSampledImages() { return m_sampled_images; }
 
 
 private:
-	BAMS::RENDERINENGINE::VertexDescription m_vertexDescription;
+	VertexDescription m_vertexDescription;
 
 	VertexAttribs m_vertexAttribs;
 

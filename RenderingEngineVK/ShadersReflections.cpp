@@ -3,7 +3,7 @@
 #include "..\3rdParty\SPRIV-Cross\spirv_glsl.hpp"
 
 using namespace spirv_cross;
-using namespace BAMS::RENDERINENGINE;
+
 //const char *SharedUniformBufferObject = "UniformBufferObject";
 
 enum ShaderReflectionType {
@@ -76,8 +76,6 @@ void SetSimplifiedType(ValMemberDetails &mem)
 
 void GetDetails(CompilerGLSL &comp, SPIRType &type, ValMemberDetails &ent)
 {
-	using BAMS::CORE::Property;
-
 	static ShaderReflectionType typeConv[] = {
 			ShaderReflectionType::UNKNOWN, // BaseType::Unknown
 			ShaderReflectionType::UNKNOWN, // BaseType::Void
@@ -468,7 +466,7 @@ void CShadersReflections::_ParsePrograms()
 			0,
 			pc.entry.size });
 	}
-	m_vertexDescription = BAMS::RENDERINENGINE::GetOptimize()->OptimizeVertexDescription(m_vertexDescription);
+	m_vertexDescription = GetOptimize()->OptimizeVertexDescription(m_vertexDescription);
 	
 }
 

@@ -1,7 +1,5 @@
 #include "stdafx.h"
 
-NAMESPACE_CORE_BEGIN
-
 // ============================================================================ allocation & deallocacation functions ===
 // Thay can be called only from alloctar classes. So we keep it in pivate class.
 
@@ -12,7 +10,7 @@ NAMESPACE_CORE_BEGIN
 #else
 #define TRACE_MEMORY_LEAKS(x)
 #endif
-
+namespace BAMS {
 namespace MemoryAllocatorsPrivate {
 	using namespace Allocators;
 
@@ -581,12 +579,12 @@ namespace MemoryAllocatorsPrivate {
 	};
 
 
-	typedef MemoryAllocatorsPrivate::DebugAllocator<MemoryAllocatorsPrivate::StandardAllocator> Default;
-	typedef MemoryAllocatorsPrivate::BlocksAllocator Blocks;
+	typedef DebugAllocator<StandardAllocator> Default;
+	typedef BlocksAllocator Blocks;
 
-	typedef MemoryAllocatorsPrivate::Alligned16Bytes Stack;
-	typedef MemoryAllocatorsPrivate::Alligned16Bytes Frame;
-}
+	typedef Alligned16Bytes Stack;
+	typedef Alligned16Bytes Frame;
+}; // MemoryAllocatorsPrivate
 
 namespace Allocators {
 
@@ -631,6 +629,5 @@ namespace Allocators {
 	}
 
 
-}
-
-NAMESPACE_CORE_END
+}; // Allocators namespace
+}; // BAMS namespace

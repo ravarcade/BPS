@@ -220,8 +220,8 @@ class cstringhastable
 	SIZE_T keyLength(const wchar_t *s) { return (wcslen(s) + 1) * sizeof(wchar_t); }
 
 	IMemoryAllocator *alloc;
-	BAMS::CORE::hashtable<const K *, SIZE_T> ht;
-	BAMS::CORE::basic_array<T *> table;
+	hashtable<const K *, SIZE_T> ht;
+	basic_array<T *> table;
 
 public:
 
@@ -329,7 +329,7 @@ class CStringHastable
 
 public:
 	IMemoryAllocator *alloc;
-	BAMS::CORE::hashtable<const char *, T *> ht;
+	hashtable<const char *, T *> ht;
 
 	CStringHastable()
 	{
@@ -399,7 +399,7 @@ class CWStringHastable
 
 public:
 	IMemoryAllocator *alloc;
-	BAMS::CORE::hashtable<const wchar_t *, T *> ht;
+	hashtable<const wchar_t *, T *> ht;
 
 	CWStringHastable()
 	{

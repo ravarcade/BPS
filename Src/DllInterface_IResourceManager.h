@@ -21,6 +21,7 @@ enum {
 	RESID_MESH = RESID_RENDERING_ENGINE_RESOURCES + 0x201,
 	RESID_MODEL,
 	RESID_IMPORTMODEL,
+	RESID_IMAGE,
 
 	RESID_VERTEXDATA,
 };
@@ -32,6 +33,7 @@ extern "C" {
 	typedef void IResourceManager;
 	typedef void IModule;
 	typedef void IMesh;
+	typedef void IImage;
 	typedef void IVertexDescription;
 
 	// Call Initialize befor do anything with resources, game engine, etc. Only some memory allocations.
@@ -93,20 +95,16 @@ extern "C" {
 	// Mesh
 	BAMS_EXPORT void IMesh_SetVertexDescription(IMesh *res, IVertexDescription *_vd, uint32_t _meshHash, IResource *_meshSrc, U32 _meshIdx);
 	BAMS_EXPORT const char * IMesh_BuildXML(IVertexDescription *_vd, uint32_t _meshHash, IResource *_meshSrc, U32 _meshIdx);
-	BAMS_EXPORT IVertexDescription * IMesh_GetVertexDescription(IMesh * res);
+	BAMS_EXPORT IVertexDescription * IMesh_GetVertexDescription(IMesh * res, bool loadASAP = false);
 	BAMS_EXPORT IResource *IMesh_GetMeshSrc(IMesh * res);
 	BAMS_EXPORT uint32_t IMesh_GetMeshIdx(IMesh * res);
 	BAMS_EXPORT uint32_t IMesh_GetMeshHash(IMesh * res);
 	BAMS_EXPORT void IMesh_SetMeshIdx(IMesh * res, uint32_t idx);
-	// Module
-	struct Message
-	{
-		U32 id;
-		U32 targetModule;
-		U32 source;
-		void *data;
-		U32 dataLen;
-	};
+
+	// Image
+	BAMS_EXPORT Image * IImage_GetImage(IImage *res, bool loadASAP = false);
+	BAMS_EXPORT void IImage_Updated(IImage *res);
+
 
 	typedef void ExternalModule_Initialize(const void *moduleData);
 	typedef void ExternalModule_Finalize(const void *moduleData);
@@ -127,20 +125,20 @@ extern "C" {
 		uint32_t msgId,
 		uint32_t msgDst,
 		uint32_t msgSrc,
-		const void *data,
+		void *data,
 		uint32_t dateLen = 0);
 
 	BAMS_EXPORT void IEngine_PostMsg(
 		uint32_t msgId,
 		uint32_t msgDst,
 		uint32_t msgSrc,
-		const void *data,
+		void *data,
 		uint32_t dateLen = 0,
 		uint32_t delay = 0);
 
 	BAMS_EXPORT void IEngine_Update(float dt);
 
-	BAMS_EXPORT BAMS::CORE::Allocators::IMemoryAllocator *GetMemoryAllocator(uint32_t allocatorType = 0, SIZE_T size = 0);
+	BAMS_EXPORT Allocators::IMemoryAllocator *GetMemoryAllocator(uint32_t allocatorType = 0, SIZE_T size = 0);
 
 	// ================================================================================== Classes ===
 
@@ -250,13 +248,21 @@ extern "C" {
 		CRESOURCEEXT(Mesh) // define constructors (+copy,+move), virtual destructo, assign operator for copy and move
 		void SetVertexDescription(IVertexDescription *vd, uint32_t meshHash, CResource &meshRes, uint32_t meshIdx) { IMesh_SetVertexDescription(static_cast<IMesh*>(Get()), vd, meshHash, meshRes.Get(), meshIdx); }
 		void SetVertexDescription(IVertexDescription *vd, uint32_t meshHash, IResource *meshRes, uint32_t meshIdx) { IMesh_SetVertexDescription(static_cast<IMesh*>(Get()), vd, meshHash, meshRes, meshIdx); }
-		IVertexDescription *GetVertexDescription() { return IMesh_GetVertexDescription(static_cast<IMesh*>(Get())); }
+		IVertexDescription *GetVertexDescription(bool loadASAP = false) { return IMesh_GetVertexDescription(static_cast<IMesh*>(Get()), loadASAP); }
 		static const char *BuildXML(IVertexDescription *vd, uint32_t meshHash, CResource &meshRes, uint32_t meshIdx) { return IMesh_BuildXML(vd, meshHash, meshRes.Get(), meshIdx); }
 		static const char *BuildXML(IVertexDescription *vd, uint32_t meshHash, IResource *meshRes, uint32_t meshIdx) { return IMesh_BuildXML(vd, meshHash, meshRes, meshIdx); }
 		IResource *GetMeshSrc() { return IMesh_GetMeshSrc(static_cast<IMesh*>(Get())); }
 		uint32_t GetMeshIdx() { return IMesh_GetMeshIdx(static_cast<IMesh*>(Get())); }
 		uint32_t GetMeshHash() { return IMesh_GetMeshHash(static_cast<IMesh*>(Get())); }
 		void SetMeshIdx(uint32_t idx) { IMesh_SetMeshIdx(static_cast<IMesh*>(Get()), idx); }
+	};
+
+	class CImage : public CResource
+	{
+	public:
+		CRESOURCEEXT(Image) // define constructors (+copy,+move), virtual destructo, assign operator for copy and move
+		Image *GetImage() { return IImage_GetImage(static_cast<IImage*>(Get())); }
+		void Updated() { IImage_Updated(static_cast<IImage*>(Get())); }
 	};
 
 	class CResourceManager
@@ -318,7 +324,7 @@ extern "C" {
 			uint32_t msgId,
 			uint32_t msgDst = 0,
 			uint32_t msgSrc = 0,
-			const void *data = nullptr,
+			void *data = nullptr,
 			uint32_t dataLen = 0)
 		{
 			IEngine_SendMsg( msgId, msgDst, msgSrc, data, dataLen);
@@ -328,7 +334,7 @@ extern "C" {
 			uint32_t msgId,
 			uint32_t msgDst,
 			uint32_t msgSrc,
-			const void *data,
+			void *data,
 			uint32_t dataLen = 0,
 			uint32_t delay = 0)
 		{
@@ -372,7 +378,8 @@ enum { // msgDst
 };
 
 enum { // msgId
-	// to everybady (general notifications)
+	// to everyone (general notifications)
+	RESOURCE_ADD_FILE        = 0x10001,
 	RESOURCE_MANIFEST_PARSED = 0x10003,
 
 	// to RENDERING_ENGINE
@@ -387,9 +394,11 @@ enum { // msgId
 	SET_CAMERA            = 0x20009,
 
 	// to IMPORT_MODULE (or everyone?)
-	IDENTIFY_RESOURCE     = 0x40001,
-	IMPORTMODEL_UPDATE    = 0x40002,
-	IMPORTMODEL_LOADMESH  = 0x40003,
+	IDENTIFY_RESOURCE      = 0x40001,
+	IMPORTMODULE_UPDATE    = 0x40002,
+	IMPORTMODULE_LOADMESH  = 0x40003,
+	IMPORTMODULE_LOADIMAGE = 0X40004,
+	IMPORTMODULE_UPDATEIMAGE = 0X40005,
 };
 
 struct PCREATE_WINDOW {
@@ -407,7 +416,7 @@ struct PADD_MESH {
 	const char *name;    // uniq name
 	const char *mesh;	 // resource name
 	const char *shader;  // resource name
-	BAMS::CORE::Properties **pProperties;
+	Properties **pProperties;
 	uint32_t *pId;
 };
 
@@ -426,14 +435,14 @@ struct SHADER_PARAM_ENTRY {
 struct PGET_SHADER_PARAMS {
 	uint32_t wnd;
 	const char *name;
-	BAMS::CORE::Properties **pProperties;
+	Properties **pProperties;
 };
 
 typedef struct PADD_SHADER PRELOAD_SHADER;
 struct PGET_OBJECT_PARAMS {
 	uint32_t wnd;
 	const char *name;
-	BAMS::CORE::Properties **pProperties;
+	Properties **pProperties;
 };
 
 struct PIDETIFY_RESOURCE {

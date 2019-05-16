@@ -1,9 +1,5 @@
 #include "stdafx.h"
 
-using namespace BAMS;
-using namespace BAMS::RENDERINENGINE;
-using BAMS::CORE::Property;
-
 const uint32_t ALWAYS_RESERVE_VERTICES = 16 * 1024; // <- 256kB for 16bytes / per vertice
 const uint32_t ALWAYS_RESERVE_INDICES = ALWAYS_RESERVE_VERTICES;
 
@@ -481,7 +477,7 @@ VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
 	if (auto res = rm.Find(name, RESID_MESH))
 	{
 		CMesh m(res);
-		auto pvd = reinterpret_cast<VertexDescription*>(m.GetVertexDescription());
+		auto pvd = reinterpret_cast<VertexDescription*>(m.GetVertexDescription(true)); // we need loaded mesh now.
 		if (pvd)
 		{
 			vd = *pvd;
@@ -711,7 +707,7 @@ void CShaderProgram::_BuindShaderProgramParamsDesc(const ValMemberDetails &entry
 			}
 			_BuindShaderProgramParamsDesc(mem, parentIdx, root, dataBufferId);
 		}
-		else if (mem.propertyType != BAMS::CORE::Property::PT_UNKNOWN)
+		else if (mem.propertyType != Property::PT_UNKNOWN)
 		{
 			m_shaderProgramParamNames.push_back({
 				&root,

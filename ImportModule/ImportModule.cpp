@@ -8,6 +8,7 @@ using namespace ::Assimp;
 
 size_t cstringlen(const char *p) { return strlen(p); }
 size_t cstringlen(const wchar_t *p) { return wcslen(p); }
+bool DecodePNG(Image *dst, U8 *src, SIZE_T size);
 
 template<typename T, typename U>
 bool endsWith(T *s, size_t slen, U *p, size_t plen, bool caseInsesitive = true)
@@ -73,13 +74,13 @@ private:
 	}
 
 
-	BAMS::CORE::CWStringHastable<IResource *> m_modelRepoName2modelRepo;
+	CWStringHastable<IResource *> m_modelRepoName2modelRepo;
 	
 	void _StartImport(IResource *res)
 	{
 		// this is temporaly
 		// it should work like this:
-		// create wroking threade for loading and parsing file with objects
+		// create wroking thread for loading and parsing file with objects
 		// after parsing working thread shoud send "parsig done event" to main thread
 		// resources should be added to RM
 		// working thread should wait for main thread until all resources are added, when working thread should be terminated (and used resources released)
@@ -98,7 +99,7 @@ private:
 			if (r.GetMeshSrc() == pimr->res)
 			{
 				auto hash = r.GetMeshHash();
-				auto &vd = *reinterpret_cast<VertexDescription *>(r.GetVertexDescription());
+				auto &vd = *reinterpret_cast<VertexDescription *>(r.GetVertexDescription(false)); // we are parsing file with meshes, we don't want to start loading it.
 
 				// check
 				U32 i = 0;
@@ -164,29 +165,60 @@ private:
 		});
 	}
 
+	bool _CheckExtensions(const wchar_t *fn, char * ext)
+	{
+		auto len = cstringlen(fn);
+		char *next_token;
+
+		const char* sz = strtok_s(ext, ";", &next_token);
+		do {
+			if (endsWith(fn, len, sz[0] == '*' ? sz + 1 : sz))
+			{
+				return true;
+			}
+		} while ((sz = strtok_s(nullptr, ";", &next_token)));
+
+		return false;
+	}
+
+	void _ResIdentify_Models(PIDETIFY_RESOURCE *p)
+	{
+		if (*(p->pType) != RESID_UNKNOWN)
+			return;
+
+		aiString aiExt;
+		aiGetExtensionList(&aiExt);
+
+		if (_CheckExtensions(p->filename, aiExt.data))
+		{
+			*(p->pType) = RESID_IMPORTMODEL;
+			_StartImport(p->res);
+		}
+	}
+
+
+	void _ResIdentify_Image(PIDETIFY_RESOURCE *p)
+	{
+		if (*(p->pType) != RESID_UNKNOWN)
+			return;
+		
+		if (_CheckExtensions(p->filename, "png;bmp;jpg;jpeg;tga"))
+		{
+			*(p->pType) = RESID_IMAGE;
+			// load texture 2d?
+			// read params and set XML data?
+
+		}
+	}
+
 public:
 	Importer() : en(nullptr) {}
 
 	void ResIdentify(void *params)
 	{
 		auto p = static_cast<PIDETIFY_RESOURCE *>(params);
-		auto fn = (p->filename);
-		auto len = cstringlen(fn);
-
-		aiString aiExt;
-		aiGetExtensionList(&aiExt);
-
-		size_t s = aiExt.length;
-		char *next_token;
-		const char* sz = strtok_s(aiExt.data, ";", &next_token);
-		do {
-			if (endsWith(fn, len,sz[0] == '*' ? sz + 1 : sz))
-			{
-				*(p->pType) = RESID_IMPORTMODEL;
-				_StartImport(p->res);
-				break;
-			}
-		} while ((sz = strtok_s(nullptr, ";", &next_token)));
+		_ResIdentify_Models(p);
+		_ResIdentify_Image(p);
 	}
 
 	void ResLoadMesh(void *params)
@@ -200,7 +232,7 @@ public:
 
 			if (pimr->IsLoaded()) 
 			{
-				auto pvd = reinterpret_cast<VertexDescription *>(m.GetVertexDescription());
+				auto pvd = reinterpret_cast<VertexDescription *>(m.GetVertexDescription(false)); // we don't want trigger "loading", because we are doing it now, so pass false to GetVertexDescription
 				auto pim = pimr->aiLoader.Mesh(m.GetMeshIdx());
 				if (pim)
 					*pvd = pim->vd;
@@ -213,6 +245,12 @@ public:
 		}
 	}
 
+	void ResLoadImage(void *params)
+	{
+		CImage res(params);
+		//TRACEW(L"ResLoadImage: " << res.GetPath() << L"\n");
+	}
+
 	void ResUpdate(void *params)
 	{
 		CResource res(params);
@@ -222,8 +260,15 @@ public:
 	
 	void OnResourceManifestParsed()
 	{
+
 		m_modelRepoName2modelRepo.clear();
 		CResourceManager rm;
+		CRawData testPng  = rm.GetRawData("test");
+		if (!testPng.IsLoaded())
+			rm.LoadSync(testPng);
+		Image img;
+		DecodePNG(&img, testPng.GetData(), testPng.GetSize());
+		img.Release();
 
 		// add all modelRepos
 		rm.Filter([](IResource *res, void *param) {
@@ -239,7 +284,7 @@ public:
 			CResource r(res);
 			uint32_t rxs = 0;
 			auto rx = r.GetXML(&rxs);
-			CORE::STR rxml(rx, rx + rxs);
+			STR rxml(rx, rx + rxs);
 
 			// check if mesh mach
 		}, this, nullptr, RESID_MESH);
@@ -247,8 +292,8 @@ public:
 
 	void Initialize()
 	{
-		BAMS::CORE::STR::Initialize();
-		BAMS::CORE::WSTR::Initialize();
+		STR::Initialize();
+		WSTR::Initialize();
 		en = new CEngine();
 	}
 
@@ -256,8 +301,8 @@ public:
 	{
 		m_modelRepoName2modelRepo.reset();
 		m_importedModelRepos.clear();
-		BAMS::CORE::WSTR::Finalize();
-		BAMS::CORE::STR::Finalize();
+		WSTR::Finalize();
+		STR::Finalize();
 		delete en;
 		en = nullptr;
 	}
@@ -291,14 +336,15 @@ public:
 //		printf("IM: Update()\n");
 	}
 
-	void SendMsg(Message *msg)
+	void SendMsg(BAMS::Message *msg)
 	{
 		switch (msg->id)
 		{
 		case RESOURCE_MANIFEST_PARSED: im.OnResourceManifestParsed(); break;
 		case IDENTIFY_RESOURCE: im.ResIdentify(msg->data); break;
-		case IMPORTMODEL_UPDATE: im.ResUpdate(msg->data); break;
-		case IMPORTMODEL_LOADMESH: im.ResLoadMesh(msg->data); break;
+		case IMPORTMODULE_UPDATE: im.ResUpdate(msg->data); break;
+		case IMPORTMODULE_LOADMESH: im.ResLoadMesh(msg->data); break;
+		case IMPORTMODULE_LOADIMAGE: im.ResLoadImage(msg->data); break;
 //		case IMPORTMODEL_RESCAN: im.Rescan(); break;
 		default:
 			printf("Not supported message");
@@ -316,6 +362,7 @@ extern "C" {
 	{
 		printf("HELLO IMPORT\n");
 		ImportModule.Register();
+
 
 	}
 }

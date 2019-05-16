@@ -1,9 +1,6 @@
 #include "stdafx.h"
 
 
-using namespace BAMS;
-using namespace RENDERINENGINE;
-
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
 

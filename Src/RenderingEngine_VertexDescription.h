@@ -125,7 +125,7 @@ enum VERTEXATTR {
 * Desction of single data information stream.
 * Used internaly only
 */
-struct RE_EXPORT Stream {
+struct BAMS_EXPORT Stream {
 	void *m_data;
 	U16 m_stride;
 	U32 m_type;
@@ -212,7 +212,7 @@ struct RE_EXPORT Stream {
 *  Definition of input vertex data structure
 *  Here is also translation form assimp::aiMesh to my vertex data structure
 */
-struct RE_EXPORT VertexDescription
+struct BAMS_EXPORT VertexDescription
 {
 public:
 	U32 m_numVertices;

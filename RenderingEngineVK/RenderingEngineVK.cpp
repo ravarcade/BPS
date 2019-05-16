@@ -2,10 +2,6 @@
 //
 
 #include "stdafx.h"
-#include "BAMEngine.h"
-
-using namespace BAMS;
-using namespace BAMS::RENDERINENGINE;
 
 
 // ============================================================================

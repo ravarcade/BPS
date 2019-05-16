@@ -1,8 +1,9 @@
 #include "stdafx.h"
 
-NAMESPACE_CORE_BEGIN
+namespace BAMS {
+namespace CORE {
 
-struct ModuleRegistrationBase : IModule
+struct ModuleRegistrationBase :IModule
 {
 	ModuleRegistrationBase *next;
 	static ModuleRegistrationBase *first;
@@ -143,7 +144,7 @@ void IEngine::SendMsg(Message *msg)
 			f->SendMsg(msg);
 }
 
-void IEngine::SendMsg(uint32_t msgId, uint32_t msgDst, uint32_t msgSrc, const void * data, uint32_t dataLen)
+void IEngine::SendMsg(uint32_t msgId, uint32_t msgDst, uint32_t msgSrc, void * data, uint32_t dataLen)
 {
 	Message msg = {
 		msgId,
@@ -160,7 +161,7 @@ void IEngine::PostMsg(Message *msg, time::duration delay)
 	messageQueue.push_back(msg, delay);
 }
 
-void IEngine::PostMsg(uint32_t msgId, uint32_t msgDst, uint32_t msgSrc, const void * data, uint32_t dataLen, time::duration delay)
+void IEngine::PostMsg(uint32_t msgId, uint32_t msgDst, uint32_t msgSrc, void * data, uint32_t dataLen, time::duration delay)
 {
 	Message msg = {
 		msgId,
@@ -186,5 +187,6 @@ void IEngine::RegisterExternalModule(
 	em->Initialize();
 }
 
-NAMESPACE_CORE_END
+}; // CORE namespace
+}; // BAMS namespace
 

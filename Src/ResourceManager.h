@@ -331,8 +331,7 @@ public:
 	ResourceManager *GetResourceManager();
 };
 
-#define RESOURCEMANAGER_ADD_FILE 0x10001
-
 #include "RawData.h"
 #include "ResShader.h"
 #include "ResMesh.h"
+#include "ResImage.h"

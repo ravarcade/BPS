@@ -1,9 +1,10 @@
 #include "stdafx.h"
 #include "DllInterface.h"
 
-NAMESPACE_BAMS_BEGIN
+namespace BAMS {
+
 using namespace CORE;
-using namespace RENDERINENGINE;
+//using namespace RENDERINENGINE;
 
 extern "C" {
 	static STR *pRetStrHelper;
@@ -162,10 +163,10 @@ extern "C" {
 		rb->SetVertexDescription(pvd, meshHash, reinterpret_cast<ResourceBase *>(meshSrc), meshIdx);
 	}
 
-	BAMS_EXPORT IVertexDescription *IMesh_GetVertexDescription(IMesh * res)
+	BAMS_EXPORT IVertexDescription *IMesh_GetVertexDescription(IMesh * res, bool loadASAP)
 	{
 		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetVertexDescription();
+		return rb->GetVertexDescription(loadASAP);
 	}
 
 	BAMS_EXPORT IResource * IMesh_GetMeshSrc(IMesh * res)
@@ -197,6 +198,19 @@ extern "C" {
 		auto pvd = reinterpret_cast<VertexDescription *>(vd);
 		*pRetStrHelper = ResMesh::BuildXML(pvd, meshHash, reinterpret_cast<ResourceBase *>(meshSrc), meshIdx);
 		return pRetStrHelper->c_str();
+	}
+
+
+	BAMS_EXPORT Image *IImage_GetImage(IImage *res, bool loadASAP)
+	{
+		auto *rb = reinterpret_cast<ResImage *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		return rb->GetImage();
+	}
+
+	BAMS_EXPORT void IImage_Updated(IImage *res)
+	{
+		auto *rb = reinterpret_cast<ResImage *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+		rb->Updated();
 	}
 
 	// =========================================================================== ResourceManager
@@ -323,10 +337,10 @@ extern "C" {
 		uint32_t msgId,
 		uint32_t msgDst,
 		uint32_t msgSrc,
-		const void *data,
+		void *data,
 		uint32_t dataLen)
 	{
-		CORE::Message msg = { msgId, msgDst, msgSrc, data, dataLen };
+		Message msg = { msgId, msgDst, msgSrc, data, dataLen };
 		BAMS::CORE::IEngine::SendMsg(&msg);
 	}
 
@@ -334,11 +348,11 @@ extern "C" {
 		uint32_t msgId,
 		uint32_t msgDst,
 		uint32_t msgSrc,
-		const void *data,
+		void *data,
 		uint32_t dataLen,
 		uint32_t delay)
 	{
-		CORE::Message msg = { msgId, msgDst, msgSrc, data, dataLen };
+		Message msg = { msgId, msgDst, msgSrc, data, dataLen };
 		BAMS::CORE::IEngine::PostMsg(&msg, delay * 1ms);
 	}
 
@@ -347,9 +361,9 @@ extern "C" {
 		BAMS::CORE::IEngine::Update(dt);
 	}
 
-	BAMS_EXPORT BAMS::CORE::Allocators::IMemoryAllocator * GetMemoryAllocator(uint32_t allocatorType, SIZE_T size)
+	BAMS_EXPORT Allocators::IMemoryAllocator * GetMemoryAllocator(uint32_t allocatorType, SIZE_T size)
 	{
-		return BAMS::CORE::Allocators::GetMemoryAllocator(allocatorType, size);
+		return Allocators::GetMemoryAllocator(allocatorType, size);
 	}
 	
 	// ========================================================================
@@ -515,4 +529,5 @@ extern "C" {
 		wprintf(w11.c_str());
 	}
 }
-NAMESPACE_BAMS_END
+
+}; // BAMS namespace

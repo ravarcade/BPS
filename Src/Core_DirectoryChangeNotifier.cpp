@@ -1,7 +1,8 @@
 #include "stdafx.h"
 
-NAMESPACE_CORE_BEGIN
 
+namespace BAMS {
+namespace CORE {
 
 struct DiskFileName
 {
@@ -429,4 +430,5 @@ void DirectoryChangeNotifier::Start() { _data->StartWorker(); }
 void DirectoryChangeNotifier::Stop() { _data->StopWorker(); }
 DiskEvent *DirectoryChangeNotifier::GetDiskEvent() { return _data->GetDiskEvent(); }
 
-NAMESPACE_CORE_END
+}; // CORE namespace
+}; // BAMS namespace

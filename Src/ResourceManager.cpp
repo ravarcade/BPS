@@ -54,7 +54,8 @@
  * Usefull links:
  * https://developersarea.wordpress.com/2014/09/26/win32-file-watcher-api-to-monitor-directory-changes/
  */
-NAMESPACE_CORE_BEGIN
+namespace BAMS {
+namespace CORE {
 
 using tinyxml2::XMLPrinter;
 using tinyxml2::XMLDocument;
@@ -930,7 +931,7 @@ void ResourceManagerModule::SendMsg(Message *msg)
 {
 	switch (msg->id)
 	{
-	case RESOURCEMANAGER_ADD_FILE:
+	case RESOURCE_ADD_FILE:
 		break;
 	}
 }
@@ -948,4 +949,5 @@ ResourceManager *ResourceManagerModule::GetResourceManager()
 	return globalResourceManager;
 }
 
-NAMESPACE_CORE_END
+}; // CORE namespace
+}; // BAMS namespace

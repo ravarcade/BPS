@@ -97,8 +97,72 @@ namespace Allocators {
 	void GetMemoryAllocationStats(uint64_t *Max, uint64_t *Current, uint64_t *Counter);
 	bool GetMemoryBlocks(void **current, size_t *size, size_t *counter, void **data);
 
-	BAMS_EXPORT IMemoryAllocator *GetMemoryAllocator(uint32_t allocatorType = IMemoryAllocator::default, SIZE_T size = 0);
+	BAMS_EXPORT IMemoryAllocator *GetMemoryAllocator(uint32_t allocatorType = IMemoryAllocator::default, SIZE_T size = 0);	
 }
 
 typedef Allocators::IMemoryAllocator IMemoryAllocator;
 typedef Allocators::MemoryAllocator MemoryAllocator;
+
+class TempMemory {
+private:
+	uint8_t *memory;
+	size_t used;
+	size_t reserved;
+	IMemoryAllocator *alloc;
+
+public:
+	TempMemory(size_t size = 0) :
+		memory(nullptr),
+		reserved(0),
+		used(0)
+	{
+		alloc = Allocators::GetMemoryAllocator();
+		resize(size);
+	}
+
+	~TempMemory() { release(); }
+
+	void release()
+	{
+		if (memory)
+		{
+			alloc->deallocate(memory);
+			memory = nullptr;
+		}
+	}
+
+	void resize(size_t size)
+	{
+		if (size > reserved)
+		{
+			auto oldMem = this->memory;
+			memory = reinterpret_cast<uint8_t*>(alloc->allocate(size));
+			reserved = size;
+			if (oldMem && used)
+			{
+				memcpy_s(memory, size, oldMem, used);
+				alloc->deallocate(oldMem);
+			}
+		}
+		used = size;
+	}
+
+	uint8_t *data() { return memory; }
+	size_t size() { return used; }
+	void clear() { used = 0; }
+
+	void *reserveForNewData(size_t size)
+	{
+		auto oldSize = used;
+		resize(used + size);
+		return memory + oldSize;
+	}
+
+	void pushData(const void *data, size_t len)
+	{
+		auto dst = reserveForNewData(len);
+		memcpy_s(dst, len, data, len);
+	}
+
+};
+

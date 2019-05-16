@@ -1,11 +1,10 @@
 #include "stdafx.h"
 
-NAMESPACE_CORE_BEGIN
+namespace BAMS {
+namespace CORE {
 
 using tinyxml2::XMLPrinter;
 using tinyxml2::XMLDocument;
-using BAMS::RENDERINENGINE::VertexDescription;
-using BAMS::RENDERINENGINE::Stream;
 
 // ----------------------------------------------------
 
@@ -58,18 +57,35 @@ void ResMesh::_LoadXML()
 
 void ResMesh::_SaveXML() { rb->XML = BuildXML(&vd, meshHash, meshSrc, meshIdx); rb->SetTimestamp(); }
 
-BAMS::RENDERINENGINE::VertexDescription * ResMesh::GetVertexDescription()
+void ResMesh::SetVertexDescription(VertexDescription * pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
+{ 
+	// set new mesh data
+	vd = *pvd; 
+	meshHash = _meshHash; 
+	meshSrc = _meshSrc; 
+	meshIdx = _meshIdx; 
+
+	// mark, that we don't need to load this mesh again.
+	isVertexDescriptionDataSet = true;  
+
+	// save settings to XML
+	_SaveXML(); 
+}
+
+VertexDescription * ResMesh::GetVertexDescription(bool loadASAP)
 {
-	if (!isVertexDescriptionDataSet)
+	if (!isVertexDescriptionDataSet && loadASAP)
 	{
-		SetVertexDescriptionData(); // Next line will set VD data. We set it now, because Import Module will call GetVertexDescription and we don't want infinite loop.
-		CEngine::SendMsg(IMPORTMODEL_LOADMESH, IMPORT_MODULE, 0, rb);
+		CEngine::SendMsg(IMPORTMODULE_LOADMESH, IMPORT_MODULE, 0, rb);
+
+		// mark, that we don't need to load this mesh again.
+		isVertexDescriptionDataSet = true;
 	}
 
 	return &vd;
 }
 
-STR ResMesh::BuildXML(BAMS::RENDERINENGINE::VertexDescription *pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
+STR ResMesh::BuildXML(VertexDescription *pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
 {
 	using tinyxml2::XMLPrinter;
 	using tinyxml2::XMLDocument;
@@ -137,4 +153,5 @@ void ResImportModel::IdentifyResourceType(ResourceBase * res)
 	IEngine::SendMsg(IDENTIFY_RESOURCE, IMPORT_MODULE, 0, &ir);
 }
 
-NAMESPACE_CORE_END
+}; // CORE namespace
+}; // BAMS namespace

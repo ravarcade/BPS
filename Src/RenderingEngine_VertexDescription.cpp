@@ -1,10 +1,10 @@
 #include "stdafx.h"
-#include "..\3rdParty\glm\glm.hpp"
+#include <glm\glm.hpp>
 
-NAMESPACE_RENDERINENGINE_BEGIN
+namespace BAMS {
 
 enum STDDT {
-	F32, F16, U32, I16, U16, U8, UPACK, IPACK
+	TF32, TF16, TU32, TI16, TU16, TU8, TUPACK, TIPACK
 };
 struct StreamTypeDataDescription {
 	uint8_t len;
@@ -13,46 +13,46 @@ struct StreamTypeDataDescription {
 };
 
 StreamTypeDataDescription stdd[VAT_MAX_TYPE] = {
-	{  0, 0, F32 }, // UNUSED = 0,
-	{  4, 1, F32 }, // FLOAT_1D = 1,
-	{  8, 2, F32 }, // FLOAT_2D = 2,
-	{ 12, 3, F32 }, // FLOAT_3D = 3,
-	{ 16, 4, F32 }, // FLOAT_4D = 4,
-	{  4, 4,  U8 }, // COL_UINT8_4D = 5, // colors
-	{  2, 1, U16 }, // IDX_UINT16_1D = 6, // index buffer
-	{  4, 1, U32 }, // IDX_UINT32_1D = 7, // index buffer
-	{  2, 1, F16 }, // HALF_1D = 8,
-	{  4, 2, F16 }, // HALF_2D = 9,
-	{  6, 3, F16 }, // HALF_3D = 10,
-	{  8, 4, F16 }, // HALF_4D = 11,
+	{  0, 0, TF32 }, // UNUSED = 0,
+	{  4, 1, TF32 }, // FLOAT_1D = 1,
+	{  8, 2, TF32 }, // FLOAT_2D = 2,
+	{ 12, 3, TF32 }, // FLOAT_3D = 3,
+	{ 16, 4, TF32 }, // FLOAT_4D = 4,
+	{  4, 4,  TU8 }, // COL_UINT8_4D = 5, // colors
+	{  2, 1, TU16 }, // IDX_UINT16_1D = 6, // index buffer
+	{  4, 1, TU32 }, // IDX_UINT32_1D = 7, // index buffer
+	{  2, 1, TF16 }, // HALF_1D = 8,
+	{  4, 2, TF16 }, // HALF_2D = 9,
+	{  6, 3, TF16 }, // HALF_3D = 10,
+	{  8, 4, TF16 }, // HALF_4D = 11,
 
 
 	// used for normals/tangents 
 	// N_ = normalized
-	{  2, 1, I16 }, // N_SHORT_1D = 12,
-	{  4, 2, I16 }, // N_SHORT_2D = 13,
-	{  6, 3, I16 }, // N_SHORT_3D = 14,
-	{  8, 4, I16 }, // N_SHORT_4D = 15, // not needed
+	{  2, 1, TI16 }, // N_SHORT_1D = 12,
+	{  4, 2, TI16 }, // N_SHORT_2D = 13,
+	{  6, 3, TI16 }, // N_SHORT_3D = 14,
+	{  8, 4, TI16 }, // N_SHORT_4D = 15, // not needed
 
 	// used for colors
-	{  2, 1, U16 }, // N_USHORT_1D = 16,
-	{  4, 2, U16 }, // N_USHORT_2D = 17,
-	{  6, 3, U16 }, // N_USHORT_3D = 18,
-	{  8, 4, U16 }, // N_USHORT_4D = 19, // not needed
+	{  2, 1, TU16 }, // N_USHORT_1D = 16,
+	{  4, 2, TU16 }, // N_USHORT_2D = 17,
+	{  6, 3, TU16 }, // N_USHORT_3D = 18,
+	{  8, 4, TU16 }, // N_USHORT_4D = 19, // not needed
 
 	// packed formats: GL_INT_2_10_10_10_REV & GL_UNSIGNED_INT_2_10_10_10_REV
-	{  4, 1, IPACK }, // INT_PACKED = 20,
-	{  4, 1, UPACK }, // UINT_PACKED = 21,
+	{  4, 1, TIPACK }, // INT_PACKED = 20,
+	{  4, 1, TUPACK }, // UINT_PACKED = 21,
 
-	{  2, 1, U16 }, // UINT16_1D = 22,
-	{  4, 2, U16 }, // UINT16_2D = 23,
-	{  6, 3, U16 }, // UINT16_3D = 24,
-	{  8, 4, U16 }, // UINT16_4D = 25,
+	{  2, 1, TU16 }, // UINT16_1D = 22,
+	{  4, 2, TU16 }, // UINT16_2D = 23,
+	{  6, 3, TU16 }, // UINT16_3D = 24,
+	{  8, 4, TU16 }, // UINT16_4D = 25,
 
-	{  1, 1,  U8 }, // UINT8_1D = 26,
-	{  2, 2,  U8 }, // UINT8_2D = 27,
-	{  3, 3,  U8 }, // UINT8_3D = 28,
-	{  4, 4,  U8 }, // UINT8_4D = 29,
+	{  1, 1,  TU8 }, // UINT8_1D = 26,
+	{  2, 2,  TU8 }, // UINT8_2D = 27,
+	{  3, 3,  TU8 }, // UINT8_3D = 28,
+	{  4, 4,  TU8 }, // UINT8_4D = 29,
 };
 
 uint32_t VertexDescription::StreamLen(const Stream &s) { return (stdd[s.m_type].len + 3) &0xfffc; }
@@ -133,23 +133,23 @@ void VertexDescription::Copy(Stream &dst, const Stream &src)
 		for (uint32_t i = 0; i < m_numVertices; ++i) {
 			for (uint32_t j = 0; j < sp; ++j)
 				switch (st) {
-				case STDDT::F32:
-					v[j] = reinterpret_cast<BAMS::CORE::F32 *>(s)[j];
+				case STDDT::TF32:
+					v[j] = reinterpret_cast<F32 *>(s)[j];
 					break;
-				case STDDT::F16:
+				case STDDT::TF16:
 					v[j] = glm::detail::toFloat32(reinterpret_cast<glm::detail::hdata *>(s)[j]);
 					break;
-				case STDDT::U8:
+				case STDDT::TU8:
 					v[j] = sn ? reinterpret_cast<UINT8 *>(s)[j] / double(0xff) : reinterpret_cast<UINT8 *>(s)[j];
 					break;
-				case STDDT::U16:
+				case STDDT::TU16:
 					v[j] = sn ? reinterpret_cast<UINT16 *>(s)[j] / double(0xffff) : reinterpret_cast<UINT16 *>(s)[j];
 					break;
-				//case STDDT::U32:  is used only for indices... so it is not used here
-				case STDDT::I16:
+				//case STDDT::TU32:  is used only for indices... so it is not used here
+				case STDDT::TI16:
 					v[j] = sn ? reinterpret_cast<INT16 *>(s)[j] / double(0x7fff) : reinterpret_cast<INT16 *>(s)[j];
 					break;
-				case STDDT::UPACK:
+				case STDDT::TUPACK:
 				{
 					UINT32 x = s[0];
 					v[2] = double(x & 0x3ff) / double(0x3ff);
@@ -161,7 +161,7 @@ void VertexDescription::Copy(Stream &dst, const Stream &src)
 					v[3] = double(x & 0x3) / double(0x3);
 				}
 					break;
-				case STDDT::IPACK:
+				case STDDT::TIPACK:
 				{
 					UINT32 x = s[0], y;
 					y = x & 0x3ff;					
@@ -181,30 +181,30 @@ void VertexDescription::Copy(Stream &dst, const Stream &src)
 
 			for (unsigned int j = 0; j < dp; ++j)
 				switch (dt) {
-				case STDDT::F32:
-					reinterpret_cast<BAMS::CORE::F32 *>(d)[j] = BAMS::CORE::F32(v[j]);
+				case STDDT::TF32:
+					reinterpret_cast<F32 *>(d)[j] = F32(v[j]);
 					break;
-				case STDDT::F16:
-					reinterpret_cast<BAMS::CORE::I16 *>(d)[j] = glm::detail::toFloat16(BAMS::CORE::F32(v[j]));
+				case STDDT::TF16:
+					reinterpret_cast<I16 *>(d)[j] = glm::detail::toFloat16(F32(v[j]));
 					break;
 
-				case STDDT::U8:
+				case STDDT::TU8:
 					assert(!dn || (v[j] <= 1.0 && v[j] >= 0.0));
 					reinterpret_cast<UINT8 *>(d)[j] = UINT8(dn ? v[j] * double(0xff) : v[j]);
 					break;
 
-				case STDDT::U16:
+				case STDDT::TU16:
 					assert(!dn || (v[j] <= 1.0 && v[j] >= 0.0));
 					reinterpret_cast<UINT16 *>(d)[j] = UINT16(dn ? v[j] * double(0xffff) : v[j]);
 					break;
-				case STDDT::I16:
+				case STDDT::TI16:
 					assert(!dn || (v[j] <= 1.0 && v[j] >= -1.0));
 					reinterpret_cast<INT16 *>(d)[j] = INT16(dn ? v[j] * double(0x7fff) : v[j]);
 					break;
-				case STDDT::UPACK:
+				case STDDT::TUPACK:
 					reinterpret_cast<UINT32 *>(d)[0] = UINT32((INT32(v[2] * 1023) & 0x3ff) << 0 | (INT32(v[1] * 1023) & 0x3ff) << 10 | (INT32(v[0] * 1023) & 0x3ff) << 20 | (INT32(v[3] * 3) & 0x3) << 30);
 					break;
-				case STDDT::IPACK:
+				case STDDT::TIPACK:
 					reinterpret_cast<UINT32 *>(d)[0] = UINT32((INT32(v[2] * 511) & 0x3ff) << 0 | (INT32(v[1] * 511) & 0x3ff) << 10 | (INT32(v[0] * 511) & 0x3ff) << 20 | (INT32(v[3] * 1) & 0x1) << 30);
 					break;
 				}
@@ -414,5 +414,4 @@ void VertexDescription::Dump(uint32_t numVert, uint32_t numIndices)
 	pr(m_indices);
 }
 
-NAMESPACE_RENDERINENGINE_END
-
+}; // BAMS namespace

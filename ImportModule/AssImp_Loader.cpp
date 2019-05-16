@@ -5,7 +5,7 @@ AssImp_Loader::AssImp_Loader() :
 	_meshBinData(nullptr),
 	minTex(0), maxTex(0)
 {
-	_aii.SetPropertyFloat("PP_GSN_MAX_SMOOTHING_ANGLE", BAMS::RENDERINENGINE::GetOptimize()->max_smoothing_angle);
+	_aii.SetPropertyFloat("PP_GSN_MAX_SMOOTHING_ANGLE", GetOptimize()->max_smoothing_angle);
 }
 
 AssImp_Loader::~AssImp_Loader()
@@ -19,7 +19,7 @@ void AssImp_Loader::PreLoad(const wchar_t * filename, const char * name, Assimp:
 {
 	unsigned int flags = aiProcess_CalcTangentSpace | aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_FlipUVs | aiProcess_RemoveRedundantMaterials | aiProcess_JoinIdenticalVertices;
 
-	BAMS::CORE::STR cvt;
+	STR cvt;
 	cvt.UTF8(const_cast<wchar_t *>(filename));
 	_fileName = cvt.c_str();
 	_importMaterials = importMaterials;
@@ -687,7 +687,7 @@ void AssImp_Loader::ProcessScene()
 void AssImp_Loader::_OptimizeMeshStorage()
 {
 	// (1) Calc size of bin data for optimized VertexDescritions
-	auto o = BAMS::RENDERINENGINE::GetOptimize();
+	auto o = GetOptimize();
 	_meshBinDataSize = 0;
 	for (auto m : _meshes)
 	{

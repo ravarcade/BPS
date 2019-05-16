@@ -1,6 +1,7 @@
 #include "stdafx.h"
 
-NAMESPACE_CORE_BEGIN
+namespace BAMS {
+namespace CORE {
 
 bool ResShader::_ParseFilename(const WSTR & prg, U32 * pStage, bool * pIsSrc)
 {
@@ -310,8 +311,8 @@ void ResShader::Link(File * p)
 	TRACEW(L"link: " << p->Filename.c_str() << L"\n");
 	reloadShaderMessageData.wnd = -1;
 	reloadShaderMessageData.shader = rb->Name.c_str();
-	CORE::Message msg = { RELOAD_SHADER, RENDERING_ENGINE, 0, &reloadShaderMessageData };
-	BAMS::CORE::IEngine::PostMsg(&msg, 100ms);
+	Message msg = { RELOAD_SHADER, RENDERING_ENGINE, 0, &reloadShaderMessageData };
+	IEngine::PostMsg(&msg, 100ms);
 }
 
 void ResShader::Delete(File * p)
@@ -375,4 +376,5 @@ void ResShader::IdentifyResourceType(ResourceBase *res)
 		res->Type = RESID_SHADER;
 }
 
-NAMESPACE_CORE_END
+}; // CORE namespace
+}; // BAMS namespace

@@ -1,6 +1,6 @@
 #include "stdafx.h"
 
-NAMESPACE_RENDERINENGINE_BEGIN
+namespace BAMS {
 
 Stream::Desc Stream::TypeDescription[VAT_MAX_TYPE] = {
 	{  0, 0, false},  // UNUSED = 0,
@@ -185,4 +185,4 @@ Optimize *GetOptimize()
 	return &optimize;
 }
 
-NAMESPACE_RENDERINENGINE_END
+}; // BAMS namespace

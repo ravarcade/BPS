@@ -10,7 +10,7 @@ struct ObjectInfo {
 	uint32_t mid;
 	uint32_t oid;
 	ObjectInfo(CShaderProgram *_shader, uint32_t _mid, uint32_t _oid) : shader(_shader), mid(_mid), oid(_oid) {}
-	BAMS::CORE::Properties *GetProperties() { return shader->GetProperties(oid); }
+	Properties *GetProperties() { return shader->GetProperties(oid); }
 };
 
 class OutputWindow
@@ -229,18 +229,19 @@ public:
 	void vkFree(VkDescriptorPool &v1, std::vector<VkDescriptorSet> &v2) { if (v1 && v2.size()) { vkFreeDescriptorSets(device, v1, static_cast<uint32_t>(v2.size()), v2.data()); v2.clear(); } }
 
 	std::vector<CShaderProgram*> forwardRenderingShaders;
-	BAMS::CORE::CStringHastable<CShaderProgram> shaders;
-	BAMS::CORE::CStringHastable<ObjectInfo> objects;
+	CStringHastable<CShaderProgram> shaders;
+	CStringHastable<ObjectInfo> objects;
 
 	ObjectInfo * AddObject(const char * name, const char * mesh, const char * shader);
 	CShaderProgram *AddShader(const char * shader);
 	CShaderProgram *ReloadShader(const char *shader);
-	void GetShaderParams(const char *shader, BAMS::CORE::Properties **params);
-	void GetObjectParams(const char * objectName, BAMS::CORE::Properties ** props);
+	void GetShaderParams(const char *shader, Properties **params);
+	void GetObjectParams(const char * objectName, Properties ** props);
 	void UpdateDrawCommands();
 
 
 	// ------------------------ camera stuffs -------------------
+
 	void SetCamera(const BAMS::PSET_CAMERA * cam);
 	BAMS::PSET_CAMERA cameraSettings;
 
@@ -277,7 +278,16 @@ public:
 		vkFree(ub.memory);
 	}
 
-	// DrawObjectInfo *GetModel(const char *name);
-	//	CShaderProgram cubeShader;
+	// ------------------------- for textures ----------------
+	Texture2D testTex;
+
+	template<> void vkDestroy(Texture2D &tex)
+	{
+		vkDestroy(tex.view);
+		vkDestroy(tex.image);
+		vkDestroy(tex.sampler);
+		vkFree(tex.memory);
+	}
+
 	friend CShaderProgram;
 };

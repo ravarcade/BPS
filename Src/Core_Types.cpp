@@ -1,7 +1,7 @@
 #include "stdafx.h"
 
 
-NAMESPACE_CORE_BEGIN
+namespace BAMS {
 
 // ============================================================================
 
@@ -58,4 +58,4 @@ void RegisteredClasses::Finalize()
 }
 
 
-NAMESPACE_CORE_END
+}; // BAMS namespace

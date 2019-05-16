@@ -1,8 +1,7 @@
 #include "stdafx.h"
-#include <stdio.h>
-//#include "Core_Tools.h"
 
-NAMESPACE_CORE_BEGIN
+namespace BAMS {
+namespace CORE {
 
 #define TICKS_PER_SECOND 10000000
 #define EPOCH_DIFFERENCE 11644473600LL
@@ -377,4 +376,5 @@ DWORD Tools::WinExec(WSTR &cmd, CWSTR cwd)
 
 UUID Tools::NOUID = { 0 };
 
-NAMESPACE_CORE_END
+}; // CORE namespace
+}; // BAMS namespace

@@ -1,14 +1,7 @@
-#define NAMESPACE_RENDERINENGINE_BEGIN namespace BAMS { namespace RENDERINENGINE {
-#define NAMESPACE_RENDERINENGINE_END } }
-#define NAMESPACE_RENDERINENGINE BAMS::RENDERINENGINE
-
-#define RE_EXPORT BAMS_EXPORT
-
-NAMESPACE_RENDERINENGINE_BEGIN
-
-#include "RenderingEngine_Config.h"
-#include "RenderingEngine_VertexDescription.h"
-
-
-NAMESPACE_RENDERINENGINE_END
-
+//namespace BAMS {
+//
+//#include "RenderingEngine_Config.h"
+//#include "RenderingEngine_VertexDescription.h"
+//#include "RenderingEngine_Image.h"
+//
+//};

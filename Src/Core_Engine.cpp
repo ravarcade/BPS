@@ -1,7 +1,7 @@
 #include "stdafx.h"
 
-NAMESPACE_CORE_BEGIN
-
+namespace BAMS {
+namespace CORE {
 
 void EngineModule::Update(float dt)
 {
@@ -25,4 +25,5 @@ EngineModule::~EngineModule()
 }
 
 
-NAMESPACE_CORE_END
+}; // CORE namespace
+}; // BAMS namespace

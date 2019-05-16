@@ -14,4 +14,6 @@
 
 // TODO: reference additional headers your program requires here
 #define BPS_BUILD_DLL
+
 #include "BAMEngine.h"
+#include "BAMEngineInternal.h" // <- this is included only for internal build

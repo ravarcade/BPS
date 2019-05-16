@@ -76,6 +76,9 @@
     <ClInclude Include="OutputWindow.h">
       <Filter>Src</Filter>
     </ClInclude>
+    <ClInclude Include="Texture2D.h">
+      <Filter>Src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -126,5 +129,11 @@
     <ClCompile Include="OutputWindow.cpp">
       <Filter>Src</Filter>
     </ClCompile>
+    <ClCompile Include="Texture2D.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

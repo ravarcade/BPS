@@ -20,7 +20,7 @@
 // TODO: reference additional headers your program requires here
 
 #include "BAMEngine.h"
-#pragma  comment(lib, "BAMEngine.lib")
+//#pragma  comment(lib, "BAMEngine.lib")
 
 #define REVK_BUILD_DLL
 #include "RenderingEngineVK.h"
