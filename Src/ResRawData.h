@@ -10,18 +10,18 @@
 /// Default resource class needed to get raw (not processed) data with given reource type id.
 /// </summary>
 template <U32 DT>
-class TRawData : public ResoureImpl<TRawData<DT>, DT, Allocators::default>
+class TResRawData : public ResoureImpl<TResRawData<DT>, DT>
 {
 public:
 	U8 *Data;
 	SIZE_T Size;
 
-	TRawData(ResourceBase *res) : Data(nullptr), Size(0) {}
-	~TRawData() { if (Data) deallocate(Data); }
+	TResRawData(ResourceBase *res) : Data(nullptr), Size(0) {}
+	~TResRawData() { if (Data) deallocate(Data); }
 
 	void Update(ResourceBase *res)
 	{
-		// memory is allocated with RawData MemoryAllocator, so we don't have to copy it.
+		// memory is allocated with ResRawData MemoryAllocator, so we don't have to copy it.
 		Data = static_cast<U8 *>(res->GetData());
 		Size = res->GetSize();
 	}
@@ -38,4 +38,4 @@ public:
 	SIZE_T GetSize() { return Size; }
 };
 
-typedef TRawData<RESID_RAWDATA> RawData;
+typedef TResRawData<RESID_RAWDATA> ResRawData;
