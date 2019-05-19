@@ -192,7 +192,9 @@ public:
 	inline bool isModified() { return _isModified; }
 	inline bool isLoadable() { return _isLoadable; }
 
+	
 	void *GetData() { return _resourceData; }
+	template<typename T> T *GetData() { return reinterpret_cast<T*>(_resourceData); }
 	SIZE_T GetSize() { return _resourceSize; }
 	time_t GetTimestamp() { return _resourceTimestamp; }
 	void SetTimestamp() { time(_resourceTimestamp); }
@@ -244,7 +246,7 @@ public:
 /// Helper class used to make resource implementation easier.
 /// It will add ResFactory to class.
 /// </summary>
-template <typename T, U32 ResTypeId, MemoryAllocator Alloc = Allocators::default, bool isLoadable = true>
+template <typename T, U32 ResTypeId, bool isLoadable = true, MemoryAllocator Alloc = Allocators::default>
 class ResoureImpl : public ResourceImplementationInterface, public Allocators::Ext<Alloc>
 {
 public:
@@ -263,8 +265,8 @@ public:
 	static U32 GetTypeId() { return _resourceFactory.TypeId; }
 };
 
-template <typename T, U32 ResTypeId, MemoryAllocator Alloc, bool IsLoadable>
-typename ResoureImpl<T, ResTypeId, Alloc, IsLoadable>::ResFactory ResoureImpl<T, ResTypeId, Alloc, IsLoadable>::_resourceFactory;
+template <typename T, U32 ResTypeId, bool IsLoadable, MemoryAllocator Alloc>
+typename ResoureImpl<T, ResTypeId, IsLoadable, Alloc>::ResFactory ResoureImpl<T, ResTypeId, IsLoadable, Alloc>::_resourceFactory;
 
 
 // ============================================================================
@@ -331,7 +333,7 @@ public:
 	ResourceManager *GetResourceManager();
 };
 
-#include "RawData.h"
+#include "ResRawData.h"
 #include "ResShader.h"
 #include "ResMesh.h"
 #include "ResImage.h"

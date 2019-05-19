@@ -22,7 +22,7 @@
     <ClInclude Include="AssImp_Loader.h">
       <Filter>Src</Filter>
     </ClInclude>
-    <ClInclude Include="image.h">
+    <ClInclude Include="Image_Loader.h">
       <Filter>Src</Filter>
     </ClInclude>
   </ItemGroup>
@@ -42,9 +42,6 @@
     <ClCompile Include="bmp.cpp">
       <Filter>Src</Filter>
     </ClCompile>
-    <ClCompile Include="image.cpp">
-      <Filter>Src</Filter>
-    </ClCompile>
     <ClCompile Include="jpeg.cpp">
       <Filter>Src</Filter>
     </ClCompile>
@@ -52,6 +49,9 @@
       <Filter>Src</Filter>
     </ClCompile>
     <ClCompile Include="tga.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="Image_Loader.cpp">
       <Filter>Src</Filter>
     </ClCompile>
   </ItemGroup>

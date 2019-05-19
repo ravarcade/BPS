@@ -58,10 +58,13 @@ private:
 		}
 	};
 
+	Image_Loader imgLoader;
+
 	CEngine *en;
 	std::vector<ImportedModelRepo *> m_importedModelRepos;
+	CWStringHastable<IResource *> m_modelRepoName2modelRepo;
 
-	ImportedModelRepo *GetImportedModelRepo(IResource *res)
+	ImportedModelRepo *_GetImportedModelRepo(IResource *res)
 	{
 		for (auto pimr : m_importedModelRepos)
 			if (pimr->res == res)
@@ -74,7 +77,6 @@ private:
 	}
 
 
-	CWStringHastable<IResource *> m_modelRepoName2modelRepo;
 	
 	void _StartImport(IResource *res)
 	{
@@ -86,7 +88,7 @@ private:
 		// working thread should wait for main thread until all resources are added, when working thread should be terminated (and used resources released)
 
 		CResourceManager rm;
-		auto pimr = GetImportedModelRepo(res);
+		auto pimr = _GetImportedModelRepo(res);
 
 		pimr->Preload();
 
@@ -95,7 +97,7 @@ private:
 		rm.Filter([](IResource *res, void *param) {
 			auto *pimr = reinterpret_cast<ImportedModelRepo*>(param);
 
-			CMesh r(res);
+			CResMesh r(res);
 			if (r.GetMeshSrc() == pimr->res)
 			{
 				auto hash = r.GetMeshHash();
@@ -137,7 +139,7 @@ private:
 		rm.Filter([](IResource *res, void *param) {
 			auto *pimr = reinterpret_cast<ImportedModelRepo*>(param);
 
-			CMesh r(res);
+			CResMesh r(res);
 			auto &al = pimr->aiLoader;
 			if (r.GetMeshSrc() == pimr->res)
 			{
@@ -157,7 +159,7 @@ private:
 		pimr->aiLoader.ForEachMesh([&](AssImp_Loader::ImportedMesh &m) {
 			if (!m.match) 
 			{ // add new mesh
-				CMesh mesh(rm.AddResource("Mesh_1", RESID_MESH));
+				CResMesh mesh(rm.AddResource("Mesh_1", RESID_MESH));
 				mesh.SetVertexDescription(&m.vd, m.hash, res, num);
 			}
 			++num;
@@ -202,7 +204,7 @@ private:
 		if (*(p->pType) != RESID_UNKNOWN)
 			return;
 		
-		if (_CheckExtensions(p->filename, "png;bmp;jpg;jpeg;tga"))
+		if (_CheckExtensions(p->filename, ".png;bmp;jpg;jpeg;tga"))
 		{
 			*(p->pType) = RESID_IMAGE;
 			// load texture 2d?
@@ -223,10 +225,10 @@ public:
 
 	void ResLoadMesh(void *params)
 	{
-		CMesh m(params);
+		CResMesh m(params);
 		auto res = m.GetMeshSrc();
 		if (res) {
-			auto *pimr = GetImportedModelRepo(res);
+			auto *pimr = _GetImportedModelRepo(res);
 			if (!pimr->IsLoaded())
 				pimr->Preload();
 
@@ -247,7 +249,14 @@ public:
 
 	void ResLoadImage(void *params)
 	{
-		CImage res(params);
+		CResImage res(params);
+		imgLoader.Load(res);
+		//TRACEW(L"ResLoadImage: " << res.GetPath() << L"\n");
+	}
+
+	void ResUpdateImage(void *params)
+	{
+		CResImage res(params);
 		//TRACEW(L"ResLoadImage: " << res.GetPath() << L"\n");
 	}
 
@@ -260,15 +269,8 @@ public:
 	
 	void OnResourceManifestParsed()
 	{
-
 		m_modelRepoName2modelRepo.clear();
 		CResourceManager rm;
-		CRawData testPng  = rm.GetRawData("test");
-		if (!testPng.IsLoaded())
-			rm.LoadSync(testPng);
-		Image img;
-		DecodePNG(&img, testPng.GetData(), testPng.GetSize());
-		img.Release();
 
 		// add all modelRepos
 		rm.Filter([](IResource *res, void *param) {
@@ -299,6 +301,7 @@ public:
 
 	void Finalize()
 	{
+		imgLoader.OnFinalize();
 		m_modelRepoName2modelRepo.reset();
 		m_importedModelRepos.clear();
 		WSTR::Finalize();
@@ -345,6 +348,7 @@ public:
 		case IMPORTMODULE_UPDATE: im.ResUpdate(msg->data); break;
 		case IMPORTMODULE_LOADMESH: im.ResLoadMesh(msg->data); break;
 		case IMPORTMODULE_LOADIMAGE: im.ResLoadImage(msg->data); break;
+		case IMPORTMODULE_UPDATEIMAGE: im.ResUpdateImage(msg->data); break;
 //		case IMPORTMODEL_RESCAN: im.Rescan(); break;
 		default:
 			printf("Not supported message");

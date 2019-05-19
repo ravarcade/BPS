@@ -75,7 +75,7 @@ class CShadersReflections
 {
 public:
 	struct ShaderProgramInfo {
-		BAMS::CRawData resource;
+		BAMS::CResRawData resource;
 		std::string entryPointName;
 		VkShaderStageFlagBits stage;
 	};
@@ -125,7 +125,7 @@ private:
 	std::vector<ShaderProgramInfo> m_programs;
 	ResourceLayout m_layout;
 	std::vector<std::string> m_outputNames;
-	BAMS::CShader m_shaderResource;
+	BAMS::CResShader m_shaderResource;
 
 	bool m_enableAlpha;
 	void _ParsePrograms();

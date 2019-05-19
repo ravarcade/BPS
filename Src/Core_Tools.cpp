@@ -1,7 +1,7 @@
 #include "stdafx.h"
 
 namespace BAMS {
-namespace CORE {
+//namespace CORE {
 
 #define TICKS_PER_SECOND 10000000
 #define EPOCH_DIFFERENCE 11644473600LL
@@ -374,7 +374,115 @@ DWORD Tools::WinExec(WSTR &cmd, CWSTR cwd)
 	return exitCode;
 }
 
+size_t slen(const wchar_t *s) { return wcslen(s); }
+size_t slen(const char *s) { return strlen(s); }
+size_t sspn(const wchar_t *s, const wchar_t *pat) { return wcsspn(s, pat); }
+size_t sspn(const char *s, const char *pat) { return strspn(s, pat); }
+const wchar_t *spbrk(const wchar_t *s, const wchar_t *pat) { return wcspbrk(s, pat); }
+const char *spbrk(const char *s, const char *pat) { return strpbrk(s, pat); }
+
+template<typename T>
+bool endsWith(T s, size_t slen, T p, size_t plen, bool caseInsesitive = true)
+{
+	if (plen > slen)
+		return false;
+
+	s += slen - plen;
+	while (*s)
+	{
+		if (caseInsesitive ? towlower(*s) != towlower(*p) : *s != *p)
+			return false;
+		++s;
+		++p;
+	}
+	return true;
+}
+
+template<typename T>
+bool endsWith(T s, size_t sl, T p, bool caseInsesitive = true) { return endsWith(s, sl, p, slen(p), caseInsesitive); }
+
+template<typename T>
+const T *strtoken(const T *s, const T *delim, size_t &len)
+{
+	static const T *olds;
+	const T *token;
+
+	if (!s) 
+		s = olds;
+
+	s += sspn(s, delim);
+	if (!*s)
+	{
+		olds = s;
+		len = 0;
+		return nullptr;
+	}
+
+	token = s;
+	s = spbrk(token, delim);
+	if (s == nullptr)
+	{
+		len = slen(token);
+		olds = token + len;
+	}
+	else {
+		len = s - token;
+		olds = s + 1;
+	}
+
+	return token;
+}
+
+/// <summary>
+/// Finds the matching file extension.
+/// Examples:
+/// FindMatchingFileExtension(L"hello.bmp", "pcx;bmp;jpeg") = 1
+/// FindMatchingFileExtension(L"hello.zip", "pcx;bmp;jpeg") = -1
+/// </summary>
+/// <param name="fn">The file name.</param>
+/// <param name="ext">The extensions.</param>
+/// <param name="caseInsesitive">if set to <c>true</c> [case insesitive].</param>
+/// <returns></returns>
+int Tools::FindMatchingFileExtension(const wchar_t * const fn, const wchar_t * const ext, bool caseInsesitive)
+{
+	size_t len = slen(fn);
+	size_t szlen = 0;
+
+	int ret = 0;
+	const wchar_t* sz = strtoken(ext, L";", szlen);
+	do {
+		if (*sz == '*') { ++sz; --szlen; }
+		if (*sz == '.') { ++sz; --szlen; }
+		if (endsWith(fn, len, sz, szlen, caseInsesitive))
+		{
+			if (szlen < len && fn[len-szlen-1] == '.')
+				return ret;
+		}
+		++ret;
+	} while ((sz = strtoken<wchar_t>(nullptr, L";", szlen)));
+	return -1;
+}
+
+int Tools::FindMatchingFileExtension(const char * const fn, const char * const ext, bool caseInsesitive)
+{
+	size_t len = slen(fn);
+	size_t szlen = 0;
+
+	int ret = 0;
+	const char* sz = strtoken(ext, ";", szlen);
+	do {
+		if (*sz == '*') { ++sz; --szlen; }
+		if (*sz == '.') { ++sz; --szlen; }
+		if (endsWith(fn, len, sz))
+		{
+			return ret;
+		}
+		++ret;
+	} while ((sz = strtoken<char>(nullptr, ";", szlen)));
+	return -1;
+}
+
 UUID Tools::NOUID = { 0 };
 
-}; // CORE namespace
+//}; // CORE namespace
 }; // BAMS namespace

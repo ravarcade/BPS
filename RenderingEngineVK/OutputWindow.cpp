@@ -695,6 +695,7 @@ void OutputWindow::_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceS
 	copyRegion.srcOffset = srcOffset; // Optional
 	copyRegion.dstOffset = dstOffset; // Optional
 	copyRegion.size = size;
+
 	vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 	vkEndCommandBuffer(commandBuffer);
 
@@ -703,8 +704,6 @@ void OutputWindow::_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceS
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
 
-	//		vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-	//		vkQueueWaitIdle(graphicsQueue);
 	vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
 	vkQueueWaitIdle(transferQueue);
 
@@ -738,6 +737,7 @@ void OutputWindow::_Cleanup()
 {
 	if (device != VK_NULL_HANDLE)
 	{
+		_CleanupTextures();
 		_CleanupShaderPrograms();
 		// do nothing for: graphicsQueue, presentQueue, transferQueue;
 		_CleanupSharedUniform();
@@ -758,6 +758,7 @@ void OutputWindow::_Cleanup()
 		vkDestroy(surface);
 	}
 	shaders.clear();
+	textures.clear();
 	objects.clear();
 }
 
@@ -1237,12 +1238,22 @@ void OutputWindow::_LoadShaderPrograms()
 
 }
 
+void OutputWindow::_CleanupTextures()
+{
+	textures.foreach([&](CTexture2d *&t) {
+		t->Release();
+		vkDestroy(*t);
+	});
+	textures.clear();
+}
+
 void OutputWindow::_CleanupShaderPrograms()
 {
 	shaders.foreach([&](CShaderProgram *&s) {
 		s->Release();
 	});
 	forwardRenderingShaders.clear();
+
 }
 
 void OutputWindow::UpdateUniformBuffer()
@@ -1460,6 +1471,25 @@ void OutputWindow::GetObjectParams(const char *objectName, Properties **props)
 void OutputWindow::UpdateDrawCommands()
 {
 	BufferRecreationNeeded();
+}
+
+void OutputWindow::AddTexture(uint32_t objectId, uint32_t textureType, const char * textureName)
+{
+	auto pObj = objects[objectId];
+	auto pIdx = textures.findIdx(textureName);
+	if (!pIdx)
+	{
+		auto texIdx = textures.addIdx(textureName, this);
+		textures[texIdx].LoadTexture(textureName);		
+	}
+}
+
+void OutputWindow::AddTexture(const char * objectName, uint32_t textureType, const char * textureName)
+{
+	auto pIdx = objects.findIdx(objectName);
+	assert(pIdx);
+	if (pIdx)
+		AddTexture(static_cast<uint32_t>(*pIdx), textureType, textureName);
 }
 
 void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)
@@ -1702,7 +1732,6 @@ bool OutputWindow::IsBufferFeatureSupported(VkFormat format, VkFormatFeatureFlag
 	return pr.bufferFeatures & features;
 }
 
-
 /// <summary>
 /// Copies data to the buffer.
 /// Naive version. It creates staging buffer. Copy data to it. Create transfer command queue..... All is not optimized.
@@ -1715,6 +1744,7 @@ void OutputWindow::CopyBuffer(VkBuffer dstBuf, VkDeviceSize offset, VkDeviceSize
 {
 	VkBuffer stagingBuffer;
 	VkDeviceMemory stagingBufferMemory;
+
 	_CreateBuffer(
 		size,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1728,6 +1758,89 @@ void OutputWindow::CopyBuffer(VkBuffer dstBuf, VkDeviceSize offset, VkDeviceSize
 
 	_CopyBuffer(stagingBuffer, dstBuf, size, 0, offset);
 
+	vkDestroy(stagingBuffer);
+	vkFree(stagingBufferMemory);
+}
+
+void OutputWindow::_CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBufferImageCopy *region)
+{
+	VkCommandBufferAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	allocInfo.commandPool = transferPool; // = commandPool;
+	allocInfo.commandBufferCount = 1;
+
+	VkCommandBuffer commandBuffer;
+	vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+
+	VkCommandBufferBeginInfo beginInfo = {};
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+	vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+	vkCmdCopyBufferToImage(
+		commandBuffer,
+		srcBuffer,
+		dstImage,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1,
+		region
+	);
+
+	vkEndCommandBuffer(commandBuffer);
+
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+
+	vkQueueSubmit(transferQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	vkQueueWaitIdle(transferQueue);
+
+	vkFreeCommandBuffers(device, allocInfo.commandPool, 1, &commandBuffer);
+}
+
+void OutputWindow::CopyImage(VkImage dstImage, Image *srcImage)
+{
+	VkDeviceSize size = srcImage->width * srcImage->height * srcImage->GetPixelSize();
+
+	// region of dstImage to update
+	VkBufferImageCopy region = {};
+	region.bufferOffset = 0;
+	region.bufferRowLength = 0;
+	region.bufferImageHeight = 0;
+
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+
+	region.imageOffset = { 0, 0, 0 };
+	region.imageExtent = {
+		srcImage->width,
+		srcImage->height,
+		1
+	};
+
+	// prepare staging buffer
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+
+	_CreateBuffer(
+		size,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer, stagingBufferMemory);
+
+	void* data;
+	vkMapMemory(device, stagingBufferMemory, 0, size, 0, &data);
+	memcpy(data, srcImage->rawImage, static_cast<size_t>(size));
+	vkUnmapMemory(device, stagingBufferMemory);
+
+	_CopyBufferToImage(dstImage, stagingBuffer, &region);
+
+	// release staging buffer
 	vkDestroy(stagingBuffer);
 	vkFree(stagingBufferMemory);
 }

@@ -4,7 +4,15 @@
 namespace BAMS {
 
 using namespace CORE;
-//using namespace RENDERINENGINE;
+
+template<typename T>
+T *Impl(void *res)
+{
+	assert(res);
+	auto ret = reinterpret_cast<T *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+	assert(ret);
+	return ret;
+}
 
 extern "C" {
 	static STR *pRetStrHelper;
@@ -28,32 +36,13 @@ extern "C" {
 	{
 		return IEngine::GetModule(moduleId);
 	}
+
 	// =========================================================================== Resource
 
-	BAMS_EXPORT void IResource_AddRef(IResource *res)
-	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
-		rb->AddRef();
-	}
-
-	BAMS_EXPORT void IResource_Release(IResource *res)
-	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
-		rb->Release();
-	}
-
-	BAMS_EXPORT uint32_t IResource_GetRefCounter(IResource *res)
-	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
-		return rb->GetRefCounter();
-	}
-
-	BAMS_EXPORT UUID IResource_GetUID(IResource *res)
-	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
-		return rb ? rb->UID : Tools::NOUID;
-	}
-
+	BAMS_EXPORT void IResource_AddRef(IResource *res) { assert(res); reinterpret_cast<ResourceBase *>(res)->AddRef(); }
+	BAMS_EXPORT void IResource_Release(IResource *res) { assert(res); reinterpret_cast<ResourceBase *>(res)->Release(); }
+	BAMS_EXPORT uint32_t IResource_GetRefCounter(IResource *res) { assert(res); return reinterpret_cast<ResourceBase *>(res)->GetRefCounter(); }
+	BAMS_EXPORT UUID IResource_GetUID(IResource *res) { assert(res); return reinterpret_cast<ResourceBase *>(res)->UID; }
 	BAMS_EXPORT const char * IResource_GetName(IResource *res)
 	{
 		auto *rb = reinterpret_cast<ResourceBase *>(res);
@@ -91,127 +80,46 @@ extern "C" {
 			*pSize = rb->XML.size();
 		return rb->XML.c_str();
 	}
-	// =========================================================================== RawData
+	// =========================================================================== ResRawData
 
-	BAMS_EXPORT unsigned char * IRawData_GetData(IRawData *res)
+	BAMS_EXPORT uint8_t * IResRawData_GetData(IResRawData *res) { return Impl<ResRawData>(res)->GetData(); }
+	BAMS_EXPORT size_t IResRawData_GetSize(IResRawData *res   ) { return Impl<ResRawData>(res)->GetSize(); }
+
+	// =========================================================================== ResShader
+
+	BAMS_EXPORT uint8_t * IResShader_GetData(IResShader *res)                           { return Impl<ResShader>(res)->GetData(); }
+	BAMS_EXPORT size_t IResShader_GetSize(IResShader *res)                              { return Impl<ResShader>(res)->GetSize(); }
+	BAMS_EXPORT void IResShader_AddProgram(IResShader *res, const wchar_t *fileName)    {        Impl<ResShader>(res)->AddProgram(fileName); }
+	BAMS_EXPORT const wchar_t * IResShader_GetSourceFilename(IResShader *res, int type) { return Impl<ResShader>(res)->GetSourceFilename(type).c_str(); }
+	BAMS_EXPORT const wchar_t * IResShader_GetBinaryFilename(IResShader *res, int type) { return Impl<ResShader>(res)->GetBinaryFilename(type).c_str(); }
+	BAMS_EXPORT void IResShader_Save(IResShader *res)                                   {        Impl<ResShader>(res)->Save(reinterpret_cast<ResourceBase *>(res));}
+	BAMS_EXPORT uint32_t IResShader_GetBinaryCount(IResShader *res)                     { return Impl<ResShader>(res)->GetBinaryCount(); }
+	BAMS_EXPORT IResRawData *IResShader_GetBinary(IResShader *res, uint32_t idx)        { return Impl<ResShader>(res)->GetBinary(idx); }
+
+	// =========================================================================== ResMesh
+
+	BAMS_EXPORT void IResMesh_SetVertexDescription(IResMesh * res, IVertexDescription * vd, uint32_t meshHash, IResource * meshSrc, U32 meshIdx)
 	{
-		auto *rb = reinterpret_cast<RawData *>( reinterpret_cast<ResourceBase *>(res)->GetImplementation() );
-		return static_cast<unsigned char *>(rb->GetData());
+		Impl<ResMesh>(res)->SetVertexDescription( 
+			reinterpret_cast<VertexDescription *>(vd), 
+			meshHash, 
+			reinterpret_cast<ResourceBase *>(meshSrc), 
+			meshIdx);
 	}
 
-	BAMS_EXPORT size_t IRawData_GetSize(IRawData *res)
-	{
-		auto *rb = reinterpret_cast<RawData *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetSize();
-	}
+	BAMS_EXPORT IVertexDescription *IResMesh_GetVertexDescription(IResMesh * res, bool loadASAP) { return Impl<ResMesh>(res)->GetVertexDescription(loadASAP); }
+	BAMS_EXPORT IResource * IResMesh_GetMeshSrc(IResMesh * res)                                  { return Impl<ResMesh>(res)->GetMeshSrc(); }
+	BAMS_EXPORT uint32_t IResMesh_GetMeshIdx(IResMesh * res)                                     { return Impl<ResMesh>(res)->GetMeshIdx(); }
+	BAMS_EXPORT void IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx)                           { return Impl<ResMesh>(res)->SetMeshIdx(idx); }
+	BAMS_EXPORT uint32_t IResMesh_GetMeshHash(IResMesh * res)                                    { return Impl<ResMesh>(res)->GetMeshHash(); }
 
-	// =========================================================================== Shader
+	// =========================================================================== ResImage
 
-	BAMS_EXPORT unsigned char * IShader_GetData(IShader *res)
-	{
-		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return static_cast<unsigned char *>(rb->GetData());
-	}
-
-	BAMS_EXPORT size_t IShader_GetSize(IShader *res)
-	{
-		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetSize();
-	}
-
-	BAMS_EXPORT void IShader_AddProgram(IShader *res, const wchar_t *fileName)
-	{
-		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		rb->AddProgram(fileName);
-	}
-
-	BAMS_EXPORT const wchar_t * IShader_GetSourceFilename(IShader *res, int type)
-	{
-		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetSourceFilename(type).c_str();
-	}
-
-	BAMS_EXPORT const wchar_t * IShader_GetBinaryFilename(IShader *res, int type)
-	{
-		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetBinaryFilename(type).c_str();
-	}
-
-
-	BAMS_EXPORT void IShader_Save(IShader *res)
-	{
-		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		rb->Save(reinterpret_cast<ResourceBase *>(res));
-	}
-
-	BAMS_EXPORT uint32_t IShader_GetBinaryCount(IShader *res)
-	{
-		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetBinaryCount();
-	}
-
-	BAMS_EXPORT IRawData *IShader_GetBinary(IShader *res, uint32_t idx)
-	{
-		auto *rb = reinterpret_cast<ResShader *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetBinary(idx);
-	}
-
-	BAMS_EXPORT void IMesh_SetVertexDescription(IMesh * res, IVertexDescription * vd, uint32_t meshHash, IResource * meshSrc, U32 meshIdx)
-	{
-		auto pvd = reinterpret_cast<VertexDescription *>(vd);
-		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		rb->SetVertexDescription(pvd, meshHash, reinterpret_cast<ResourceBase *>(meshSrc), meshIdx);
-	}
-
-	BAMS_EXPORT IVertexDescription *IMesh_GetVertexDescription(IMesh * res, bool loadASAP)
-	{
-		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetVertexDescription(loadASAP);
-	}
-
-	BAMS_EXPORT IResource * IMesh_GetMeshSrc(IMesh * res)
-	{
-		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetMeshSrc();
-	}
-
-	BAMS_EXPORT uint32_t IMesh_GetMeshIdx(IMesh * res)
-	{
-		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetMeshIdx();
-	}
-
-	BAMS_EXPORT void IMesh_SetMeshIdx(IMesh * res, uint32_t idx)
-	{
-		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		rb->SetMeshIdx(idx);
-	}
-
-	BAMS_EXPORT uint32_t IMesh_GetMeshHash(IMesh * res)
-	{
-		auto *rb = reinterpret_cast<ResMesh *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetMeshHash();
-	}
-
-	BAMS_EXPORT const char * IMesh_BuildXML(IVertexDescription * vd, uint32_t meshHash, IResource * meshSrc, U32 meshIdx)
-	{
-		auto pvd = reinterpret_cast<VertexDescription *>(vd);
-		*pRetStrHelper = ResMesh::BuildXML(pvd, meshHash, reinterpret_cast<ResourceBase *>(meshSrc), meshIdx);
-		return pRetStrHelper->c_str();
-	}
-
-
-	BAMS_EXPORT Image *IImage_GetImage(IImage *res, bool loadASAP)
-	{
-		auto *rb = reinterpret_cast<ResImage *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		return rb->GetImage();
-	}
-
-	BAMS_EXPORT void IImage_Updated(IImage *res)
-	{
-		auto *rb = reinterpret_cast<ResImage *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
-		rb->Updated();
-	}
+	BAMS_EXPORT Image *IResImage_GetImage(IResImage *res, bool loadASAP) { return Impl<ResImage>(res)->GetImage(loadASAP); }
+	BAMS_EXPORT void IResImage_Updated(IResImage *res)                   {        Impl<ResImage>(res)->Updated(); }
+	BAMS_EXPORT uint8_t *IResImage_GetSrcData(IResImage *res)            { return Impl<ResImage>(res)->GetSrcData(); }
+	BAMS_EXPORT size_t IResImage_GetSrcSize(IResImage *res)              { return Impl<ResImage>(res)->GetSrcSize(); }
+	BAMS_EXPORT void IResImage_ReleaseSrc(IResImage *res)                {        Impl<ResImage>(res)->ReleaseSrc(); }
 
 	// =========================================================================== ResourceManager
 
@@ -269,16 +177,16 @@ extern "C" {
 		return resm->Get(uid);
 	}
 
-	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID & uid)
+	BAMS_EXPORT IResRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID & uid)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
 		return resm->Get(uid);
 	}
 
-	BAMS_EXPORT IRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name)
+	BAMS_EXPORT IResRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->Get<RawData>(name);
+		return resm->Get<ResRawData>(name);
 	}
 
 	BAMS_EXPORT void IResourceManager_LoadSync(IResourceManager *rm, IResource *res)

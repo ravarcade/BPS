@@ -41,7 +41,7 @@ void ResShader::_LoadXML()
 	using tinyxml2::XMLPrinter;
 	using tinyxml2::XMLDocument;
 
-	// memory is allocated with RawData MemoryAllocator, so we don't have to copy it.
+	// memory is allocated with ResRawData MemoryAllocator, so we don't have to copy it.
 	Data = static_cast<U8 *>(rb->GetData());
 	Size = rb->GetSize();
 	auto &rm = globalResourceManager;

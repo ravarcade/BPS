@@ -39,8 +39,6 @@ public:
 	CShaderProgram() = default;
 	CShaderProgram(OutputWindow *outputWindow) : vk(outputWindow) {}
 
-	void SetParentOutputWindow(OutputWindow *outputWindow) { vk = outputWindow; }
-
 	void LoadProgram(const char *program);
 	void Release();
 
@@ -111,12 +109,12 @@ private:
 
 	CShadersReflections          m_reflection;
 	OutputWindow                 *vk                     = nullptr;
+	VkSampleCountFlagBits        m_msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
 	VkRenderPass                 m_renderPass            = nullptr;
-	VkSampleCountFlagBits        m_msaaSamples           = VK_SAMPLE_COUNT_1_BIT;
 
 	VkPipelineLayout             m_pipelineLayout        = nullptr;
-	VkPipeline                   m_graphicsPipeline      = nullptr;
+	VkPipeline                   m_pipeline              = nullptr;
 
 	std::vector<VkDescriptorSetLayout>             m_descriptorSetLayout;
 
@@ -143,7 +141,7 @@ private:
 	std::vector<ShaderProgramParamDesc>            m_shaderProgramParamNames;
 	bool                                           m_isPushConstantsUsed;
 
-	VkDescriptorSet              m_descriptorSet = nullptr;
+	VkDescriptorSet            m_descriptorSet = nullptr;
 	std::vector<UniformBuffer> m_uniformBuffers;
 
 	struct BufferSet {

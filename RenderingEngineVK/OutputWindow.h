@@ -96,16 +96,6 @@ private:
 
 	DeferredFrameBuffers deferredFrameBuf;
 
-	/*
-	VkImage depthImage;
-	VkDeviceMemory depthImageMemory;
-	VkImageView depthImageView;
-
-	VkImage colorImage;
-	VkDeviceMemory colorImageMemory;
-	VkImageView colorImageView;
-	*/
-
 	VkCommandPool commandPool;
 	VkCommandPool transferPool;
 	VkSemaphore imageAvailableSemaphore;
@@ -168,6 +158,7 @@ private:
 	SharedUniformBufferObject *sharedUboData = nullptr;
 
 	void _LoadShaderPrograms();
+	void _CleanupTextures();
 	void _CleanupShaderPrograms();
 	void _Cleanup();
 
@@ -179,9 +170,9 @@ private:
 	void _SimplePresent(VkSemaphore & waitSemaphore, uint32_t imageIndex);
 
 	bool _UpdateBeforeDrawFrame();
-	
-	static void _OnWindowSize(GLFWwindow *wnd, int width, int height);
+	void _RecreateSwapChain();
 
+	static void _OnWindowSize(GLFWwindow *wnd, int width, int height);
 public:
 	OutputWindow();
 	~OutputWindow() { _Cleanup(); }
@@ -191,15 +182,17 @@ public:
 	void Close(GLFWwindow *wnd = nullptr);
 
 	void UpdateUniformBuffer();
-	void _RecreateSwapChain();
+
 	void DrawFrame();
 	void PrepareShader(CShaderProgram * sh);
 	bool Exist() { return device != VK_NULL_HANDLE; }
 	void BufferRecreationNeeded() { updateFlags.commandBuffers[FORWARD] = true; updateFlags.commandBuffers[DEFERRED] = true; }
 	bool IsValid() { return window != nullptr; }
 	bool IsBufferFeatureSupported(VkFormat format, VkFormatFeatureFlagBits features);
-	
+
 	void CopyBuffer(VkBuffer dstBuf, VkDeviceSize offset, VkDeviceSize size, void *srcData);
+	void _CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBufferImageCopy * region);
+	void CopyImage(VkImage dstImage, Image * srcImage);
 
 	template<typename T> void vkDestroy(T &v) { if (v) { vkDestroyDevice(v, allocator); v = VK_NULL_HANDLE; } }
 
@@ -235,10 +228,12 @@ public:
 	ObjectInfo * AddObject(const char * name, const char * mesh, const char * shader);
 	CShaderProgram *AddShader(const char * shader);
 	CShaderProgram *ReloadShader(const char *shader);
-	void GetShaderParams(const char *shader, Properties **params);
+	void GetShaderParams(const char * shader, Properties **params);
 	void GetObjectParams(const char * objectName, Properties ** props);
 	void UpdateDrawCommands();
 
+	void AddTexture(uint32_t objectId, uint32_t textureType, const char *textureName);
+	void AddTexture(const char *objectName, uint32_t textureType, const char *textureName);
 
 	// ------------------------ camera stuffs -------------------
 
@@ -279,15 +274,16 @@ public:
 	}
 
 	// ------------------------- for textures ----------------
-	Texture2D testTex;
 
-	template<> void vkDestroy(Texture2D &tex)
+	template<> void vkDestroy(CTexture2d &tex)
 	{
 		vkDestroy(tex.view);
 		vkDestroy(tex.image);
 		vkDestroy(tex.sampler);
 		vkFree(tex.memory);
 	}
+	CStringHastable<CTexture2d> textures;
 
 	friend CShaderProgram;
+	friend CTexture2d;
 };

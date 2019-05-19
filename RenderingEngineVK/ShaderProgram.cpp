@@ -41,12 +41,12 @@ void CShaderProgram::Release()
 	m_descriptorSetLayout.clear();
 
 	vk->vkDestroy(m_pipelineLayout);
-	vk->vkDestroy(m_graphicsPipeline);
+	vk->vkDestroy(m_pipeline);
 }
 
 void CShaderProgram::CreateGraphicsPipeline()
 {
-	vk->vkDestroy(m_graphicsPipeline); // delete graphicsPipline if it exist
+	vk->vkDestroy(m_pipeline); // delete graphicsPipline if it exist
 
 	auto shaderStages = _Compile();
 	auto vertexInputInfo = _GetVertexInputInfo();
@@ -87,7 +87,7 @@ void CShaderProgram::CreateGraphicsPipeline()
 	}
 #endif
 
-	if (vkCreateGraphicsPipelines(vk->device, VK_NULL_HANDLE, 1, &pipelineInfo, vk->allocator, &m_graphicsPipeline) != VK_SUCCESS) {
+	if (vkCreateGraphicsPipelines(vk->device, VK_NULL_HANDLE, 1, &pipelineInfo, vk->allocator, &m_pipeline) != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create graphics pipeline!");
 	}
 	// some cleanups
@@ -476,7 +476,7 @@ VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
 	BAMS::CResourceManager rm;
 	if (auto res = rm.Find(name, RESID_MESH))
 	{
-		CMesh m(res);
+		CResMesh m(res);
 		auto pvd = reinterpret_cast<VertexDescription*>(m.GetVertexDescription(true)); // we need loaded mesh now.
 		if (pvd)
 		{
@@ -895,7 +895,7 @@ void CShaderProgram::UpdateDescriptorSets()
 
 void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 {
-	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
+	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
 	uint32_t lastBufferSetIdx = -1;
 	if (vk->currentDescriptorSet != m_descriptorSet)

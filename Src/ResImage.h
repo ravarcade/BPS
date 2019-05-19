@@ -6,7 +6,7 @@
 *
 */
 
-class ResImage : public ResoureImpl<ResImage, RESID_IMAGE, Allocators::default, false>
+class ResImage : public ResoureImpl<ResImage, RESID_IMAGE>
 {
 	ResourceBase *rb;
 	Image img;
@@ -23,4 +23,8 @@ public:
 
 	Image *GetImage(bool loadASAP = false);
 	void Updated();
+
+	U8 *GetSrcData();
+	SIZE_T GetSrcSize();
+	void ReleaseSrc();
 };

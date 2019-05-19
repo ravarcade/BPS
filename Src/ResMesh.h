@@ -6,7 +6,7 @@
 *
 */
 
-class ResMesh : public ResoureImpl<ResMesh, RESID_MESH, Allocators::default, false> 
+class ResMesh : public ResoureImpl<ResMesh, RESID_MESH, false> 
 {
 	ResourceBase *rb;
 	VertexDescription vd;
@@ -16,6 +16,7 @@ class ResMesh : public ResoureImpl<ResMesh, RESID_MESH, Allocators::default, fal
 	bool isVertexDescriptionDataSet;
 	void _LoadXML();
 	void _SaveXML();
+	static STR _BuildXML(VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx);
 
 public:
 	ResMesh(ResourceBase *res) : rb(res), meshSrc(nullptr), meshIdx(-1), meshHash(0), isVertexDescriptionDataSet(false) {
@@ -34,11 +35,9 @@ public:
 	U32 GetMeshIdx() { return meshIdx; }
 	void SetMeshIdx(U32 idx) { meshIdx = idx; }
 	U32 GetMeshHash() { return meshHash; }
-
-	static STR BuildXML(VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx);
 };
 
-class ResImportModel : public ResoureImpl<ResImportModel, RESID_IMPORTMODEL, Allocators::default, false>
+class ResImportModel : public ResoureImpl<ResImportModel, RESID_IMPORTMODEL, false>
 {
 	ResourceBase *rb;
 	SIZE_T resourceSize;

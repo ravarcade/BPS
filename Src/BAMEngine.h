@@ -59,23 +59,16 @@ constexpr ptrdiff_t COUNT_OF(Type const (&)[n]) noexcept { return n; }
 
 namespace BAMS {
 	
-// #include "Core.h"
 #include "Core_BasicTypes.h"
 #include "Core_MemoryAllocator.h"
 #include "Core_Types.h"
 #include "Core_Message.h"
-	namespace CORE {
+#include "Core_Tools.h"
 
-	}
-
-
-//#include "RenderingEngine_DllInterface.h"
 #include "RenderingEngine_Config.h"
 #include "RenderingEngine_VertexDescription.h"
-//#include "RenderingEngine_VertexData.h"
 #include "RenderingEngine_Image.h"
 
-	// #include "DllInterface.h"
 #include "DllInterface_IResourceManager.h"
 
 };

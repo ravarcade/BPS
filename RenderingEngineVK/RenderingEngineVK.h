@@ -44,7 +44,7 @@ using namespace BAMS;
 #include "Utils.h"
 #include "ShadersReflections.h"
 #include "ShaderProgram.h"
-#include "Texture2D.h"
+#include "Texture2d.h"
 #include "iglfw.h"
 #include "OutputWindow.h"
 #include "ire.h"

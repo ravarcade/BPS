@@ -1,5 +1,7 @@
 #include "stdafx.h"
 
+using namespace BAMS;
+
 AssImp_Loader::AssImp_Loader() :
 	_isLoaded(false),
 	_meshBinData(nullptr),
@@ -284,8 +286,6 @@ void AssImp_Loader::AddMesh_broken(aiMesh *mesh)
 	} // if (mesh->HasBones()) 
 	*/
 } // VertexDescription
-
-using namespace BAMS::CORE;
 
 U32 JSHash(Stream &s, U32 numVert, U32 hash = 0)
 {

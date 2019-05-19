@@ -367,6 +367,9 @@ void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
 		int num = static_cast<int>(onWnd[wnd].size());
 		SetParams(pprop, num);
 		onWnd[wnd].push_back(*pprop);
+
+		PADD_TEXTURE addTexParams = { wnd, oid, 0, "test" };
+		en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);	
 	}
 }
 
@@ -625,8 +628,10 @@ int main()
 			rm.LoadSync();
 			ToggleWnd(en,0); // show first window
 
+			CResImage ri = rm.Find("test", RESID_IMAGE);
+			auto img = ri.GetImage(true);
 
-			CMesh m1 = rm.Find("Mesh_1", RESID_MESH);
+			CResMesh m1 = rm.Find("Mesh_1", RESID_MESH);
 			auto vd = m1.GetVertexDescription(true);
 			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 			

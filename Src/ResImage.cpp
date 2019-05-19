@@ -13,6 +13,7 @@ ResImage::ResImage(ResourceBase *res)
 ResImage::~ResImage()
 {
 	img.Release();
+	ReleaseSrc();
 }
 
 void ResImage::_LoadXML()
@@ -34,6 +35,7 @@ void ResImage::Update(ResourceBase * res) {
 void ResImage::Release(ResourceBase * res)
 {
 	img.Release();
+	ReleaseSrc();
 }
 
 /// <summary>
@@ -54,9 +56,19 @@ Image * ResImage::GetImage(bool loadASAP)
 /// <summary>
 /// Called by ImportModule when image is loaded and properties (like size, format) are updated and image manifest should be updated.
 /// </summary>
-void ResImage::Updated()
-{
-	_SaveXML();
+void ResImage::Updated() { _SaveXML(); }
+
+U8 * ResImage::GetSrcData() { return rb->GetData<U8>(); }
+
+SIZE_T ResImage::GetSrcSize() { return rb->GetSize(); }
+
+void ResImage::ReleaseSrc() {
+	auto pData = GetSrcData();
+	if (pData)
+	{
+		rb->GetMemoryAllocator()->deallocate(pData);
+		rb->ResourceLoad(nullptr, 0);
+	}
 }
 
 }; // CORE namespace

@@ -7,7 +7,7 @@
 */
 
 
-class Tools
+class BAMS_EXPORT Tools
 {
 public:
 	typedef void TSearchForFilesCallback(WSTR &filename, U64 size, time_t timestamp, void *ctrl);
@@ -29,6 +29,8 @@ public:
 	static void String2UUID(UUID &uuid, const char *buf);
 	static void SearchForFiles(const WSTR &path, TSearchForFilesCallback SearchForFilesCallback, void *ctrl);
 	static DWORD WinExec(WSTR &cmd, CWSTR cwd = nullptr);
+	static int FindMatchingFileExtension(const wchar_t * const fn, const wchar_t * const ext, bool caseInsesitive = true);
+	static int FindMatchingFileExtension(const char * const fn, const char * const ext, bool caseInsesitive = true);
 
 	static UUID NOUID;
 };

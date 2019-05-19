@@ -1,10 +1,13 @@
 #pragma once
 
-class Texture2D
+class CTexture2d
 {
 public:
-	Texture2D();
-	~Texture2D();
+	CTexture2d(OutputWindow *outputWindow);
+	~CTexture2d();
+
+	void LoadTexture(const char *textureResourceName);
+	void Release();
 
 protected:
 	VkSampler sampler = VK_NULL_HANDLE;
@@ -20,4 +23,5 @@ protected:
 	uint32_t mipLevels;
 
 	friend class OutputWindow;
+	OutputWindow *vk;
 };

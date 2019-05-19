@@ -274,6 +274,10 @@ auto ow = outputWindows[p->wnd]; \
 if (!ow || !ow->Exist())  return;
 
 
+/// <summary>
+/// Adds the mesh.
+/// </summary>
+/// <param name="params">The parameters.</param>
 void  ire::AddMesh(const void * params)
 {
 	CASTMSGPARAMS(PADD_MESH);
@@ -285,6 +289,12 @@ void  ire::AddMesh(const void * params)
 		if (p->pId)
 			*p->pId = oi->oid;
 	}
+}
+
+void ire::AddTexture(const void * params)
+{
+	CASTMSGPARAMS(PADD_TEXTURE);
+	ow->AddTexture(p->objectId, p->slot, p->textureResourceName);
 }
 
 void ire::AddShader(const void * params)

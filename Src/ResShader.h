@@ -6,10 +6,10 @@
 *
 */
 
-typedef TRawData<RESID_SHADER_SRC> ResShaderSrc;
-typedef TRawData<RESID_SHADER_BIN> ResShaderBin;
+typedef TResRawData<RESID_SHADER_SRC> ResShaderSrc;
+typedef TResRawData<RESID_SHADER_BIN> ResShaderBin;
 
-class ResShader : public ResoureImpl<ResShader, RESID_SHADER, Allocators::default>
+class ResShader : public ResoureImpl<ResShader, RESID_SHADER>
 {
 	static constexpr char *SubprogramTypes[] = { "Vert", "Frag", "Geom", "Ctrl", "Eval" };
 	static constexpr SIZE_T NumSubprogramTypes = COUNT_OF(SubprogramTypes);

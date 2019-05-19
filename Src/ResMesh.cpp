@@ -55,7 +55,7 @@ void ResMesh::_LoadXML()
 
 }
 
-void ResMesh::_SaveXML() { rb->XML = BuildXML(&vd, meshHash, meshSrc, meshIdx); rb->SetTimestamp(); }
+void ResMesh::_SaveXML() { rb->XML = _BuildXML(&vd, meshHash, meshSrc, meshIdx); rb->SetTimestamp(); }
 
 void ResMesh::SetVertexDescription(VertexDescription * pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
 { 
@@ -85,7 +85,7 @@ VertexDescription * ResMesh::GetVertexDescription(bool loadASAP)
 	return &vd;
 }
 
-STR ResMesh::BuildXML(VertexDescription *pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
+STR ResMesh::_BuildXML(VertexDescription *pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
 {
 	using tinyxml2::XMLPrinter;
 	using tinyxml2::XMLDocument;

@@ -182,7 +182,7 @@
     <ClInclude Include="..\Src\Core_Module.h" />
     <ClInclude Include="..\Src\Core_Properties.h" />
     <ClInclude Include="..\Src\Core_Queue.h" />
-    <ClInclude Include="..\Src\RawData.h" />
+    <ClInclude Include="..\Src\ResRawData.h" />
     <ClInclude Include="..\Src\RenderingEngine_Image.h" />
     <ClInclude Include="..\Src\ResImage.h" />
     <ClInclude Include="..\Src\ResMesh.h" />
@@ -192,7 +192,6 @@
     <ClInclude Include="..\Src\Core_Types.h" />
     <ClInclude Include="..\Src\DllInterface_IResourceManager.h" />
     <ClInclude Include="..\Src\RenderingEngine_Config.h" />
-    <ClInclude Include="..\Src\RenderingEngine_VertexData.h" />
     <ClInclude Include="..\Src\RenderingEngine_VertexDescription.h" />
     <ClInclude Include="..\Src\ResShader.h" />
     <ClInclude Include="stdafx.h" />

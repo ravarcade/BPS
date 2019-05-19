@@ -3,7 +3,7 @@
 /*
  ResourceBase:
  1. Type = UNKNOWN               : Added to resource manager but not recognized yet.
- 2. Type = RawData::GetTypeId()  : All resources not matching any resonable resource type.
+ 2. Type = ResRawData::GetTypeId()  : All resources not matching any resonable resource type.
  3. Type = RealResourceType::GetTypeId()
 
  ResourceBase states:
@@ -396,7 +396,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		{
 			// we must have res type set
 			if (res->Type == RESID_UNKNOWN)
-				res->Type = RawData::GetTypeId();
+				res->Type = ResRawData::GetTypeId();
 
 			// we need to find correct "create" function ...
 			for (auto f = ResourceFactoryChain::First; f; f = f->Next)
@@ -410,9 +410,9 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 				}
 			}
 
-			// ... and if we still don't know what it is... it must be RawData.
+			// ... and if we still don't know what it is... it must be ResRawData.
 			if (res->_resourceImplementation == nullptr)
-				res->Type = RawData::GetTypeId();
+				res->Type = ResRawData::GetTypeId();
 		}
 	}
 
@@ -856,7 +856,8 @@ ResourceBase * ResourceManager::Get(const STR & resName, U32 typeId)
 	}
 
 	// if we don't have type set, when set one.
-	if (ret->Type == RESID_UNKNOWN)
+	if (ret->Type == RESID_UNKNOWN ||
+		(ret->Type == RESID_RAWDATA && typeId != RESID_UNKNOWN))
 	{
 		ret->Type = typeId;
 	}
