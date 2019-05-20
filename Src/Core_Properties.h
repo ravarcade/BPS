@@ -14,23 +14,28 @@ public:
 		PT_F32, // mat4 = FP32 * 16, mat3 = FP32 * 9
 		PT_CSTR,
 		PT_ARRAY,
+		PT_TEXTURE,
 		PT_UNKNOWN = 0xffffffff
 	};
 
 	U32 type;
 	U32 parent;
 	U32 count;
-	U32 idx;
 	CSTR name;
 	void *val;
 	U32 array_size;
 	U32 array_stride;
 	
-	Property()                                 : type(PT_EMPTY), parent(-1), count(0),   name(nullptr), val(nullptr), idx(-1), array_stride(0) {}
-	Property(CSTR n, I32 *v, U32 cnt = 1)      : type(PT_I32),   parent(-1), count(cnt), name(n), val(v), idx(-1), array_stride(0) {}
-	Property(CSTR n, F32 *v, U32 cnt = 1)      : type(PT_F32),   parent(-1), count(cnt), name(n), val(v), idx(-1), array_stride(0) {}
-	Property(CSTR n, CSTR *v)                  : type(PT_CSTR),  parent(-1), count(1),   name(n), val(v), idx(-1), array_stride(0) {}
-	Property(CSTR n)                           : type(PT_EMPTY), parent(-1), count(0),   name(n), val(nullptr), idx(-1), array_stride(0) {}
+	// implementation
+	U32 buffer_idx;
+	U32 buffer_offset;
+	U32 buffer_object_stride;
+
+	Property()                                 : type(PT_EMPTY), parent(-1), count(0),   name(nullptr), val(nullptr), array_stride(0) {}
+	Property(CSTR n, I32 *v, U32 cnt = 1)      : type(PT_I32),   parent(-1), count(cnt), name(n), val(v), array_stride(0) {}
+	Property(CSTR n, F32 *v, U32 cnt = 1)      : type(PT_F32),   parent(-1), count(cnt), name(n), val(v), array_stride(0) {}
+	Property(CSTR n, CSTR *v)                  : type(PT_CSTR),  parent(-1), count(1),   name(n), val(v), array_stride(0) {}
+	Property(CSTR n)                           : type(PT_EMPTY), parent(-1), count(0),   name(n), val(nullptr), array_stride(0) {}
 
 	bool IsEmpty() const { return count == 0 || type == PT_EMPTY; };
 

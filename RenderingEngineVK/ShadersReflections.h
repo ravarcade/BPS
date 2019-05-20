@@ -55,22 +55,6 @@ struct ValDetails {
 	ValMemberDetails entry;
 };
 
-
-//struct ShaderDataInfo {
-//	VertexDescription vertexDescription;
-//
-//	VertexAttribs vertexAttribs;
-//
-//	std::vector<ValDetails> params_in_ubos;
-//	std::vector<ValDetails> params_in_push_constants;
-//	std::vector<SampledImageDesc> sampled_images;
-//	uint32_t push_constatns_size;
-//	uint32_t shared_ubos_size;
-//	uint32_t total_ubos_size;
-//	uint32_t max_single_ubo_size;
-//	std::vector<uint32_t> ubo_sizes;
-//};
-
 class CShadersReflections
 {
 public:
@@ -97,9 +81,7 @@ public:
 
 	void LoadProgram(const char *shaderName);
 
-
 	const std::vector<std::string> &GetOutputNames() { return m_outputNames; }
-
 
 	const std::vector<ShaderProgramInfo> &GetPrograms() { return m_programs; }
 	const ResourceLayout &GetLayout() { return m_layout; }
@@ -109,6 +91,7 @@ public:
 	const std::vector<ValDetails> &GetParamsInPushConstants() { return m_params_in_push_constants; }
 	const std::vector<SampledImageDesc> &GetSampledImages() { return m_sampled_images; }
 
+	MProperties BuildProperties();
 
 private:
 	VertexDescription m_vertexDescription;

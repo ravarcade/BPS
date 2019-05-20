@@ -191,7 +191,7 @@ public:
 	bool IsBufferFeatureSupported(VkFormat format, VkFormatFeatureFlagBits features);
 
 	void CopyBuffer(VkBuffer dstBuf, VkDeviceSize offset, VkDeviceSize size, void *srcData);
-	void _CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBufferImageCopy * region);
+	void _CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBufferImageCopy & region, VkImageSubresourceRange & subresourceRange);
 	void CopyImage(VkImage dstImage, Image * srcImage);
 
 	template<typename T> void vkDestroy(T &v) { if (v) { vkDestroyDevice(v, allocator); v = VK_NULL_HANDLE; } }

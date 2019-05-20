@@ -65,9 +65,11 @@ public:
 			{
 				if (p.type != Property::PT_EMPTY)
 				{
-					auto pb = m_shaderProgramParamNames[p.idx];
-					auto buf = m_paramsBuffers[pb.dataBufferId].buffer;
-					p.val = buf + pb.root->entry.size * drawObjectId + pb.mem->offset;
+//					auto pb = m_shaderProgramParamNames[p.idx];
+//					auto buf = m_paramsBuffers[pb.dataBufferId].buffer;
+//					p.val = buf + pb.root->entry.size * drawObjectId + pb.mem->offset;
+					auto buf = m_paramsBuffers[p.buffer_idx].buffer;
+					p.val = buf + p.buffer_object_stride * drawObjectId + p.buffer_offset;
 				}
 			}
 		}
@@ -75,7 +77,6 @@ public:
 	}
 
 	uint32_t GetObjectCount() { return static_cast<uint32_t>(m_drawObjectData.size()); }
-
 	void SetDrawOrder(uint32_t order) { m_drawOrder = order; }
 	uint32_t GetDrawOrder() { return m_drawOrder; }
 
@@ -124,7 +125,8 @@ private:
 	enum {
 		PUSH_CONSTANTS,
 		HOSTVISIBLE_UBO,
-		UBO
+		UBO,
+		TEXTURES
 	};
 	struct PropertiesBufferInfo
 	{
@@ -137,14 +139,14 @@ private:
 	std::vector<PropertiesBufferInfo>              m_paramsBuffers;
 	std::vector<uint8_t>                           m_paramsLocalBuffer;
 
-	MProperties                        m_properties;
+	MProperties                                    m_properties;
 	std::vector<ShaderProgramParamDesc>            m_shaderProgramParamNames;
 	bool                                           m_isPushConstantsUsed;
 
 	VkDescriptorSet            m_descriptorSet = nullptr;
 	std::vector<UniformBuffer> m_uniformBuffers;
 
-	struct BufferSet {
+	struct MeshBufferSet {
 		VkBuffer       vertexBuffer;
 		VkDeviceMemory vertexBufferMemory;
 		VkBuffer       indexBuffer;
@@ -164,11 +166,12 @@ private:
 	};
 
 	struct DrawObjectData {
-		uint32_t paramsSetId;
+		uint32_t paramsSetId; // used for push constants
+		VkDescriptorSet descriptorSet;
 		uint32_t meshIdx;
 	};
 
-	std::vector<BufferSet> m_bufferSets;
+	std::vector<MeshBufferSet> m_meshBufferSets;
 	std::vector<Mesh> m_meshes;
 	std::vector<DrawObjectData> m_drawObjectData;
 	hashtable<const char *, uint32_t> m_meshNames;

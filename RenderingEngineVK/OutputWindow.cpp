@@ -1762,7 +1762,7 @@ void OutputWindow::CopyBuffer(VkBuffer dstBuf, VkDeviceSize offset, VkDeviceSize
 	vkFree(stagingBufferMemory);
 }
 
-void OutputWindow::_CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBufferImageCopy *region)
+void OutputWindow::_CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBufferImageCopy &region, VkImageSubresourceRange &subresourceRange)
 {
 	VkCommandBufferAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1777,7 +1777,29 @@ void OutputWindow::_CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBu
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 	beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
+	VkImageMemoryBarrier imageMemoryBarrier = {};
+	imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	imageMemoryBarrier.image = dstImage;
+	imageMemoryBarrier.subresourceRange = subresourceRange;
+	imageMemoryBarrier.srcAccessMask = 0;
+	imageMemoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+
+
 	vkBeginCommandBuffer(commandBuffer, &beginInfo);
+
+	if (false)
+		vkCmdPipelineBarrier(
+		commandBuffer,
+		VK_PIPELINE_STAGE_HOST_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		0,
+		0, nullptr,
+		0, nullptr,
+		1, &imageMemoryBarrier);
 
 	vkCmdCopyBufferToImage(
 		commandBuffer,
@@ -1785,8 +1807,21 @@ void OutputWindow::_CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBu
 		dstImage,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		1,
-		region
+		&region
 	);
+	imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	if (false)
+	vkCmdPipelineBarrier(
+		commandBuffer,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0,
+		0, nullptr,
+		0, nullptr,
+		1, &imageMemoryBarrier);
 
 	vkEndCommandBuffer(commandBuffer);
 
@@ -1804,14 +1839,15 @@ void OutputWindow::_CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBu
 void OutputWindow::CopyImage(VkImage dstImage, Image *srcImage)
 {
 	VkDeviceSize size = srcImage->width * srcImage->height * srcImage->GetPixelSize();
-
+	VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	
 	// region of dstImage to update
 	VkBufferImageCopy region = {};
 	region.bufferOffset = 0;
 	region.bufferRowLength = 0;
 	region.bufferImageHeight = 0;
 
-	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.aspectMask = aspectMask;
 	region.imageSubresource.mipLevel = 0;
 	region.imageSubresource.baseArrayLayer = 0;
 	region.imageSubresource.layerCount = 1;
@@ -1822,6 +1858,13 @@ void OutputWindow::CopyImage(VkImage dstImage, Image *srcImage)
 		srcImage->height,
 		1
 	};
+
+	VkImageSubresourceRange subresourceRange = {};
+	subresourceRange.aspectMask = region.imageSubresource.aspectMask;
+	subresourceRange.baseArrayLayer = region.imageSubresource.baseArrayLayer;
+	subresourceRange.layerCount = region.imageSubresource.layerCount;
+	subresourceRange.baseMipLevel = region.imageSubresource.mipLevel;
+	subresourceRange.levelCount = 1;
 
 	// prepare staging buffer
 	VkBuffer stagingBuffer;
@@ -1838,7 +1881,7 @@ void OutputWindow::CopyImage(VkImage dstImage, Image *srcImage)
 	memcpy(data, srcImage->rawImage, static_cast<size_t>(size));
 	vkUnmapMemory(device, stagingBufferMemory);
 
-	_CopyBufferToImage(dstImage, stagingBuffer, &region);
+	_CopyBufferToImage(dstImage, stagingBuffer, region, subresourceRange);
 
 	// release staging buffer
 	vkDestroy(stagingBuffer);

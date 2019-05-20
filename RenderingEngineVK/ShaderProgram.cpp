@@ -27,13 +27,13 @@ void CShaderProgram::Release()
 	}
 	m_uniformBuffers.clear();
 
-	for (auto &set : m_bufferSets) {
+	for (auto &set : m_meshBufferSets) {
 		vk->vkDestroy(set.vertexBuffer);
 		vk->vkFree(set.vertexBufferMemory);
 		vk->vkDestroy(set.indexBuffer);
 		vk->vkFree(set.indexBufferMemory);
 	}
-	m_bufferSets.clear();
+	m_meshBufferSets.clear();
 
 	for (auto &dsl : m_descriptorSetLayout) {
 		vk->vkDestroy(dsl);
@@ -446,7 +446,7 @@ void CShaderProgram::_CreateNewBufferSet(uint32_t numVertices, uint32_t numIndec
 	if (!va.size) // we don't create buffers if we don't have any vertex input
 		return;
 
-	BufferSet set;
+	MeshBufferSet set;
 	vk->_CreateBuffer(
 		numVertices * va.size,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -466,7 +466,7 @@ void CShaderProgram::_CreateNewBufferSet(uint32_t numVertices, uint32_t numIndec
 	set.freeVertices = numVertices;
 	set.freeIndices = numIndeces;
 
-	m_bufferSets.emplace_back(set);
+	m_meshBufferSets.emplace_back(set);
 }
 
 VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
@@ -509,16 +509,16 @@ uint32_t CShaderProgram::AddMesh(const char *name)
 	if (!vd)
 		return -1;
 
-	// we check only last BufferSet
-	BufferSet *set = m_bufferSets.size() ? &*m_bufferSets.rbegin() : nullptr;
+	// we check only last MeshBufferSet
+	MeshBufferSet *set = m_meshBufferSets.size() ? &*m_meshBufferSets.rbegin() : nullptr;
 	if (set == nullptr || set->freeVertices < vd->m_numVertices || set->freeIndices < vd->m_numIndices)
 	{
 		_CreateNewBufferSet(
 			vd->m_numVertices < ALWAYS_RESERVE_VERTICES ? vd->m_numVertices + ALWAYS_RESERVE_VERTICES : vd->m_numVertices,
 			vd->m_numIndices < ALWAYS_RESERVE_INDICES ? vd->m_numIndices + ALWAYS_RESERVE_INDICES : vd->m_numIndices);
-		set = &*m_bufferSets.rbegin();
+		set = &*m_meshBufferSets.rbegin();
 	}
-	uint32_t bufferSetIdx = static_cast<uint32_t>(m_bufferSets.size()) - 1;
+	uint32_t bufferSetIdx = static_cast<uint32_t>(m_meshBufferSets.size()) - 1;
 
 	uint32_t indeceSize = sizeof(uint32_t);
 	uint32_t firstIndex = set->usedIndices;
@@ -633,6 +633,7 @@ void CShaderProgram::_CreateUniformBuffers()
 void CShaderProgram::_BuildProperties()
 {
 	_BuindShaderProgramParamsDesc();
+
 	// we want to skip "SharedUBO"
 	m_properties.clear();
 
@@ -656,11 +657,36 @@ void CShaderProgram::_BuildProperties()
 		auto pr = m_properties.add();
 		pr->name = p.mem->name.c_str();
 		pr->parent = parentId;
-		pr->idx = paramIdx;
 		pr->type = p.mem->propertyType;
 		pr->count = p.mem->propertyCount;
 		pr->array_size = p.mem->array;
 		pr->array_stride = p.mem->array_stride;
+		pr->buffer_idx = p.dataBufferId;
+		pr->buffer_object_stride = p.root->entry.size;
+		pr->buffer_offset = p.mem->offset;
+	}
+
+	// add textures
+	auto &sampledImages = m_reflection.GetSampledImages();
+	auto &pcParams = m_reflection.GetParamsInPushConstants();
+	auto &uboParams = m_reflection.GetParamsInUBO();
+	U32 sampledImagesBufferIdx = static_cast<U32>(pcParams.size() + uboParams.size());
+	U32 sampledImagesBufferObjectStrid = static_cast<U32>(sampledImages.size() * sizeof(CTexture2d*));
+	U32 sampledImagesBufferOffset = 0;
+	for (auto &si : sampledImages)
+	{
+		auto pr = m_properties.add();
+		pr->name = si.name.c_str();
+		pr->parent = -1;
+		pr->type = Property::PT_TEXTURE;
+		pr->count = 1;
+		pr->array_size = 0;
+		pr->array_stride = 0;
+		pr->val = 0;
+		pr->buffer_idx = sampledImagesBufferIdx;
+		pr->buffer_object_stride = sampledImagesBufferObjectStrid;
+		pr->buffer_offset = sampledImagesBufferOffset;
+		sampledImagesBufferOffset += sizeof(CTexture2d*);
 	}
 }
 
@@ -727,6 +753,8 @@ void CShaderProgram::_BuildShaderDataBuffers()
 {
 	auto &pcParams = m_reflection.GetParamsInPushConstants();
 	auto &uboParams = m_reflection.GetParamsInUBO(); 
+	auto &sampledImages = m_reflection.GetSampledImages();
+	auto sampledImagesObjectStride = static_cast<uint32_t>(sampledImages.size() * sizeof(void *));
 	// I can't use m_uniformBuffers :( It is not initialized yet. 
 	// I have to make all decision base on uboParams
 	
@@ -746,6 +774,8 @@ void CShaderProgram::_BuildShaderDataBuffers()
 	if (maxObjects > MAXNUMOBJCTS)
 		maxObjects = MAXNUMOBJCTS;
 
+	
+	localMemorySize += sampledImagesObjectStride;
 	m_paramsLocalBuffer.resize(localMemorySize*maxObjects);
 	auto localBuf = m_paramsLocalBuffer.data();
 	
@@ -785,6 +815,15 @@ void CShaderProgram::_BuildShaderDataBuffers()
 			localBuf += ub.size * maxObjects;
 		}
 	}	
+	if (sampledImages.size())
+	{
+		m_paramsBuffers.push_back({
+				TEXTURES,
+				localBuf,
+				sampledImagesObjectStride,
+				false
+			});
+	}
 }
 
 void CShaderProgram::_ImportMeshData(const VertexDescription *srcVD, void *dstBuf)
@@ -866,6 +905,17 @@ void CShaderProgram::UpdateDescriptorSets()
 		wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		wds.descriptorCount = 1;
 		auto imageInfo = vk->GetDescriptionImageInfo(si.name.c_str());
+		if (!imageInfo)
+		{
+			const char *textureName = "test";
+			auto pt = vk->textures.find(textureName);
+			if (!pt)
+			{
+				pt = vk->textures.add(textureName, vk);
+				pt->LoadTexture(textureName);
+			}
+			imageInfo = &pt->descriptor;
+		}
 		assert(imageInfo);
 		wds.pImageInfo = imageInfo;
 		descriptorWrites.push_back(wds);
@@ -922,7 +972,7 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 		if (m.numVertex > 0 && m.bufferSetIdx != lastBufferSetIdx)
 		{
 			lastBufferSetIdx = m.bufferSetIdx;
-			auto &bs = m_bufferSets[m.bufferSetIdx];
+			auto &bs = m_meshBufferSets[m.bufferSetIdx];
 			VkBuffer vertexBuffers[] = { bs.vertexBuffer };
 			VkDeviceSize offsets[] = { 0 };
 			vkCmdBindVertexBuffers(cb, 0, 1, vertexBuffers, offsets);

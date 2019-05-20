@@ -23,6 +23,7 @@ void CTexture2d::LoadTexture(const char * textureResourceName)
 
 	// copy texture from ram to gpu
 	vk->CopyImage(image, img);
+	vk->_TransitionImageLayout(image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	// create sampler
 	VkSamplerCreateInfo samplerInfo = {};

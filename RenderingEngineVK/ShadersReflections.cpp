@@ -241,6 +241,121 @@ void CShadersReflections::LoadProgram(const char *shaderName)
 	_ParsePrograms();
 }
 
+struct ShaderProgramParamDesc {
+	const ValDetails *root;
+	const ValMemberDetails *mem;
+	uint32_t parentIdx;
+	uint32_t dataBufferId;
+	uint32_t propertyParentIdx;
+};
+
+void _BuindShaderProgramParamsDesc(std::vector<ShaderProgramParamDesc> &shaderProgramParamNames, const ValMemberDetails &entry, uint32_t parentIdx, const ValDetails &root, uint32_t dataBufferId)
+{
+	assert(entry.members.size() > 0);
+
+	for (auto &mem : entry.members)
+	{
+		if (mem.members.size())
+		{
+			// add parent?
+			if (mem.propertyType == Property::PT_ARRAY) // it is array! add parrent
+			{
+				shaderProgramParamNames.push_back({
+					&root,
+					&mem,
+					parentIdx,
+					dataBufferId,
+					static_cast<uint32_t>(-1)
+					});
+				parentIdx = static_cast<uint32_t>(shaderProgramParamNames.size() - 1);
+			}
+			_BuindShaderProgramParamsDesc(shaderProgramParamNames, mem, parentIdx, root, dataBufferId);
+		}
+		else if (mem.propertyType != Property::PT_UNKNOWN)
+		{
+			shaderProgramParamNames.push_back({
+				&root,
+				&mem,
+				parentIdx,
+				dataBufferId,
+				static_cast<uint32_t>(-1)
+				});
+		}
+	}
+}
+
+MProperties CShadersReflections::BuildProperties()
+{
+	std::vector<ShaderProgramParamDesc> shaderProgramParamNames;
+
+	uint32_t dataBufferId = 0;
+	for (auto &vd : m_params_in_push_constants) {
+		_BuindShaderProgramParamsDesc(shaderProgramParamNames, vd.entry, -1, vd, dataBufferId);
+		++dataBufferId;
+	}
+	for (auto &vd : m_params_in_ubos) {
+		_BuindShaderProgramParamsDesc(shaderProgramParamNames, vd.entry, -1, vd, dataBufferId);
+		++dataBufferId;
+	}
+
+	auto m_isPushConstantsUsed = m_params_in_push_constants.size() && shaderProgramParamNames.size(); // !!!
+
+
+	// ------------------------------------
+	// we want to skip "SharedUBO"
+	MProperties	properties;
+
+	// add all parents for lev 0
+	uint32_t paramIdx = -1;
+	for (auto &p : shaderProgramParamNames)
+	{
+		++paramIdx;
+		if (p.root->isSharedUBO)
+			continue;
+
+		p.propertyParentIdx = paramIdx;
+		uint32_t parentId = -1;
+		if (p.parentIdx < shaderProgramParamNames.size())
+		{
+			parentId = shaderProgramParamNames[p.parentIdx].propertyParentIdx;
+		}
+
+		// add entry
+		auto pr = properties.add();
+		pr->name = p.mem->name.c_str();
+		pr->parent = parentId;
+		pr->type = p.mem->propertyType;
+		pr->count = p.mem->propertyCount;
+		pr->array_size = p.mem->array;
+		pr->array_stride = p.mem->array_stride;
+		pr->buffer_idx = p.dataBufferId;
+		pr->buffer_object_stride = p.root->entry.size;
+		pr->buffer_offset = p.mem->offset;
+	}
+
+	// add textures
+	U32 sampledImagesBufferIdx = static_cast<U32>(m_params_in_push_constants.size() + m_params_in_ubos.size());
+	U32 sampledImagesBufferObjectStrid = static_cast<U32>(m_sampled_images.size() * sizeof(CTexture2d*));
+	U32 sampledImagesBufferOffset = 0;
+	for (auto &si : m_sampled_images)
+	{
+		auto pr = properties.add();
+		pr->name = si.name.c_str();
+		pr->parent = -1;
+		pr->type = Property::PT_TEXTURE;
+		pr->count = 1;
+		pr->array_size = 0;
+		pr->array_stride = 0;
+		pr->val = 0;
+		pr->buffer_idx = sampledImagesBufferIdx;
+		pr->buffer_object_stride = sampledImagesBufferObjectStrid;
+		pr->buffer_offset = sampledImagesBufferOffset;
+		sampledImagesBufferOffset += sizeof(CTexture2d*);
+	}
+
+	return std::move(properties);
+}
+
 // ============================================================================ ShadersReflections private methods ===
 
 VkFormat GetVkFormat(uint32_t streamFormat)
