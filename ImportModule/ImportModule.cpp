@@ -204,7 +204,7 @@ private:
 		if (*(p->pType) != RESID_UNKNOWN)
 			return;
 		
-		if (_CheckExtensions(p->filename, ".png;bmp;jpg;jpeg;tga"))
+		if (Tools::FindMatchingFileExtension(p->filename, L"png;bmp;jpg;jpeg;tga") >= 0)
 		{
 			*(p->pType) = RESID_IMAGE;
 			// load texture 2d?

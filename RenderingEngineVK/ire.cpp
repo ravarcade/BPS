@@ -294,7 +294,7 @@ void  ire::AddMesh(const void * params)
 void ire::AddTexture(const void * params)
 {
 	CASTMSGPARAMS(PADD_TEXTURE);
-	ow->AddTexture(p->objectId, p->slot, p->textureResourceName);
+	ow->AddTexture(p->propVal, p->textureResourceName);
 }
 
 void ire::AddShader(const void * params)
@@ -339,7 +339,7 @@ void ire::GetShaderParams(const void * params)
 void ire::GetObjectParams(const void * params)
 {
 	CASTMSGPARAMS(PGET_OBJECT_PARAMS);
-	ow->GetObjectParams(p->name, p->pProperties);
+	ow->GetObjectParams(p->name, p->objectIdx, p->pProperties);
 }
 
 void ire::UpdateDrawCommands(const void *params)

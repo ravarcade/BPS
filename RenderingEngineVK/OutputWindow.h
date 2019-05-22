@@ -171,6 +171,7 @@ private:
 
 	bool _UpdateBeforeDrawFrame();
 	void _RecreateSwapChain();
+	void _CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBufferImageCopy & region, VkImageSubresourceRange & subresourceRange);
 
 	static void _OnWindowSize(GLFWwindow *wnd, int width, int height);
 public:
@@ -191,7 +192,6 @@ public:
 	bool IsBufferFeatureSupported(VkFormat format, VkFormatFeatureFlagBits features);
 
 	void CopyBuffer(VkBuffer dstBuf, VkDeviceSize offset, VkDeviceSize size, void *srcData);
-	void _CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBufferImageCopy & region, VkImageSubresourceRange & subresourceRange);
 	void CopyImage(VkImage dstImage, Image * srcImage);
 
 	template<typename T> void vkDestroy(T &v) { if (v) { vkDestroyDevice(v, allocator); v = VK_NULL_HANDLE; } }
@@ -229,11 +229,10 @@ public:
 	CShaderProgram *AddShader(const char * shader);
 	CShaderProgram *ReloadShader(const char *shader);
 	void GetShaderParams(const char * shader, Properties **params);
-	void GetObjectParams(const char * objectName, Properties ** props);
+	void GetObjectParams(const char * objectName, uint32_t objectIdx, Properties ** props);
 	void UpdateDrawCommands();
 
-	void AddTexture(uint32_t objectId, uint32_t textureType, const char *textureName);
-	void AddTexture(const char *objectName, uint32_t textureType, const char *textureName);
+	void AddTexture(void *propVal, const char *textureName);
 
 	// ------------------------ camera stuffs -------------------
 

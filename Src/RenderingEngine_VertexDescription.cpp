@@ -353,6 +353,7 @@ void VertexDescription::Dump(uint32_t numVert, uint32_t numIndices)
 		"VA_INDICES" };
 
 	TRACE("V: " << m_numVertices << ", I: " << m_numIndices << "\n");
+	return;
 	uint32_t t = VA_POSITION;
 	auto pr = [&](Stream &s) {
 		++t;

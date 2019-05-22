@@ -90,10 +90,11 @@ bool DecodeBMP(Image *dst, U8 *src, SIZE_T size, TempMemory &tmp)
 		for (unsigned int y = 0; y < height; ++y) {
 			BYTE *d = dstBin + pitch * (vflip ? height - y + 1 : y);
 			for (int x = width - 1; x >= 0; --x) {
-				*d++ = *s++;
-				*d++ = *s++;
-				*d++ = *s++;
+				*d++ = s[2];
+				*d++ = s[1];
+				*d++ = s[0];
 				*d++ = 255;
+				s += 3;
 			}
 			s += rowsizefix;
 		}

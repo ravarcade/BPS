@@ -839,7 +839,7 @@ void OutputWindow::_CreateDescriptorPool()
 	{
 		pools.resize(VK_DESCRIPTOR_TYPE_RANGE_SIZE);
 		for (auto &x : pools)
-			x += 5;
+			x += 15;
 		numShaderPrograms += 5;
 		s = static_cast<uint32_t>(pools.size());
 	}
@@ -1114,8 +1114,8 @@ void OutputWindow::_CreateDeferredFramebuffer()
 void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagBits samples)
 {
 //	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_R16G16_SNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, _FindDepthFormat() };
-//	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_R16G16_SNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32G32B32A32_SFLOAT, _FindDepthFormat() };
-	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32G32B32A32_SFLOAT, _FindDepthFormat() };
+	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_R16G16_SNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32G32B32A32_SFLOAT, _FindDepthFormat() };
+//	VkFormat deferredAttachmentFormats[] = { VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R32G32B32A32_SFLOAT, _FindDepthFormat() };
 	//VK_FORMAT_A2B10G10R10_UNORM_PACK32
 
 	VkImageUsageFlags deferredAttachmentUsage[] = {	
@@ -1261,7 +1261,10 @@ void OutputWindow::UpdateUniformBuffer()
 	if (!sharedUboData)
 		return;
 
-	SetCamera(&cameraSettings);
+	shaders.foreach([&](CShaderProgram *&s) {
+		s->RebuildAllMiniDescriptorSets(false);
+	});
+	SetCamera(&cameraSettings);	
 }
 
 void OutputWindow::_RecreateSwapChain()
@@ -1275,7 +1278,8 @@ void OutputWindow::_RecreateSwapChain()
 	{
 		_CreateDeferredFramebuffer();
 		shaders.foreach([&](CShaderProgram *&sh) {
-			sh->UpdateDescriptorSets();
+			sh->RebuildAllMiniDescriptorSets(true);
+			//sh->UpdateDescriptorSets();
 		});
 		_CreateCommandBuffers();
 	}
@@ -1416,8 +1420,9 @@ void OutputWindow::PrepareShader(CShaderProgram *sh)
 	{
 		// prepare shader to be used.
 		sh->CreateGraphicsPipeline();
-		sh->CreateDescriptorSets();
-		sh->UpdateDescriptorSets();
+//		sh->CreateDescriptorSets();
+//		sh->UpdateDescriptorSets();
+		sh->RebuildAllMiniDescriptorSets();
 	}
 }
 
@@ -1461,9 +1466,14 @@ void OutputWindow::GetShaderParams(const char *shader, Properties **props)
 }
 
 
-void OutputWindow::GetObjectParams(const char *objectName, Properties **props)
+void OutputWindow::GetObjectParams(const char *objectName, uint32_t objectIdx, Properties **props)
 {
-	auto oi = objects.find(objectName);
+	ObjectInfo *oi;
+	if (objectName)
+		oi = objects.find(objectName);
+	else
+		oi = &objects[objectIdx];
+
 	if (!oi) return;
 	*props = oi->GetProperties();
 }
@@ -1473,23 +1483,15 @@ void OutputWindow::UpdateDrawCommands()
 	BufferRecreationNeeded();
 }
 
-void OutputWindow::AddTexture(uint32_t objectId, uint32_t textureType, const char * textureName)
-{
-	auto pObj = objects[objectId];
-	auto pIdx = textures.findIdx(textureName);
-	if (!pIdx)
+void OutputWindow::AddTexture(void *propVal, const char * textureName)
+{	
+	auto pTex = textures.find(textureName);
+	if (!pTex)
 	{
-		auto texIdx = textures.addIdx(textureName, this);
-		textures[texIdx].LoadTexture(textureName);		
+		pTex = textures.add(textureName, this);
+		pTex->LoadTexture(textureName);		
 	}
-}
-
-void OutputWindow::AddTexture(const char * objectName, uint32_t textureType, const char * textureName)
-{
-	auto pIdx = objects.findIdx(objectName);
-	assert(pIdx);
-	if (pIdx)
-		AddTexture(static_cast<uint32_t>(*pIdx), textureType, textureName);
+	*reinterpret_cast<VkDescriptorImageInfo **>(propVal) = &pTex->descriptor;
 }
 
 void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)

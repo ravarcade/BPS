@@ -14,7 +14,6 @@ void CShaderProgram::LoadProgram(const char *program)
 {
 	// to do: add support for loading program description from manifest
 	m_reflection.LoadProgram(program);
-	_BuildProperties();
 }
 
 void CShaderProgram::Release()
@@ -502,6 +501,23 @@ uint32_t CShaderProgram::AddMesh(const char *name)
 		uint32_t meshId = static_cast<uint32_t>(m_meshes.size());
 		m_meshes.push_back(m);
 		*m_meshNames.add(name) = meshId;
+
+		// set textures for postprocessing
+		auto &sampledImages = m_reflection.GetSampledImages();
+		auto cnt = static_cast<uint32_t>(sampledImages.size());
+		if (cnt)
+		{
+			auto pb = m_paramsBuffers.rbegin();
+			auto texDescBuf = reinterpret_cast<VkDescriptorImageInfo **>(pb->buffer + pb->size*meshId);
+			for (uint32_t i=0; i<cnt; ++i)
+			{
+				auto imageInfo = vk->GetDescriptionImageInfo(sampledImages[i].name.c_str());
+				if (imageInfo)
+				{
+					texDescBuf[i] = imageInfo;
+				}
+			}
+		}
 		return meshId;
 	}
 
@@ -577,6 +593,29 @@ uint32_t CShaderProgram::AddObject(uint32_t meshIdx)
 void CShaderProgram::_CreateUniformBuffers()
 {
 	auto &uboParams = m_reflection.GetParamsInUBO();
+
+	// don't update if we end with exacly same ubos
+	if (m_uniformBuffers.size() == uboParams.size()) 
+	{
+		bool isSame = true;
+		for (uint32_t i = 0; i<uboParams.size() && isSame; ++i)
+		{
+			auto &nu = uboParams[i];
+			auto &ob = m_uniformBuffers[i];
+			if (nu.binding != ob.binding ||
+				nu.stage != ob.stage ||
+				nu.entry.size != ob.size ||
+				nu.isSharedUBO != ob.isSharedUbo)
+			{
+				isSame = false;
+			}
+		}
+
+		if (isSame)
+			return;
+	}
+
+	m_uniformBuffers.clear();
 	for (auto &ubo : uboParams)
 	{
 		if (ubo.isSharedUBO) // "ubo" is global/shared ubo and we do not create it here... only separate ones used in this shader
@@ -626,126 +665,6 @@ void CShaderProgram::_CreateUniformBuffers()
 	}
 }
 
-/// <summary>
-/// Builds the shader properties.
-/// For every ubo binding, we will have separete buffer, also one for push constants.
-/// </summary>
-void CShaderProgram::_BuildProperties()
-{
-	_BuindShaderProgramParamsDesc();
-
-	// we want to skip "SharedUBO"
-	m_properties.clear();
-
-
-	// add all parents for lev 0
-	uint32_t paramIdx = -1;
-	for (auto &p : m_shaderProgramParamNames)
-	{
-		++paramIdx;
-		if (p.root->isSharedUBO)
-			continue;
-
-		p.propertyParentIdx = paramIdx;
-		uint32_t parentId = -1;
-		if (p.parentIdx < m_shaderProgramParamNames.size())
-		{
-			parentId = m_shaderProgramParamNames[p.parentIdx].propertyParentIdx;
-		}
-
-		// add entry
-		auto pr = m_properties.add();
-		pr->name = p.mem->name.c_str();
-		pr->parent = parentId;
-		pr->type = p.mem->propertyType;
-		pr->count = p.mem->propertyCount;
-		pr->array_size = p.mem->array;
-		pr->array_stride = p.mem->array_stride;
-		pr->buffer_idx = p.dataBufferId;
-		pr->buffer_object_stride = p.root->entry.size;
-		pr->buffer_offset = p.mem->offset;
-	}
-
-	// add textures
-	auto &sampledImages = m_reflection.GetSampledImages();
-	auto &pcParams = m_reflection.GetParamsInPushConstants();
-	auto &uboParams = m_reflection.GetParamsInUBO();
-	U32 sampledImagesBufferIdx = static_cast<U32>(pcParams.size() + uboParams.size());
-	U32 sampledImagesBufferObjectStrid = static_cast<U32>(sampledImages.size() * sizeof(CTexture2d*));
-	U32 sampledImagesBufferOffset = 0;
-	for (auto &si : sampledImages)
-	{
-		auto pr = m_properties.add();
-		pr->name = si.name.c_str();
-		pr->parent = -1;
-		pr->type = Property::PT_TEXTURE;
-		pr->count = 1;
-		pr->array_size = 0;
-		pr->array_stride = 0;
-		pr->val = 0;
-		pr->buffer_idx = sampledImagesBufferIdx;
-		pr->buffer_object_stride = sampledImagesBufferObjectStrid;
-		pr->buffer_offset = sampledImagesBufferOffset;
-		sampledImagesBufferOffset += sizeof(CTexture2d*);
-	}
-}
-
-void CShaderProgram::_BuindShaderProgramParamsDesc()
-{
-	m_shaderProgramParamNames.clear();
-
-	uint32_t dataBufferId = 0;
-	auto &pcParams = m_reflection.GetParamsInPushConstants();
-	auto &uboParams = m_reflection.GetParamsInUBO();
-	_BuindShaderProgramParamsDesc(&pcParams, dataBufferId);
-	_BuindShaderProgramParamsDesc(&uboParams, dataBufferId);
-
-	m_isPushConstantsUsed = pcParams.size() && m_shaderProgramParamNames.size();
-}
-
-void CShaderProgram::_BuindShaderProgramParamsDesc(const std::vector<ValDetails>* vals, uint32_t &dataBufferId)
-{
-	for (auto &vd : *vals) {
-		_BuindShaderProgramParamsDesc(vd.entry, -1, vd, dataBufferId);
-		++dataBufferId;
-	}
-}
-
-void CShaderProgram::_BuindShaderProgramParamsDesc(const ValMemberDetails &entry, uint32_t parentIdx, const ValDetails &root, uint32_t dataBufferId)
-{
-	assert(entry.members.size() > 0);
-
-	for (auto &mem : entry.members)
-	{
-		if (mem.members.size())
-		{
-			// add parent?
-			if (mem.propertyType == Property::PT_ARRAY) // it is array! add parrent
-			{
-				m_shaderProgramParamNames.push_back({
-					&root,
-					&mem,
-					parentIdx,
-					dataBufferId,
-					static_cast<uint32_t>(-1)
-				});
-				parentIdx = static_cast<uint32_t>(m_shaderProgramParamNames.size() - 1);
-			}
-			_BuindShaderProgramParamsDesc(mem, parentIdx, root, dataBufferId);
-		}
-		else if (mem.propertyType != Property::PT_UNKNOWN)
-		{
-			m_shaderProgramParamNames.push_back({
-				&root,
-				&mem,
-				parentIdx,
-				dataBufferId,
-				static_cast<uint32_t>(-1)
-			});
-		}
-	}
-}
-
 const uint32_t MAXBUFFERCHUNKSIZE = 32 * 1024;
 const uint32_t MAXNUMOBJCTS = 1000;
 
@@ -754,9 +673,9 @@ void CShaderProgram::_BuildShaderDataBuffers()
 	auto &pcParams = m_reflection.GetParamsInPushConstants();
 	auto &uboParams = m_reflection.GetParamsInUBO(); 
 	auto &sampledImages = m_reflection.GetSampledImages();
-	auto sampledImagesObjectStride = static_cast<uint32_t>(sampledImages.size() * sizeof(void *));
-	// I can't use m_uniformBuffers :( It is not initialized yet. 
-	// I have to make all decision base on uboParams
+	uint32_t sampledImagesObjectStride = static_cast<uint32_t>(sampledImages.size() * sizeof(void *));
+	uint32_t pushConstantsStride = 0;
+	uint32_t pushConstantsStages = 0;
 	
 	// calc required memory to store own data
 	uint32_t localMemorySize = 0;
@@ -776,6 +695,18 @@ void CShaderProgram::_BuildShaderDataBuffers()
 
 	
 	localMemorySize += sampledImagesObjectStride;
+
+	// check if we have same buffers
+	
+	if (localMemorySize*maxObjects == m_paramsLocalBuffer.size() &&
+		m_paramsBuffers.size() == pcParams.size() + m_uniformBuffers.size() + (sampledImages.size() ? 1:0))
+	{
+		bool isSame = true;
+
+		if (isSame)
+			return;
+	}
+
 	m_paramsLocalBuffer.resize(localMemorySize*maxObjects);
 	auto localBuf = m_paramsLocalBuffer.data();
 	
@@ -788,8 +719,11 @@ void CShaderProgram::_BuildShaderDataBuffers()
 			pc.entry.size,
 			false
 			});
-		localBuf += pc.entry.size * maxObjects;
+		pushConstantsStages |= pc.stage;
+		pushConstantsStride += pc.entry.size;	
 	}
+	localBuf += pushConstantsStride * maxObjects;
+	m_pushConstantsStage = pushConstantsStages;
 
 	for (auto &ub : m_uniformBuffers)
 	{
@@ -856,6 +790,198 @@ void CShaderProgram::_ImportMeshData(const VertexDescription *srcVD, void *dstBu
 	vd.Dump();
 }
 
+void CShaderProgram::RebuildAllMiniDescriptorSets(bool forceRebuildMe)
+{
+	if (m_paramsBuffers.rbegin()->type != TEXTURES && !forceRebuildMe)
+	{
+		// we dont have textures! go simple path
+		return;
+
+	}
+	auto pb = m_paramsBuffers.rbegin();
+	auto texDescBuf = reinterpret_cast<VkDescriptorImageInfo **>(pb->buffer);
+	size_t texDescStride = pb->size;
+	auto numSampledImages = static_cast<uint32_t>(m_reflection.GetSampledImages().size());
+
+	// this is very slow process... we need something smarter.
+	for (MiniDescriptorSet &mds : m_miniDescriptorSets)
+	{
+		mds.refCounter = 0;
+		mds.rebuildMe = forceRebuildMe;
+	}
+	m_uniqMiniDescriptoSets.clear();
+
+	MiniDescriptorSet mds;
+	memset(&mds, 0, sizeof(mds));
+	mds.refCounter = 1;
+	mds.rebuildMe = true;
+
+	uint32_t numOfExistingDescriptorSets = static_cast<uint32_t>(m_miniDescriptorSets.size());
+	uint32_t used = 0;
+
+	//
+	for (auto &dod : m_drawObjectData)
+	{
+		auto idx = dod.paramsSetId;
+		auto pTexInBuf = texDescBuf + idx * numSampledImages;
+		for (uint32_t i = 0; i < numSampledImages; ++i)
+			mds.textures[i] = pTexInBuf[i];
+		mds.uniformBufferSet = 0;
+
+		if (dod.descriptorSet && dod.miniDescriptorSetIndex < m_miniDescriptorSets.size())
+		{
+			MiniDescriptorSet * mdsUsed = &m_miniDescriptorSets[dod.miniDescriptorSetIndex];
+			if (cmp<const MiniDescriptorSet *>()(mdsUsed, &mds))
+			{
+				if (mdsUsed->refCounter == 0)
+				{
+					m_uniqMiniDescriptoSets[mdsUsed] = static_cast<uint32_t>(dod.miniDescriptorSetIndex);
+					++used;
+				}
+				++mdsUsed->refCounter;
+				continue;
+			}
+		}
+
+		uint32_t *pidx = m_uniqMiniDescriptoSets.find(&mds);
+		if (pidx)
+		{
+			dod.miniDescriptorSetIndex = *pidx;
+			auto &mds = m_miniDescriptorSets[*pidx];
+			if (mds.refCounter == 0) {
+				m_uniqMiniDescriptoSets[&mds] = *pidx;
+				++used;
+			}
+			++mds.refCounter;
+		}
+		else
+		{ 
+			m_uniqMiniDescriptoSets[&mds] = static_cast<uint32_t>(m_miniDescriptorSets.size());
+			dod.miniDescriptorSetIndex = static_cast<uint32_t>(m_miniDescriptorSets.size());
+			m_miniDescriptorSets.emplace_back(mds);
+			++used;
+		}
+	}
+
+	//
+	uint32_t cnt = static_cast<uint32_t>(m_miniDescriptorSets.size());
+	std::vector<VkDescriptorSet> freeDescriptorSets;
+	if (used < m_miniDescriptorSets.size())
+	{
+		// we have some unused descriptor sets, try to optimize it.
+		std::vector<uint32_t> map(m_miniDescriptorSets.size());
+		uint32_t lastUsedIdx = -1;
+		
+		for (uint32_t i = 0; i < cnt; ++i)
+		{
+			if (m_miniDescriptorSets[i].refCounter > 0)
+			{
+				++lastUsedIdx;
+				if (i != lastUsedIdx)
+					m_miniDescriptorSets[lastUsedIdx] = m_miniDescriptorSets[i];
+
+				if (m_miniDescriptorSets[lastUsedIdx].descriptorSet == VK_NULL_HANDLE)
+				{
+					if (freeDescriptorSets.size())
+					{
+						m_miniDescriptorSets[lastUsedIdx].descriptorSet = *freeDescriptorSets.rbegin();
+						freeDescriptorSets.resize(freeDescriptorSets.size() - 1);
+					}
+					else { // create new descriptor set
+						m_miniDescriptorSets[lastUsedIdx].descriptorSet = vk->CreateDescriptorSets(m_descriptorSetLayout);
+					}
+					m_miniDescriptorSets[lastUsedIdx].rebuildMe = true;
+				}
+			}
+			else {
+				if (m_miniDescriptorSets[i].descriptorSet) // recycle not used descriptor sets
+					freeDescriptorSets.emplace_back(m_miniDescriptorSets[i].descriptorSet);
+			}
+
+			map[i] = lastUsedIdx;
+		}
+
+		//
+		for (auto &dod : m_drawObjectData)
+		{
+			dod.miniDescriptorSetIndex = map[dod.miniDescriptorSetIndex];
+			dod.descriptorSet = m_miniDescriptorSets[dod.miniDescriptorSetIndex].descriptorSet;
+		}
+
+		uint32_t newSize = used + static_cast<uint32_t>(freeDescriptorSets.size());
+		m_miniDescriptorSets.resize(newSize);
+		for (uint32_t i = 0; i < freeDescriptorSets.size(); ++i)
+		{
+			m_miniDescriptorSets[used + i].descriptorSet = freeDescriptorSets[i];
+		}
+	}
+	else {
+		uint32_t cnt = static_cast<uint32_t>(m_miniDescriptorSets.size());
+		for (uint32_t i = numOfExistingDescriptorSets; i < cnt; ++i)
+		{
+			m_miniDescriptorSets[i].descriptorSet = vk->CreateDescriptorSets(m_descriptorSetLayout);
+			TRACE("[cr:" << m_miniDescriptorSets[i].descriptorSet << ", l=(");
+			for (auto &x : m_descriptorSetLayout)
+				TRACE(", " << x);
+			TRACE(")]\n");
+			m_miniDescriptorSets[i].rebuildMe = true;
+		}
+	}
+
+	// rebuild all marked as "rebuildMe" descriptor sets
+	for (auto &mds : m_miniDescriptorSets)
+	{
+		if (mds.rebuildMe && mds.refCounter)
+		{
+			UpdateDescriptorSet(mds);
+		}
+	}
+}
+
+void CShaderProgram::UpdateDescriptorSet(MiniDescriptorSet &mds)
+{
+	auto &sampledImages = m_reflection.GetSampledImages();
+	TRACE("[up:" << mds.descriptorSet << ": ");
+	std::vector<VkWriteDescriptorSet> descriptorWrites;
+	VkWriteDescriptorSet wds = {};
+	wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	wds.dstSet = mds.descriptorSet;
+	wds.dstBinding = 0;
+	wds.dstArrayElement = 0;
+
+	for (uint32_t i=0; i< sampledImages.size(); ++i)
+	{
+		if (mds.textures[i])
+		{
+			wds.dstBinding = sampledImages[i].binding;
+			wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			wds.descriptorCount = 1;
+			wds.pImageInfo = mds.textures[i];
+			descriptorWrites.push_back(wds);
+			TRACE("(" << i << ":" << sampledImages[i].binding << ":" << mds.textures[i] << ")");
+		}
+	}
+
+	// add UBO's
+	std::vector<VkDescriptorBufferInfo> buffersInfo;
+	buffersInfo.resize(m_uniformBuffers.size());
+	VkDescriptorBufferInfo *pBufferInfo = buffersInfo.data();
+	for (auto &ubo : m_uniformBuffers)
+	{
+		*pBufferInfo = { ubo.buffer, 0, ubo.size };
+
+		wds.dstBinding = ubo.binding;
+		wds.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		wds.descriptorCount = 1;
+		wds.pBufferInfo = pBufferInfo;
+
+		descriptorWrites.push_back(wds);
+	}
+
+	TRACE(" " << descriptorWrites.size() <<"]\n");
+	vkUpdateDescriptorSets(vk->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
+}
+
 void CShaderProgram::CreateDescriptorSets()
 {
 	m_descriptorSet = vk->CreateDescriptorSets(m_descriptorSetLayout);
@@ -863,32 +989,6 @@ void CShaderProgram::CreateDescriptorSets()
 
 void CShaderProgram::UpdateDescriptorSets()
 {
-
-	/*
-	VkDescriptorImageInfo imageInfo = {};
-	imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	imageInfo.imageView = _textureImageView;
-	imageInfo.sampler = _textureSampler;
-	*/
-
-	/*	std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
-
-	descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[0].dstSet = _descriptorSet;
-	descriptorWrites[0].dstBinding = 0;
-	descriptorWrites[0].dstArrayElement = 0;
-	descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	descriptorWrites[0].descriptorCount = 1;
-	descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-	descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	descriptorWrites[1].dstSet = _descriptorSet;
-	descriptorWrites[1].dstBinding = 1;
-	descriptorWrites[1].dstArrayElement = 0;
-	descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-	descriptorWrites[1].descriptorCount = 1;
-	descriptorWrites[1].pImageInfo = &imageInfo;
-	*/
 
 	std::vector<VkWriteDescriptorSet> descriptorWrites;
 	VkWriteDescriptorSet wds = {};
@@ -948,27 +1048,36 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
 	uint32_t lastBufferSetIdx = -1;
-	if (vk->currentDescriptorSet != m_descriptorSet)
-	{
-		vk->currentDescriptorSet = m_descriptorSet;
-		vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &vk->currentDescriptorSet, 0, nullptr);
-	}
+
 
 //	TRACE("[" << m_drawObjectData.size() << "]");
 
 	uint8_t *pcBuffer = nullptr;
 	uint32_t pcStride = 0;
 	uint32_t pcStage = 0;
-	if (m_isPushConstantsUsed)
+	if (m_pushConstantsStage != 0)
 	{
-		uint32_t pcBufferId = m_shaderProgramParamNames[0].dataBufferId;
-		pcBuffer = m_paramsBuffers[pcBufferId].buffer;
-		pcStride = m_paramsBuffers[pcBufferId].size;
-		pcStage = m_shaderProgramParamNames[0].root->stage;
+		pcBuffer = m_paramsBuffers[0].buffer;
+		pcStride = m_paramsBuffers[0].size;
+		pcStage = m_pushConstantsStage;
 	}
+	TRACE("[");
 	for (auto &dod : m_drawObjectData)
 	{
 		auto &m = m_meshes[dod.meshIdx];
+
+		if (!dod.descriptorSet)
+		{
+			dod.descriptorSet = m_miniDescriptorSets[dod.miniDescriptorSetIndex].descriptorSet;
+		}
+
+		if (vk->currentDescriptorSet != dod.descriptorSet)
+		{
+			vk->currentDescriptorSet = dod.descriptorSet;
+			vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &vk->currentDescriptorSet, 0, nullptr);
+			TRACE(":" << vk->currentDescriptorSet);
+		}
+
 		if (m.numVertex > 0 && m.bufferSetIdx != lastBufferSetIdx)
 		{
 			lastBufferSetIdx = m.bufferSetIdx;
@@ -979,7 +1088,7 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 			vkCmdBindIndexBuffer(cb, bs.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 		}
 
-		if (m_isPushConstantsUsed)
+		if (m_pushConstantsStage)
 		{
 			vkCmdPushConstants(cb, m_pipelineLayout, pcStage, 0, pcStride, pcBuffer);
 			pcBuffer += pcStride;
@@ -994,4 +1103,5 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 			vkCmdDrawIndexed(cb, m.numIndex, 1, m.firstIndex, m.firstVertex, 0);
 		}
 	}
+	TRACE("]\n");
 }

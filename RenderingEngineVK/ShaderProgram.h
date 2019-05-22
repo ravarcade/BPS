@@ -1,40 +1,53 @@
 
 class OutputWindow; // parent output window class with working interface to Vulkan
 
-
-/// <summary>
-/// To set any param for shader program (regardless it is in push constants or ubo), you need:
-/// objectId - index of object drawed by this shader. [uint32_t]
-/// paramId - index of param for this shader. [uint32_t]
-/// pVal - pointer to memory with value of param. [void *]
-/// </summary>
-struct ShaderProgramParam {
-	uint32_t objectId;
-	uint32_t paramId;
-	void *pVal;
-};
-
 struct UniformBuffer
 {
 	uint32_t binding;
 	uint32_t stage;
 	uint32_t size;
 	VkBuffer buffer;
-	VkDeviceMemory memory;	
+	VkDeviceMemory memory;
 	void *mappedBuffer;
 	bool isSharedUbo;
 };
 
+// descriptor sets managment
+struct MiniDescriptorSet
+{
+	VkDescriptorSet descriptorSet;
+	VkDescriptorImageInfo *textures[4];
+	uint32_t uniformBufferSet;
+	uint32_t hash;
+	uint32_t nextEmpty;
+	uint32_t refCounter;
+	bool rebuildMe;
+};
+
+template<>
+struct hash<const MiniDescriptorSet *>
+{
+	U32 operator() (const MiniDescriptorSet *key)
+	{
+		auto h = JSHash(reinterpret_cast<const U8*>(key->textures), sizeof(key->textures));
+		return JSHash(reinterpret_cast<const U8*>(&(key->uniformBufferSet)), sizeof(key->uniformBufferSet), h);
+	}
+};
+
+template<>
+struct cmp<const MiniDescriptorSet *> {
+	bool operator()(const MiniDescriptorSet * a, const MiniDescriptorSet * b) 
+	{ 
+		return a->textures[0] == b->textures[0] &&
+			a->textures[1] == b->textures[1] &&
+			a->textures[2] == b->textures[2] &&
+			a->textures[3] == b->textures[3] &&
+			a->uniformBufferSet == b->uniformBufferSet;
+	};
+};
+
 class CShaderProgram
 {
-	struct ShaderProgramParamDesc {
-		const ValDetails *root;
-		const ValMemberDetails *mem;
-		uint32_t parentIdx;
-		uint32_t dataBufferId;
-		uint32_t propertyParentIdx;
-	};
-
 public:
 	CShaderProgram() = default;
 	CShaderProgram(OutputWindow *outputWindow) : vk(outputWindow) {}
@@ -59,26 +72,25 @@ public:
 
 	Properties *GetProperties(uint32_t drawObjectId = -1) 
 	{
+		auto *properties = &m_reflection.GetProperties();
 		if (drawObjectId != -1)
 		{
-			for (auto &p : m_properties)
+			for (auto &p : *properties)
 			{
 				if (p.type != Property::PT_EMPTY)
 				{
-//					auto pb = m_shaderProgramParamNames[p.idx];
-//					auto buf = m_paramsBuffers[pb.dataBufferId].buffer;
-//					p.val = buf + pb.root->entry.size * drawObjectId + pb.mem->offset;
 					auto buf = m_paramsBuffers[p.buffer_idx].buffer;
 					p.val = buf + p.buffer_object_stride * drawObjectId + p.buffer_offset;
 				}
 			}
 		}
-		return &m_properties; 
+		return properties;
 	}
 
 	uint32_t GetObjectCount() { return static_cast<uint32_t>(m_drawObjectData.size()); }
 	void SetDrawOrder(uint32_t order) { m_drawOrder = order; }
 	uint32_t GetDrawOrder() { return m_drawOrder; }
+	void RebuildAllMiniDescriptorSets(bool forceRebuildMe = false);
 
 private:
 	std::vector<VkPipelineShaderStageCreateInfo> _Compile();
@@ -94,12 +106,6 @@ private:
 	VkRenderPass _GetRenderPass();
 	uint32_t _GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSize);
 	void _CreateUniformBuffers();
-
-	void _BuildProperties();
-
-	void _BuindShaderProgramParamsDesc();
-	void _BuindShaderProgramParamsDesc(const std::vector<ValDetails> *vals, uint32_t &dataBufferId);
-	void _BuindShaderProgramParamsDesc(const ValMemberDetails & entry, uint32_t parentIdx, const ValDetails & root, uint32_t dataBufferId);
 	void _BuildShaderDataBuffers();
 
 	void _CreateNewBufferSet(uint32_t numVertices, uint32_t numIndeces);
@@ -109,19 +115,18 @@ private:
 	const VertexAttribs &_GetVertexAttribs() { return m_reflection.GetVertexAttribs(); }
 
 	CShadersReflections          m_reflection;
-	OutputWindow                 *vk                     = nullptr;
+	OutputWindow                 *vk = nullptr;
 	VkSampleCountFlagBits        m_msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 
-	VkRenderPass                 m_renderPass            = nullptr;
+	VkRenderPass                 m_renderPass = nullptr;
 
-	VkPipelineLayout             m_pipelineLayout        = nullptr;
-	VkPipeline                   m_pipeline              = nullptr;
+	VkPipelineLayout             m_pipelineLayout = nullptr;
+	VkPipeline                   m_pipeline = nullptr;
 
 	std::vector<VkDescriptorSetLayout>             m_descriptorSetLayout;
-
 	std::vector<VkVertexInputBindingDescription>   m_bindingDescription;		// <- info about: [1] binding point, [2] data stride (in bytes), [3] input rate: per vertex or per instance
 	std::vector<VkVertexInputAttributeDescription> m_attributeDescriptions;		// <- info about: [1] location (see vert-shader program), [2] binding (bufer from where data are read), [3] format (flota/int/bool // single val/no. of elements in vector), [4] offset in buffer
-//	std::vector<std::vector<uint8_t>>              m_paramsBuffer;
+
 	enum {
 		PUSH_CONSTANTS,
 		HOSTVISIBLE_UBO,
@@ -138,10 +143,13 @@ private:
 
 	std::vector<PropertiesBufferInfo>              m_paramsBuffers;
 	std::vector<uint8_t>                           m_paramsLocalBuffer;
+	uint32_t                                       m_pushConstantsStage;
 
-	MProperties                                    m_properties;
-	std::vector<ShaderProgramParamDesc>            m_shaderProgramParamNames;
-	bool                                           m_isPushConstantsUsed;
+	uint32_t firstEmptyMiniDescriptorSet = -1;
+	std::vector<MiniDescriptorSet> m_miniDescriptorSets;
+	hashtable<const MiniDescriptorSet *, uint32_t> m_uniqMiniDescriptoSets;
+
+	void UpdateDescriptorSet(MiniDescriptorSet & mds);
 
 	VkDescriptorSet            m_descriptorSet = nullptr;
 	std::vector<UniformBuffer> m_uniformBuffers;
@@ -169,6 +177,13 @@ private:
 		uint32_t paramsSetId; // used for push constants
 		VkDescriptorSet descriptorSet;
 		uint32_t meshIdx;
+		uint32_t miniDescriptorSetIndex;
+		DrawObjectData() :
+			paramsSetId(0),
+			descriptorSet(0),
+			meshIdx(0),
+			miniDescriptorSetIndex(-1)
+		{}
 	};
 
 	std::vector<MeshBufferSet> m_meshBufferSets;

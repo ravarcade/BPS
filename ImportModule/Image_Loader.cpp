@@ -26,7 +26,7 @@ void Image_Loader::Load(CResImage & res)
 	rm.LoadSync(res);
 
 	// check extensions:
-	int extIdx = BAMS::Tools::FindMatchingFileExtension(res.GetPath(), L"bmp;tga;png;jpg;jpeg");
+	int extIdx = Tools::FindMatchingFileExtension(res.GetPath(), L"bmp;tga;png;jpg;jpeg");
 	switch (extIdx)
 	{
 	case 0: // bmp

@@ -142,7 +142,7 @@ bool DecodeTGA(Image *dst, U8 *src, SIZE_T size, TempMemory &tmp)
 	int dLineStep = pitch;
 	int dPixelStep = pixelSize;
 
-	if (!(hdr->ImageDescriptor & 0x20)) { // vertical flip
+	if ((hdr->ImageDescriptor & 0x20)) { // vertical flip
 		dstLine += pitch * (height - 1); // 4*tex.textureWidth*(tex.height-1); // go to last line;
 		dLineStep = -dLineStep;
 	}

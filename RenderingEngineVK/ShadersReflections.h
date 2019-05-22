@@ -90,9 +90,8 @@ public:
 	const std::vector<ValDetails> &GetParamsInUBO() { return m_params_in_ubos; }
 	const std::vector<ValDetails> &GetParamsInPushConstants() { return m_params_in_push_constants; }
 	const std::vector<SampledImageDesc> &GetSampledImages() { return m_sampled_images; }
-
-	MProperties BuildProperties();
-
+	MProperties &GetProperties() { return m_properties; }
+	
 private:
 	VertexDescription m_vertexDescription;
 
@@ -109,7 +108,9 @@ private:
 	ResourceLayout m_layout;
 	std::vector<std::string> m_outputNames;
 	BAMS::CResShader m_shaderResource;
+	MProperties m_properties;
 
 	bool m_enableAlpha;
 	void _ParsePrograms();
+	MProperties _BuildProperties();
 };

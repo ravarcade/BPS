@@ -172,10 +172,10 @@ Properties *GetShaderParams(BAMS::CEngine &en, uint32_t wnd, const char *shaderN
 	return prop;
 }
 
-Properties * GetObjectParams(BAMS::CEngine &en, uint32_t wnd, const char *objectName)
+Properties * GetObjectParams(BAMS::CEngine &en, uint32_t wnd, const char *objectName, uint32_t objectIdx = 0)
 {
 	Properties *prop;
-	PGET_OBJECT_PARAMS p = { wnd, objectName, &prop };
+	PGET_OBJECT_PARAMS p = { wnd, objectName, objectIdx, &prop };
 	en.SendMsg(GET_OBJECT_PARAMS, RENDERING_ENGINE, 0, &p);
 
 	return prop;
@@ -188,6 +188,16 @@ Property *FindProp(MProperties &prop, const char *name)
 	{
 		if (strcmp(prop[i].name, name) == 0)
 			return &prop[i];
+	}
+	return nullptr;
+}
+
+Property *FindProp(Properties &prop, const char *name)
+{
+	for (uint32_t i = 0; i < prop.count; ++i)
+	{
+		if (strcmp(prop.properties[i].name, name) == 0)
+			return &prop.properties[i];
 	}
 	return nullptr;
 }
@@ -223,9 +233,9 @@ void SetModel(Property &p, uint32_t num)
 void SetBaseColor(Property &p, uint32_t num)
 {
 	static float colors[][4] = {
-		{ 0.5f, 1, 1, 1 },
-		{ 1, 0.5f, 1, 1 },
-		{ 1, 1, 0.5f, 1 }
+		{ 0.8f, 1, 1, 1 },
+		{ 1, 0.8f, 1, 1 },
+		{ 1, 1, 0.8f, 1 }
 	};
 
 	memcpy_s(p.val, 4 * sizeof(float), colors[num % 3], 4 * sizeof(float));
@@ -343,6 +353,14 @@ void Spin(BAMS::CEngine &en)
 		if (onWnd[i].size())
 		{
 			auto p = FindProp(onWnd[i][0], "model");
+			if (!p) {
+				auto newProp = GetObjectParams(en, i, nullptr, 1);
+				if (newProp)
+				{
+					onWnd[i][0] = *newProp;
+					p = FindProp(onWnd[i][0], "model");
+				}
+			}
 			if (p)
 			{
 				SetModel(*p, 0);
@@ -356,6 +374,7 @@ void Spin(BAMS::CEngine &en)
 void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
 {
 	static const char *meshes[] = { "Mesh_1", "Mesh_2", "Mesh_4", "Mesh_5", "Mesh_6", "Mesh_7" };
+	static const char *colorTextures[] = {"flipper-t1-white-red",  "test", "guard1_body", "test", "test", "test" };
 	uint32_t oid = -1;
 	Properties *pprop = nullptr;
 	PADD_MESH addMeshParams = { wnd, "name is irrelevant", meshes[i], "basic", &pprop, &oid };
@@ -367,9 +386,12 @@ void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
 		int num = static_cast<int>(onWnd[wnd].size());
 		SetParams(pprop, num);
 		onWnd[wnd].push_back(*pprop);
-
-		PADD_TEXTURE addTexParams = { wnd, oid, 0, "test" };
-		en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);	
+		auto pTex = FindProp(*pprop, "samplerColor");
+		if (pTex)
+		{
+			PADD_TEXTURE addTexParams = { wnd, pTex->val, colorTextures[i] };
+			en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
+		}
 	}
 }
 
@@ -596,10 +618,10 @@ void testloop(BAMS::CEngine &en)
 
 				case VK_NUMPAD4: AddToWnd(en, 0, 0);	break;
 				case VK_NUMPAD1: AddToWnd(en, 0, 1);	break;
-				case VK_NUMPAD5: AddToWnd(en, 1, 2);	break;
-				case VK_NUMPAD2: AddToWnd(en, 1, 3);	break;
-				case VK_NUMPAD6: AddToWnd(en, 2, 4);	break;
-				case VK_NUMPAD3: AddToWnd(en, 2, 5);	break;
+				case VK_NUMPAD5: AddToWnd(en, 0, 2);	break;
+				case VK_NUMPAD2: AddToWnd(en, 0, 3);	break;
+				case VK_NUMPAD6: AddToWnd(en, 0, 4);	break;
+				case VK_NUMPAD3: AddToWnd(en, 0, 5);	break;
 				case VK_NUMPAD0: ChangeDebugView(en);	break;
 
 //				default:					TRACE("KEY: " << i << "\n");

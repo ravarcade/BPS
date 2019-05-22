@@ -473,6 +473,7 @@ typedef struct PADD_SHADER PRELOAD_SHADER;
 struct PGET_OBJECT_PARAMS {
 	uint32_t wnd;
 	const char *name;
+	uint32_t objectIdx;
 	Properties **pProperties;
 };
 
@@ -498,7 +499,6 @@ struct PSET_CAMERA {
 
 struct PADD_TEXTURE {
 	uint32_t wnd;
-	uint32_t objectId;
-	uint32_t slot;
+	void *propVal;
 	const char *textureResourceName;
 };
