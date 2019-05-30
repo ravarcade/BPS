@@ -34,7 +34,7 @@ public:
 	Property()                                 : type(PT_EMPTY), parent(-1), count(0),   name(nullptr), val(nullptr), array_stride(0) {}
 	Property(CSTR n, I32 *v, U32 cnt = 1)      : type(PT_I32),   parent(-1), count(cnt), name(n), val(v), array_stride(0) {}
 	Property(CSTR n, F32 *v, U32 cnt = 1)      : type(PT_F32),   parent(-1), count(cnt), name(n), val(v), array_stride(0) {}
-	Property(CSTR n, CSTR *v)                  : type(PT_CSTR),  parent(-1), count(1),   name(n), val(v), array_stride(0) {}
+	Property(CSTR n, CSTR v)                   : type(PT_CSTR),  parent(-1), count(1),   name(n), val(const_cast<char *>(v)), array_stride(0) {}
 	Property(CSTR n)                           : type(PT_EMPTY), parent(-1), count(0),   name(n), val(nullptr), array_stride(0) {}
 
 	bool IsEmpty() const { return count == 0 || type == PT_EMPTY; };
@@ -51,7 +51,7 @@ public:
 	void Set(I32 v) { Set(PT_I32, &v, sizeof(v)); }
 	void Set(F32 v) { Set(PT_F32, &v, sizeof(v)); }
 	void Set(F32 *v, U32 cnt = 1) { Set(PT_F32, v, sizeof(F32)*cnt); }
-	void Set(CSTR *v) { Set(PT_CSTR, &v, sizeof(v)); }
+	void Set(CSTR v) { val = const_cast<char *>(v); }
 };
 
 struct Properties

@@ -1,7 +1,6 @@
 #include "stdafx.h"
 
 namespace BAMS {
-//namespace CORE {
 
 #define TICKS_PER_SECOND 10000000
 #define EPOCH_DIFFERENCE 11644473600LL
@@ -482,7 +481,84 @@ int Tools::FindMatchingFileExtension(const char * const fn, const char * const e
 	return -1;
 }
 
+template<typename T> void _dumpArray(const char *txt, T *val, U32 cnt)
+{
+	TRACE("[" << txt );
+	if (cnt > 1)
+		TRACE("[" << cnt << "]");
+	TRACE("] ");
+
+	for (U32 i = 0; i < cnt; ++i)
+	{
+		if (i > 0)
+			TRACE(", ");
+		TRACE(val[i]);
+	}
+}
+
+void Tools::Dump(BAMS::Properties * prop)
+{
+	for (uint32_t i = 0; i < prop->count; ++i)
+	{
+		auto p = prop->properties[i];
+		TRACE("" << i << ": " << p.name << ": ");
+		switch (p.type)
+		{
+		case Property::PT_EMPTY:
+			TRACE("[EMPTY]");
+			break;
+
+		case Property::PT_I32:
+			_dumpArray("I32", reinterpret_cast<I32*>(p.val), p.count);
+			break;
+
+		case Property::PT_U32:
+			_dumpArray("U32", reinterpret_cast<U32*>(p.val), p.count);
+			break;
+
+		case Property::PT_I16:
+			_dumpArray("I16", reinterpret_cast<I16*>(p.val), p.count);
+			break;
+
+		case Property::PT_U16:
+			_dumpArray("U16", reinterpret_cast<U16*>(p.val), p.count);
+			break;
+
+		case Property::PT_I8:
+			_dumpArray("I8", reinterpret_cast<I8*>(p.val), p.count);
+			break;
+
+		case Property::PT_U8:
+			_dumpArray("U8", reinterpret_cast<U8*>(p.val), p.count);
+			break;
+
+		case Property::PT_F32:
+			_dumpArray("F32", reinterpret_cast<F32*>(p.val), p.count);
+			break;
+
+		case Property::PT_CSTR:
+			TRACE("[CSTR] \"" << reinterpret_cast<const char *>(p.val) << "\"");
+			break;
+
+		case Property::PT_ARRAY:
+			TRACE("[ARRAY]");
+			break;
+
+		case Property::PT_TEXTURE:
+			TRACE("[TEXTURE]");
+			break;
+
+		case Property::PT_UNKNOWN:
+			TRACE("[UNKNOWN]");
+			break;
+
+
+
+		}
+		TRACE("\n");
+	}
+}
+
 UUID Tools::NOUID = { 0 };
 
-//}; // CORE namespace
 }; // BAMS namespace

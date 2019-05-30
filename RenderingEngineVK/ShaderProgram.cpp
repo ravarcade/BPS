@@ -16,6 +16,9 @@ void CShaderProgram::LoadProgram(const char *program)
 	m_reflection.LoadProgram(program);
 }
 
+/// <summary>
+/// Releases all resources allocated before program is destroyed.
+/// </summary>
 void CShaderProgram::Release()
 {
 	for (auto &ubo : m_uniformBuffers)
@@ -42,6 +45,45 @@ void CShaderProgram::Release()
 	vk->vkDestroy(m_pipelineLayout);
 	vk->vkDestroy(m_pipeline);
 }
+
+
+/// <summary>
+/// Adds the object.
+/// </summary>
+/// <param name="meshIdx">Index of the mesh.</param>
+/// <returns></returns>
+uint32_t CShaderProgram::AddObject(const char *meshName)
+{
+	uint32_t meshIdx = _AddMesh(meshName);
+	if (meshIdx == -1)
+		return -1;
+
+	DrawObjectData dod;
+	dod.meshIdx = meshIdx;
+	dod.paramsSetId = static_cast<uint32_t>(m_drawObjectData.size());
+	m_drawObjectData.push_back(dod);
+
+	return dod.paramsSetId;
+}
+
+Properties * CShaderProgram::GetProperties(uint32_t drawObjectId)
+{
+	auto *properties = &m_reflection.GetProperties();
+	if (drawObjectId != -1)
+	{
+		for (auto &p : *properties)
+		{
+			if (p.type != Property::PT_EMPTY)
+			{
+				auto buf = m_paramsBuffers[p.buffer_idx].buffer;
+				p.val = buf + p.buffer_object_stride * drawObjectId + p.buffer_offset;
+			}
+		}
+	}
+	return properties;
+}
+
+// ============================================================================ CShaderProgram protected methods ===
 
 void CShaderProgram::CreateGraphicsPipeline()
 {
@@ -99,6 +141,100 @@ void CShaderProgram::CreateGraphicsPipeline()
 }
 
 // ============================================================================ CShaderProgram private methods ===
+
+uint32_t CShaderProgram::_AddMesh(const char *name)
+{
+	if (auto pMeshId = m_meshNames.find(name))
+		return *pMeshId;
+
+	auto &va = _GetVertexAttribs();
+
+	// if this shader don't use any geometry (like deferred resolve shader) we don'y need to load any mesh
+	if (!va.size)
+	{
+		Mesh m = { 0, 0, 0, 0, 3 }; // empty mesh with 3 indices (they are not readed from mem, they are computed in shader)
+
+		uint32_t meshId = static_cast<uint32_t>(m_meshes.size());
+		m_meshes.push_back(m);
+		*m_meshNames.add(name) = meshId;
+
+		// set textures for postprocessing
+		auto &sampledImages = m_reflection.GetSampledImages();
+		auto cnt = static_cast<uint32_t>(sampledImages.size());
+		if (cnt)
+		{
+			auto pb = m_paramsBuffers.rbegin();
+			auto texDescBuf = reinterpret_cast<VkDescriptorImageInfo **>(pb->buffer + pb->size*meshId);
+			for (uint32_t i = 0; i < cnt; ++i)
+			{
+				auto imageInfo = vk->GetDescriptionImageInfo(sampledImages[i].name.c_str());
+				if (imageInfo)
+				{
+					texDescBuf[i] = imageInfo;
+				}
+			}
+		}
+		return meshId;
+	}
+
+	const VertexDescription *vd = _GetMeshVertexDescription(name);
+	if (!vd)
+		return -1;
+
+	// we check only last MeshBufferSet
+	MeshBufferSet *set = m_meshBufferSets.size() ? &*m_meshBufferSets.rbegin() : nullptr;
+	if (set == nullptr || set->freeVertices < vd->m_numVertices || set->freeIndices < vd->m_numIndices)
+	{
+		_CreateNewBufferSet(
+			vd->m_numVertices < ALWAYS_RESERVE_VERTICES ? vd->m_numVertices + ALWAYS_RESERVE_VERTICES : vd->m_numVertices,
+			vd->m_numIndices < ALWAYS_RESERVE_INDICES ? vd->m_numIndices + ALWAYS_RESERVE_INDICES : vd->m_numIndices);
+		set = &*m_meshBufferSets.rbegin();
+	}
+	uint32_t bufferSetIdx = static_cast<uint32_t>(m_meshBufferSets.size()) - 1;
+
+	uint32_t indeceSize = sizeof(uint32_t);
+	uint32_t firstIndex = set->usedIndices;
+	uint32_t vboSize = vd->m_numVertices * va.size;
+	uint32_t iboSize = vd->m_numIndices * indeceSize;
+
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	vk->_CreateBuffer(
+		vboSize + iboSize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer, stagingBufferMemory);
+
+	void* data;
+	vkMapMemory(vk->device, stagingBufferMemory, 0, vboSize + iboSize, 0, &data);
+	_ImportMeshData(vd, data);
+	vkUnmapMemory(vk->device, stagingBufferMemory);
+
+	vk->_CopyBuffer(stagingBuffer, set->vertexBuffer, vboSize, 0, set->usedVertices * va.size);
+	vk->_CopyBuffer(stagingBuffer, set->indexBuffer, iboSize, vboSize, set->usedIndices * indeceSize);
+
+	vk->vkDestroy(stagingBuffer);
+	vk->vkFree(stagingBufferMemory);
+
+	// add "mesh"
+	Mesh m = {
+		bufferSetIdx,
+		set->usedVertices,
+		set->usedIndices,
+		vd->m_numVertices,
+		vd->m_numIndices
+	};
+
+	set->usedVertices += vd->m_numVertices;
+	set->usedIndices += vd->m_numIndices;
+
+	uint32_t meshId = static_cast<uint32_t>(m_meshes.size());
+	m_meshes.push_back(m);
+
+	*m_meshNames.add(name) = meshId;
+
+	return meshId;
+}
 
 std::vector<VkPipelineShaderStageCreateInfo> CShaderProgram::_Compile()
 {
@@ -486,110 +622,6 @@ VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
 	return nullptr;
 }
 
-uint32_t CShaderProgram::AddMesh(const char *name)
-{
-	if (auto pMeshId = m_meshNames.find(name))
-		return *pMeshId;
-
-	auto &va = _GetVertexAttribs();
-
-	// if this shader don't use any geometry (like deferred resolve shader) we don'y need to load any mesh
-	if (!va.size)
-	{
-		Mesh m = { 0, 0, 0, 0, 3 }; // empty mesh with 3 indices (they are not readed from mem, they are computed in shader)
-
-		uint32_t meshId = static_cast<uint32_t>(m_meshes.size());
-		m_meshes.push_back(m);
-		*m_meshNames.add(name) = meshId;
-
-		// set textures for postprocessing
-		auto &sampledImages = m_reflection.GetSampledImages();
-		auto cnt = static_cast<uint32_t>(sampledImages.size());
-		if (cnt)
-		{
-			auto pb = m_paramsBuffers.rbegin();
-			auto texDescBuf = reinterpret_cast<VkDescriptorImageInfo **>(pb->buffer + pb->size*meshId);
-			for (uint32_t i=0; i<cnt; ++i)
-			{
-				auto imageInfo = vk->GetDescriptionImageInfo(sampledImages[i].name.c_str());
-				if (imageInfo)
-				{
-					texDescBuf[i] = imageInfo;
-				}
-			}
-		}
-		return meshId;
-	}
-
-	const VertexDescription *vd = _GetMeshVertexDescription(name);
-	if (!vd)
-		return -1;
-
-	// we check only last MeshBufferSet
-	MeshBufferSet *set = m_meshBufferSets.size() ? &*m_meshBufferSets.rbegin() : nullptr;
-	if (set == nullptr || set->freeVertices < vd->m_numVertices || set->freeIndices < vd->m_numIndices)
-	{
-		_CreateNewBufferSet(
-			vd->m_numVertices < ALWAYS_RESERVE_VERTICES ? vd->m_numVertices + ALWAYS_RESERVE_VERTICES : vd->m_numVertices,
-			vd->m_numIndices < ALWAYS_RESERVE_INDICES ? vd->m_numIndices + ALWAYS_RESERVE_INDICES : vd->m_numIndices);
-		set = &*m_meshBufferSets.rbegin();
-	}
-	uint32_t bufferSetIdx = static_cast<uint32_t>(m_meshBufferSets.size()) - 1;
-
-	uint32_t indeceSize = sizeof(uint32_t);
-	uint32_t firstIndex = set->usedIndices;
-	uint32_t vboSize = vd->m_numVertices * va.size;
-	uint32_t iboSize = vd->m_numIndices * indeceSize;
-
-	VkBuffer stagingBuffer;
-	VkDeviceMemory stagingBufferMemory;
-	vk->_CreateBuffer(
-		vboSize + iboSize,
-		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-		stagingBuffer, stagingBufferMemory);
-
-	void* data;
-	vkMapMemory(vk->device, stagingBufferMemory, 0, vboSize + iboSize, 0, &data);
-	_ImportMeshData(vd, data);
-	vkUnmapMemory(vk->device, stagingBufferMemory);
-
-	vk->_CopyBuffer(stagingBuffer, set->vertexBuffer, vboSize, 0, set->usedVertices * va.size);
-	vk->_CopyBuffer(stagingBuffer, set->indexBuffer, iboSize, vboSize, set->usedIndices * indeceSize);
-
-	vk->vkDestroy(stagingBuffer);
-	vk->vkFree(stagingBufferMemory);
-
-	// add "mesh"
-	Mesh m = {
-		bufferSetIdx,
-		set->usedVertices,
-		set->usedIndices,
-		vd->m_numVertices,
-		vd->m_numIndices
-	};
-
-	set->usedVertices += vd->m_numVertices;
-	set->usedIndices += vd->m_numIndices;
-
-	uint32_t meshId = static_cast<uint32_t>(m_meshes.size());
-	m_meshes.push_back(m);
-
-	*m_meshNames.add(name) = meshId;
-
-	return meshId;
-}
-
-uint32_t CShaderProgram::AddObject(uint32_t meshIdx)
-{
-	DrawObjectData dod;
-	dod.meshIdx = meshIdx;
-	dod.paramsSetId = static_cast<uint32_t>(m_drawObjectData.size());
-	m_drawObjectData.push_back(dod);
-
-	return dod.paramsSetId;
-}
-
 void CShaderProgram::_CreateUniformBuffers()
 {
 	auto &uboParams = m_reflection.GetParamsInUBO();
@@ -920,10 +952,10 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool forceRebuildMe)
 		for (uint32_t i = numOfExistingDescriptorSets; i < cnt; ++i)
 		{
 			m_miniDescriptorSets[i].descriptorSet = vk->CreateDescriptorSets(m_descriptorSetLayout);
-			TRACE("[cr:" << m_miniDescriptorSets[i].descriptorSet << ", l=(");
-			for (auto &x : m_descriptorSetLayout)
-				TRACE(", " << x);
-			TRACE(")]\n");
+//			TRACE("[cr:" << m_miniDescriptorSets[i].descriptorSet << ", l=(");
+//			for (auto &x : m_descriptorSetLayout)
+//				TRACE(", " << x);
+//			TRACE(")]\n");
 			m_miniDescriptorSets[i].rebuildMe = true;
 		}
 	}
@@ -941,7 +973,7 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool forceRebuildMe)
 void CShaderProgram::UpdateDescriptorSet(MiniDescriptorSet &mds)
 {
 	auto &sampledImages = m_reflection.GetSampledImages();
-	TRACE("[up:" << mds.descriptorSet << ": ");
+//	TRACE("[up:" << mds.descriptorSet << ": ");
 	std::vector<VkWriteDescriptorSet> descriptorWrites;
 	VkWriteDescriptorSet wds = {};
 	wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -958,7 +990,7 @@ void CShaderProgram::UpdateDescriptorSet(MiniDescriptorSet &mds)
 			wds.descriptorCount = 1;
 			wds.pImageInfo = mds.textures[i];
 			descriptorWrites.push_back(wds);
-			TRACE("(" << i << ":" << sampledImages[i].binding << ":" << mds.textures[i] << ")");
+//			TRACE("(" << i << ":" << sampledImages[i].binding << ":" << mds.textures[i] << ")");
 		}
 	}
 
@@ -978,70 +1010,10 @@ void CShaderProgram::UpdateDescriptorSet(MiniDescriptorSet &mds)
 		descriptorWrites.push_back(wds);
 	}
 
-	TRACE(" " << descriptorWrites.size() <<"]\n");
+//	TRACE(" " << descriptorWrites.size() <<"]\n");
 	vkUpdateDescriptorSets(vk->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
-void CShaderProgram::CreateDescriptorSets()
-{
-	m_descriptorSet = vk->CreateDescriptorSets(m_descriptorSetLayout);
-}
-
-void CShaderProgram::UpdateDescriptorSets()
-{
-
-	std::vector<VkWriteDescriptorSet> descriptorWrites;
-	VkWriteDescriptorSet wds = {};
-	wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	wds.dstSet = m_descriptorSet;
-	wds.dstBinding = 0;
-	wds.dstArrayElement = 0;
-
-	// add sampled_images
-	auto &sampledImages = m_reflection.GetSampledImages();
-	for (auto &si : sampledImages)
-	{
-		wds.dstBinding = si.binding;
-		wds.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		wds.descriptorCount = 1;
-		auto imageInfo = vk->GetDescriptionImageInfo(si.name.c_str());
-		if (!imageInfo)
-		{
-			const char *textureName = "test";
-			auto pt = vk->textures.find(textureName);
-			if (!pt)
-			{
-				pt = vk->textures.add(textureName, vk);
-				pt->LoadTexture(textureName);
-			}
-			imageInfo = &pt->descriptor;
-		}
-		assert(imageInfo);
-		wds.pImageInfo = imageInfo;
-		descriptorWrites.push_back(wds);
-	}
-
-	// add UBO's
-	std::vector<VkDescriptorBufferInfo> buffersInfo;
-	buffersInfo.resize(m_uniformBuffers.size());
-	VkDescriptorBufferInfo *pBufferInfo = buffersInfo.data();
-	for (auto &ubo : m_uniformBuffers)
-	{
-		*pBufferInfo = {ubo.buffer, 0, ubo.size};
-
-		wds.dstBinding = ubo.binding;
-		wds.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		wds.descriptorCount = 1;
-		wds.pBufferInfo = pBufferInfo;
-
-		descriptorWrites.push_back(wds);
-	}
-
-	vkUpdateDescriptorSets(vk->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
-}
-
-#include <chrono>
-#include <glm/gtc/matrix_transform.hpp>
 
 void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 {
@@ -1061,7 +1033,7 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 		pcStride = m_paramsBuffers[0].size;
 		pcStage = m_pushConstantsStage;
 	}
-	TRACE("[");
+//	TRACE("[");
 	for (auto &dod : m_drawObjectData)
 	{
 		auto &m = m_meshes[dod.meshIdx];
@@ -1075,7 +1047,7 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 		{
 			vk->currentDescriptorSet = dod.descriptorSet;
 			vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &vk->currentDescriptorSet, 0, nullptr);
-			TRACE(":" << vk->currentDescriptorSet);
+//			TRACE(":" << vk->currentDescriptorSet);
 		}
 
 		if (m.numVertex > 0 && m.bufferSetIdx != lastBufferSetIdx)
@@ -1103,5 +1075,5 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 			vkCmdDrawIndexed(cb, m.numIndex, 1, m.firstIndex, m.firstVertex, 0);
 		}
 	}
-	TRACE("]\n");
+//	TRACE("]\n");
 }

@@ -7,9 +7,8 @@ enum EDrawOrder {
 
 struct ObjectInfo {
 	CShaderProgram *shader;
-	uint32_t mid;
 	uint32_t oid;
-	ObjectInfo(CShaderProgram *_shader, uint32_t _mid, uint32_t _oid) : shader(_shader), mid(_mid), oid(_oid) {}
+	ObjectInfo(CShaderProgram *_shader, uint32_t _oid) : shader(_shader), oid(_oid) {}
 	Properties *GetProperties() { return shader->GetProperties(oid); }
 };
 
@@ -45,16 +44,19 @@ private:
 
 	struct DeferredFrameBuffers
 	{
+		DeferredFrameBuffers() {
+			memset(this, 0, sizeof(DeferredFrameBuffers));
+		}
+
 		uint32_t width, height;
-		FrameBufferAttachment normals;
-		FrameBufferAttachment albedo;
-		FrameBufferAttachment pbr;
+		FrameBufferAttachment frameBufferAttachments[3];
 		FrameBufferAttachment depth;
 		VkFramebuffer frameBuffer;
 
-		VkImageView depthView;
+		VkImageView depthView; // // we have 2 views of depth attachment, one is created to use in in depth reconstruction (read only) and one if for normal Z-Buffer write/tests
 
 		VkRenderPass renderPass;
+
 		VkSampler colorSampler;
 		VkSemaphore deferredSemaphore;
 		VkSemaphore resolvingSemaphore;
@@ -64,9 +66,10 @@ private:
 		template<typename T>
 		void ForEachFrameBuffer(T f) 
 		{
-			f(normals);
-			f(albedo);
-			f(pbr);
+			for (auto &fba : frameBufferAttachments)
+			{
+				f(fba);
+			}
 			f(depth);
 		};
 		std::vector<VkDescriptorImageInfo>descriptionImageInfo;
@@ -89,12 +92,9 @@ private:
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
-	VkRenderPass renderPass = nullptr;
-
-	FrameBufferAttachment depth;
-	FrameBufferAttachment color;
 
 	DeferredFrameBuffers deferredFrameBuf;
+	DeferredFrameBuffers forwardFrameBuf;
 
 	VkCommandPool commandPool;
 	VkCommandPool transferPool;
@@ -146,11 +146,14 @@ private:
 	void _CleanupRenderPass();
 
 	void _CreateDescriptorPool();
+
 	void _CreateDeferredCommandBuffer(VkCommandBuffer & cb);
 	void _CreateForwardCommandBuffer(VkCommandBuffer & cb, VkFramebuffer & frameBuffer);
+	
 	void _CreateCommandBuffers();
 	void _RecreateCommandBuffers();
 	void _CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBits samples);
+	
 	void _CleanupDeferredFramebuffer();
 	void _CreateDeferredFramebuffer();
 	void _CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagBits samples);
@@ -250,9 +253,8 @@ public:
 		vkDestroy(fb.colorSampler);
 		vkDestroy(fb.frameBuffer);
 		vkDestroy(fb.renderPass);
-		vkDestroy(fb.albedo);
-		vkDestroy(fb.normals);
-		vkDestroy(fb.pbr);
+		for (auto &fba : fb.frameBufferAttachments)
+			vkDestroy(fba);
 		vkDestroy(fb.depthView);
 		vkDestroy(fb.depth);
 		fb.shaders.clear();

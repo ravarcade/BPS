@@ -6,7 +6,7 @@ namespace CORE {
 ResImage::ResImage(ResourceBase *res)
 	: rb(res)
 {
-	if (res->XML.size())
+	if (res->XML->FirstChild())
 		_LoadXML(); // XML is readed from manifest, so no need to load any file from disk
 }
 

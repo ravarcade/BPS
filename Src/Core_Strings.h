@@ -495,7 +495,7 @@ public:
 					return true; // last char in pattern is '*'
 
 				for (U j = pos + 1; j < _used; ++j)
-					if (wildcard(pat, j, i))
+					if (iwildcard(pat, j, i))
 						return true;
 				return false;
 			}
@@ -615,6 +615,7 @@ public:
 	basic_string_base<T, U> substr(I32 start, I32 len = 0x7fffffff) const { return GetValue().substr(start, len); }
 
 	bool wildcard(const shared_string& pat, U pos = 0, U patPos = 0) const { return GetValue().wildcard(pat.ToBasicString(), pos, patPos); }
+	bool iwildcard(const shared_string& pat, U pos = 0, U patPos = 0) const { return GetValue().iwildcard(pat.ToBasicString(), pos, patPos); }
 
 	template <typename V>
 	bool wildcard(const basic_string_base<T, V>& pat, U pos = 0, V patPos = 0) const { return GetValue().wildcard(pat, pos, patPos); }

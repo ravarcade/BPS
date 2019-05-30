@@ -170,21 +170,21 @@ void AssImp_Loader::AddMesh_broken(aiMesh *mesh)
 				}
 			}
 		} // if (faces) 
-	} // if (mesh->HasFaces()) 
+	} // if (aiMesh->HasFaces()) 
 
 	/*
-	if (mesh->HasBones())
+	if (aiMesh->HasBones())
 	{
 		boneMap->ResetMinMax();
 
 		// find max number of bones for vertex
 		static std::vector<UINT16> bonesCounter;
 
-		bonesCounter.resize(mesh->mNumVertices);
+		bonesCounter.resize(aiMesh->mNumVertices);
 		memset(&bonesCounter[0], 0, bonesCounter.size() * sizeof(bonesCounter[0]));
-		for (unsigned int i = 0; i < mesh->mNumBones; ++i)
+		for (unsigned int i = 0; i < aiMesh->mNumBones; ++i)
 		{
-			aiBone * bone = mesh->mBones[i];
+			aiBone * bone = aiMesh->mBones[i];
 
 			UINT16 bid = boneMap->GetBoneID(bone->mName.C_Str());
 			for (unsigned int j = 0; j < bone->mNumWeights; ++j)
@@ -204,15 +204,15 @@ void AssImp_Loader::AddMesh_broken(aiMesh *mesh)
 		max_bones_in_vert = ((max_bones_in_vert + 3) / 4) * 4;
 
 		// reserver memory for bones info
-		u16_boneIDs.resize(max_bones_in_vert*mesh->mNumVertices);
-		f32_weights.resize(max_bones_in_vert*mesh->mNumVertices);
+		u16_boneIDs.resize(max_bones_in_vert*aiMesh->mNumVertices);
+		f32_weights.resize(max_bones_in_vert*aiMesh->mNumVertices);
 		memset(&u16_boneIDs[0], 0, u16_boneIDs.size() * sizeof(u16_boneIDs[0]));
 		memset(&f32_weights[0], 0, f32_weights.size() * sizeof(f32_weights[0]));
 
 		// copy data
-		for (unsigned int i = 0; i < mesh->mNumBones; ++i)
+		for (unsigned int i = 0; i < aiMesh->mNumBones; ++i)
 		{
-			aiBone * bone = mesh->mBones[i];
+			aiBone * bone = aiMesh->mBones[i];
 			UINT16 bid = boneMap->GetBoneID(bone->mName.C_Str()) - boneMap->GetBaseID();
 			for (unsigned int j = 0; j < bone->mNumWeights; ++j)
 			{
@@ -283,7 +283,7 @@ void AssImp_Loader::AddMesh_broken(aiMesh *mesh)
 				break;
 		}
 		bonesCounter.clear();
-	} // if (mesh->HasBones()) 
+	} // if (aiMesh->HasBones()) 
 	*/
 } // VertexDescription
 
@@ -338,79 +338,79 @@ U32 AssImp_Loader::_JSHash(VertexDescription &vd, U32 hash)
 	return hash;
 }
 
-void AssImp_Loader::AddMesh(aiMesh *mesh)
+void AssImp_Loader::AddMesh(aiMesh *aiMesh)
 {
 	_meshes.push_back(ImportedMesh());
-	auto &m = *_meshes.rbegin();
-	VertexDescription &vd = m.vd;
-	m.match = false;
+	ImportedMesh *mesh = &(*_meshes.rbegin());
+	VertexDescription &vd = mesh->vd;
+	mesh->match = false;
 
-	vd.m_numVertices = mesh->mNumVertices;
-	vd.m_vertices = Stream(&mesh->mVertices[0][0]);
+	vd.m_numVertices = aiMesh->mNumVertices;
+	vd.m_vertices = Stream(&aiMesh->mVertices[0][0]);
 
-	if (mesh->HasNormals())
-		vd.m_normals = Stream(&mesh->mNormals[0][0]);
+	if (aiMesh->HasNormals())
+		vd.m_normals = Stream(&aiMesh->mNormals[0][0]);
 
-	if (mesh->HasTangentsAndBitangents()) 
+	if (aiMesh->HasTangentsAndBitangents()) 
 	{
-		vd.m_tangents = Stream(&mesh->mTangents[0][0]);
-		vd.m_bitangents = Stream(&mesh->mBitangents[0][0]);
+		vd.m_tangents = Stream(&aiMesh->mTangents[0][0]);
+		vd.m_bitangents = Stream(&aiMesh->mBitangents[0][0]);
 	}
 
 	for (int i = 0; i < COUNT_OF(vd.m_colors); ++i)
 	{
-		if (mesh->HasVertexColors(i))
+		if (aiMesh->HasVertexColors(i))
 		{
 			bool normalized = true;
-			for (unsigned int j = 0; j < mesh->mNumVertices && normalized; ++j)
+			for (unsigned int j = 0; j < aiMesh->mNumVertices && normalized; ++j)
 			{
 				for (unsigned int k = 0; k < 4; ++k)
 				{
-					if (mesh->mColors[i][j][k] < 0.0 || mesh->mColors[i][j][k] > 1.0)
+					if (aiMesh->mColors[i][j][k] < 0.0 || aiMesh->mColors[i][j][k] > 1.0)
 					{
 						normalized = false;
 						break;
 					}
 				}
 			}
-			vd.m_colors[i] = Stream(&mesh->mColors[i][0][0], 4);
+			vd.m_colors[i] = Stream(&aiMesh->mColors[i][0][0], 4);
 			vd.m_colors[i].m_normalized = normalized;
 		}
 	}
 
 	for (int i = 0; i < COUNT_OF(vd.m_textureCoords); ++i)
 	{
-		if (mesh->HasTextureCoords(i))
+		if (aiMesh->HasTextureCoords(i))
 		{
 			bool normalized = true;
-			for (unsigned int j = 0; j < mesh->mNumVertices && normalized; ++j)
+			for (unsigned int j = 0; j < aiMesh->mNumVertices && normalized; ++j)
 			{
-				for (unsigned int k = 0; k < mesh->mNumUVComponents[i]; ++k)
+				for (unsigned int k = 0; k < aiMesh->mNumUVComponents[i]; ++k)
 				{
-					if (mesh->mTextureCoords[i][j][k] < 0.0 || mesh->mTextureCoords[i][j][k] > 1.0)
+					if (aiMesh->mTextureCoords[i][j][k] < 0.0 || aiMesh->mTextureCoords[i][j][k] > 1.0)
 					{
 						normalized = false;
 						break;
 					}
 				}
 			}
-			vd.m_textureCoords[i] = Stream(&mesh->mTextureCoords[i][0][0], mesh->mNumUVComponents[i], sizeof(mesh->mTextureCoords[i][0][0]) * 3);
+			vd.m_textureCoords[i] = Stream(&aiMesh->mTextureCoords[i][0][0], aiMesh->mNumUVComponents[i], sizeof(aiMesh->mTextureCoords[i][0][0]) * 3);
 			vd.m_textureCoords[i].m_normalized = normalized;
 		}
 	}
-	if (mesh->HasFaces())
+	if (aiMesh->HasFaces())
 	{
 		uint32_t faces = 0;
 		bool uint16IsFine = true;
 		const int MAX_UINT16 = 0xffff;
 		SIZE_T l = 3 * sizeof(U32);
-		for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
+		for (unsigned int i = 0; i < aiMesh->mNumFaces; ++i)
 		{
-			if (mesh->mFaces[i].mNumIndices == 3)
+			if (aiMesh->mFaces[i].mNumIndices == 3)
 			{ // only triangles
-				for (unsigned int j = 0; j < mesh->mFaces[i].mNumIndices; ++j)
+				for (unsigned int j = 0; j < aiMesh->mFaces[i].mNumIndices; ++j)
 				{
-					if (mesh->mFaces[i].mIndices[j] > MAX_UINT16)
+					if (aiMesh->mFaces[i].mIndices[j] > MAX_UINT16)
 					{
 						uint16IsFine = false;
 					}
@@ -430,13 +430,13 @@ void AssImp_Loader::AddMesh(aiMesh *mesh)
 				U16 *p = &u16_indicesData[first];
 
 				vd.m_indices = Stream(reinterpret_cast<U16*>(first), 0); // it is index, so len = 0
-				for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
+				for (unsigned int i = 0; i < aiMesh->mNumFaces; ++i)
 				{
-					if (mesh->mFaces[i].mNumIndices != 3)
+					if (aiMesh->mFaces[i].mNumIndices != 3)
 						continue;
-					*p++ = (UINT16)mesh->mFaces[i].mIndices[0];
-					*p++ = (UINT16)mesh->mFaces[i].mIndices[1];
-					*p++ = (UINT16)mesh->mFaces[i].mIndices[2];
+					*p++ = (UINT16)aiMesh->mFaces[i].mIndices[0];
+					*p++ = (UINT16)aiMesh->mFaces[i].mIndices[1];
+					*p++ = (UINT16)aiMesh->mFaces[i].mIndices[2];
 				}
 			}
 			else {
@@ -445,32 +445,33 @@ void AssImp_Loader::AddMesh(aiMesh *mesh)
 				U32 *p = &u32_indicesData[first];
 
 				vd.m_indices = Stream(reinterpret_cast<U32*>(first), 0); // it is index, so len = 0
-				for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
+				for (unsigned int i = 0; i < aiMesh->mNumFaces; ++i)
 				{
-					if (mesh->mFaces[i].mNumIndices != 3)
+					if (aiMesh->mFaces[i].mNumIndices != 3)
 						continue;
-					*p++ = mesh->mFaces[i].mIndices[0];
-					*p++ = mesh->mFaces[i].mIndices[1];
-					*p++ = mesh->mFaces[i].mIndices[2];
+					*p++ = aiMesh->mFaces[i].mIndices[0];
+					*p++ = aiMesh->mFaces[i].mIndices[1];
+					*p++ = aiMesh->mFaces[i].mIndices[2];
 				}
 			}
 		} // if (faces) 
-	} // if (mesh->HasFaces()) 
-	m.hash = _JSHash(vd);
+	} // if (aiMesh->HasFaces()) 
+	_AddMaterial(mesh, aiMesh);
+	mesh->hash = _JSHash(vd);
 
 	/*
-	if (mesh->HasBones())
+	if (aiMesh->HasBones())
 	{
 		boneMap->ResetMinMax();
 
 		// find max number of bones for vertex
 		static std::vector<UINT16> bonesCounter;
 
-		bonesCounter.resize(mesh->mNumVertices);
+		bonesCounter.resize(aiMesh->mNumVertices);
 		memset(&bonesCounter[0], 0, bonesCounter.size() * sizeof(bonesCounter[0]));
-		for (unsigned int i = 0; i < mesh->mNumBones; ++i)
+		for (unsigned int i = 0; i < aiMesh->mNumBones; ++i)
 		{
-			aiBone * bone = mesh->mBones[i];
+			aiBone * bone = aiMesh->mBones[i];
 
 			UINT16 bid = boneMap->GetBoneID(bone->mName.C_Str());
 			for (unsigned int j = 0; j < bone->mNumWeights; ++j)
@@ -490,15 +491,15 @@ void AssImp_Loader::AddMesh(aiMesh *mesh)
 		max_bones_in_vert = ((max_bones_in_vert + 3) / 4) * 4;
 
 		// reserver memory for bones info
-		u16_boneIDs.resize(max_bones_in_vert*mesh->mNumVertices);
-		f32_weights.resize(max_bones_in_vert*mesh->mNumVertices);
+		u16_boneIDs.resize(max_bones_in_vert*aiMesh->mNumVertices);
+		f32_weights.resize(max_bones_in_vert*aiMesh->mNumVertices);
 		memset(&u16_boneIDs[0], 0, u16_boneIDs.size() * sizeof(u16_boneIDs[0]));
 		memset(&f32_weights[0], 0, f32_weights.size() * sizeof(f32_weights[0]));
 
 		// copy data
-		for (unsigned int i = 0; i < mesh->mNumBones; ++i)
+		for (unsigned int i = 0; i < aiMesh->mNumBones; ++i)
 		{
-			aiBone * bone = mesh->mBones[i];
+			aiBone * bone = aiMesh->mBones[i];
 			UINT16 bid = boneMap->GetBoneID(bone->mName.C_Str()) - boneMap->GetBaseID();
 			for (unsigned int j = 0; j < bone->mNumWeights; ++j)
 			{
@@ -569,9 +570,70 @@ void AssImp_Loader::AddMesh(aiMesh *mesh)
 				break;
 		}
 		bonesCounter.clear();
-	} // if (mesh->HasBones())
+	} // if (aiMesh->HasBones())
 	*/
 } // VertexDescription
+
+constexpr uint64_t cFive(const char * const t) {
+	if (!t[0]) return 0;
+	if (!t[1]) return 
+		static_cast<uint64_t>(t[0]) << 32;
+
+	if (!t[2]) return 
+		static_cast<uint64_t>(t[0]) << 32 |
+		static_cast<uint64_t>(t[1]) << 24;
+
+	if (!t[3]) return 
+		static_cast<uint64_t>(t[0]) << 32 |
+		static_cast<uint64_t>(t[1]) << 24 |
+		static_cast<uint64_t>(t[8]) << 16;
+
+	return 
+		static_cast<uint64_t>(t[0]) << 32 |
+		static_cast<uint64_t>(t[1]) << 24 | 
+		static_cast<uint64_t>(t[2]) << 16 | 
+		static_cast<uint64_t>(t[3]) << 8 | 
+		static_cast<uint64_t>(t[4]);
+}
+
+void AssImp_Loader::_AddMaterial(ImportedMesh *m, aiMesh *aiMesh)
+{
+	auto *aiMat = _pScene->mMaterials[aiMesh->mMaterialIndex];
+	for (uint32_t i = 0; i < aiMat->mNumProperties; ++i)
+	{
+		auto p = aiMat->mProperties[i];
+		auto name = p->mKey.C_Str();
+		// get first 5 chars
+		uint64_t five = cFive(name);
+		std::string sVal = p->mType == aiPTI_String ? std::string(p->mData+4, p->mData+4 + *reinterpret_cast<U32*>(p->mData)) : "";
+
+		switch (five) {
+		case cFive("$clr."):
+		case cFive("$mat."):
+			assert(p->mType == aiPTI_Float || p->mType == aiPTI_Integer);
+			if (p->mType == aiPTI_Float)
+				m->prop.add(name + 5, reinterpret_cast<F32 *>(p->mData), p->mDataLength / static_cast<U32>(sizeof(F32)));
+			else if (p->mType == aiPTI_Integer)
+				m->prop.add(name + 5, reinterpret_cast<I32 *>(p->mData), p->mDataLength / static_cast<U32>(sizeof(I32)));
+			break;
+
+		case cFive("$tex."):
+			m->prop.add(name + 5, reinterpret_cast<CSTR>(p->mData) + 4);
+			break;
+
+		case cFive("?mat."):
+			m->prop.add(name + 5, reinterpret_cast<CSTR>(p->mData) + 4);
+			break;
+
+		default:
+			assert(false);
+			TRACE("unknown: \""<< name << "\"\n");
+		}		
+	}
+	
+	_SafeMProperties(m->prop);
+	BAMS::Tools::Dump(&m->prop);
+}
 
 void AssImp_Loader::LoadMeshes()
 {
@@ -599,9 +661,10 @@ void AssImp_Loader::LoadMeshes()
 			continue;
 
 		AddMesh(srcMesh);
+		
 /*
-		m->m_pMeshes[validMeshID] = new MeshToDrawFactory();
-		m->m_pMeshes[validMeshID]->m_pMesh = VertexManager::AddMesh(srcMesh, m_pBones);
+		mesh->m_pMeshes[validMeshID] = new MeshToDrawFactory();
+		mesh->m_pMeshes[validMeshID]->m_pMesh = VertexManager::AddMesh(srcMesh, m_pBones);
 		if (m_importMaterials)
 		{
 			m_pMaterials[validMeshID] = pMaterials[srcMesh->mMaterialIndex];
@@ -610,7 +673,7 @@ void AssImp_Loader::LoadMeshes()
 		if (!minMaxVertSet && srcMesh->mNumVertices > 0) {
 			if (_pScene->mNumMeshes > 0) {
 				for (int k = 0; k < 3; ++k)
-					m->minVert[k] = m->maxVert[k] = srcMesh->mVertices[0][k];
+					mesh->minVert[k] = mesh->maxVert[k] = srcMesh->mVertices[0][k];
 				minMaxVertSet = true;
 			}
 		}
@@ -618,10 +681,10 @@ void AssImp_Loader::LoadMeshes()
 		aiVector3D *v = srcMesh->mVertices;
 		for (unsigned int j = 0; j < srcMesh->mNumVertices; ++j) {
 			for (int k = 0; k < 3; ++k) {
-				if (m->minVert[k] > v[j][k])
-					m->minVert[k] = v[j][k];
-				if (m->maxVert[k] < v[j][k])
-					m->maxVert[k] = v[j][k];
+				if (mesh->minVert[k] > v[j][k])
+					mesh->minVert[k] = v[j][k];
+				if (mesh->maxVert[k] < v[j][k])
+					mesh->maxVert[k] = v[j][k];
 			}
 		}
 
@@ -722,5 +785,16 @@ void AssImp_Loader::_OptimizeMeshStorage()
 	for (auto &m : _meshes)
 	{
 		TRACE(i << ": V: " << m.vd.m_numVertices << ", I: " << m.vd.m_numIndices << ", H: " << m.hash << "\n");
+	}
+}
+
+void AssImp_Loader::_SafeMProperties(BAMS::MProperties &dst)
+{
+	for (uint32_t i = 0; i < dst.count; ++i)
+	{
+		auto &p = dst.properties[i];
+		p.name = _cstringStorage.add(p.name);
+		if (p.type == Property::PT_CSTR)
+			p.val = const_cast<char *>(_cstringStorage.add(reinterpret_cast<const char *>(p.val)));
 	}
 }

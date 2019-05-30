@@ -33,4 +33,6 @@ public:
 	static int FindMatchingFileExtension(const char * const fn, const char * const ext, bool caseInsesitive = true);
 
 	static UUID NOUID;
+
+	static void Dump(BAMS::Properties *prop);
 };

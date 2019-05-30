@@ -11,10 +11,10 @@ using tinyxml2::XMLDocument;
 void ResMesh::_LoadXML()
 {
 	auto &rm = globalResourceManager;
-	XMLDocument xml;
-	xml.Parse(rb->XML.c_str(), rb->XML.size());
+	tinyxml2::XMLElement* r = rb->XML->FirstChildElement("Mesh");
+	if (r == nullptr)
+		return;
 
-	auto r = xml.FirstChildElement("Mesh");
 	WSTR srcFileName;
 	srcFileName.UTF8(r->Attribute("src"));
 	rm->AbsolutePath(srcFileName);
@@ -36,8 +36,15 @@ void ResMesh::_LoadXML()
 	};
 
 	auto xml2streamarray = [&](Stream *o, int num, const char *streamName) {
-		for (int i=0; i<num;++i)
-			xml2stream(o[i], streamName);
+		auto s = r->FirstChildElement(streamName);
+		for (int i = 0; i < num; ++i) {
+			if (!s)
+				break;
+			o[i].m_type = s->IntAttribute("type", 0);
+			o[i].m_stride = s->IntAttribute("stride", 0);
+			o[i].m_normalized = s->BoolAttribute("normalized", false);
+			s = s->NextSiblingElement(streamName);
+		}
 	};
 
 #define XML2STREAM(x) xml2stream(vd.m_ ## x, #x);
@@ -52,10 +59,62 @@ void ResMesh::_LoadXML()
 	XML2STREAMARRAY(boneWeights);
 	XML2STREAMARRAY(boneIDs);
 	XML2STREAM(indices);
-
 }
 
-void ResMesh::_SaveXML() { rb->XML = _BuildXML(&vd, meshHash, meshSrc, meshIdx); rb->SetTimestamp(); }
+void ResMesh::_SaveXML() 
+{ 
+//	STR ResMesh::_BuildXML(VertexDescription *pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
+//	{
+//	using tinyxml2::XMLPrinter;
+//	using tinyxml2::XMLDocument;
+
+	auto &rm = globalResourceManager;
+	auto out = rb->XML ? rb->XML : rm->NewXMLElement("temp");
+	out->DeleteChildren();
+//	XMLDocument out;
+	auto *r = rm->NewXMLElement("Mesh");
+	STR cvt;
+	WSTR msf = meshSrc->Path;
+	rm->RelativePath(msf);
+	cvt.UTF8(msf);
+	r->SetAttribute("src", cvt.c_str());
+	r->SetAttribute("idx", meshIdx);
+	r->SetAttribute("hash", meshHash);
+	r->SetAttribute("vertices", vd.m_numVertices);
+	r->SetAttribute("indices", vd.m_numIndices);
+	auto stream2xml = [&](Stream &s, const char *streamName) {
+		if (s.isUsed())
+		{
+			auto o = rm->NewXMLElement(streamName);
+			o->SetAttribute("type", s.m_type);
+			o->SetAttribute("stride", s.m_stride);
+			o->SetAttribute("normalized", s.m_normalized);
+			r->InsertEndChild(o);
+		}
+	};
+
+	auto streamarray2xml = [&](Stream *s, int num, const char *streamName) {
+		for (int i = 0; i < num; ++i)
+			stream2xml(s[i], streamName);
+	};
+
+
+#define STREAM2XML(x) stream2xml(vd.m_ ## x, #x);
+#define STREAMARRAY2XML(x) streamarray2xml(vd.m_ ## x, static_cast<int>(COUNT_OF(vd.m_ ## x)), #x);
+
+	STREAM2XML(vertices);
+	STREAM2XML(normals);
+	STREAM2XML(tangents);
+	STREAM2XML(bitangents);
+	STREAMARRAY2XML(colors);
+	STREAMARRAY2XML(textureCoords);
+	STREAMARRAY2XML(boneWeights);
+	STREAMARRAY2XML(boneIDs);
+	STREAM2XML(indices);
+
+	out->InsertFirstChild(r);
+	rb->SetTimestamp(); 
+}
 
 void ResMesh::SetVertexDescription(VertexDescription * pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
 { 
@@ -83,61 +142,6 @@ VertexDescription * ResMesh::GetVertexDescription(bool loadASAP)
 	}
 
 	return &vd;
-}
-
-STR ResMesh::_BuildXML(VertexDescription *pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
-{
-	using tinyxml2::XMLPrinter;
-	using tinyxml2::XMLDocument;
-
-	auto &rm = globalResourceManager;
-	XMLDocument out;
-	auto *r = out.NewElement("Mesh");
-	STR cvt;
-	WSTR msf = _meshSrc->Path;
-	rm->RelativePath(msf);
-	cvt.UTF8(msf);
-	r->SetAttribute("src", cvt.c_str());
-	r->SetAttribute("idx", _meshIdx);
-	r->SetAttribute("hash", _meshHash);
-	r->SetAttribute("vertices", pvd->m_numVertices);
-	r->SetAttribute("indices", pvd->m_numIndices);
-	auto stream2xml = [&](Stream &s, const char *streamName) {
-		if (s.isUsed())
-		{
-			auto o = out.NewElement(streamName);
-			o->SetAttribute("type", s.m_type);
-			o->SetAttribute("stride", s.m_stride);
-			o->SetAttribute("normalized", s.m_normalized);
-			r->InsertEndChild(o);
-		}
-	};
-
-	auto streamarray2xml = [&](Stream *s, int num, const char *streamName) {
-		for (int i = 0; i < num; ++i)
-			stream2xml(s[i], streamName);
-	};
-
-
-#define STREAM2XML(x) stream2xml(pvd->m_ ## x, #x);
-#define STREAMARRAY2XML(x) streamarray2xml(pvd->m_ ## x, static_cast<int>(COUNT_OF(pvd->m_ ## x)), #x);
-
-	STREAM2XML(vertices);
-	STREAM2XML(normals);
-	STREAM2XML(tangents);
-	STREAM2XML(bitangents);
-	STREAMARRAY2XML(colors);
-	STREAMARRAY2XML(textureCoords);
-	STREAMARRAY2XML(boneWeights);
-	STREAMARRAY2XML(boneIDs);
-	STREAM2XML(indices);
-
-	out.InsertFirstChild(r);
-	XMLPrinter prn;
-	out.Print(&prn);
-
-	STR ret(prn.CStr());
-	return std::move(ret);
 }
 
 // ==========================================================

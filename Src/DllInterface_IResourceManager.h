@@ -60,7 +60,6 @@ extern "C" {
 	BAMS_EXPORT bool            IResource_IsLoaded(IResource *res);
 	BAMS_EXPORT uint32_t        IResource_GetType(IResource *res);
 	BAMS_EXPORT bool            IResource_IsLoadable(IResource *res);
-	BAMS_EXPORT const char *    IResource_GetXML(IResource *res, uint32_t *pSize = nullptr);
 
 	// ResourceManager
 	BAMS_EXPORT IResourceManager * IResourceManager_Create();
@@ -70,7 +69,8 @@ extern "C" {
 	BAMS_EXPORT void               IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT void               IResourceManager_RootDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT IResource *        IResourceManager_FindByName(IResourceManager *rm, const char *name, uint32_t type = 0);
-	BAMS_EXPORT void               IResourceManager_Filter(IResourceManager *rm, void (*callback)(IResource *, void *), void *localData, const char *pattern = nullptr, uint32_t typeId = RESID_UNKNOWN);
+	BAMS_EXPORT void               IResourceManager_Filter(IResourceManager *rm, void(*callback)(IResource *, void *), void *localData, const char *pattern = nullptr, uint32_t typeId = RESID_UNKNOWN);
+	BAMS_EXPORT void               IResourceManager_FilterByFilename(IResourceManager *rm, void(*callback)(IResource *, void *), void *localData, const char *pattern, IResource * rootResource, bool caseInsesitive = true);
 	BAMS_EXPORT IResource *        IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IResRawData *      IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IResRawData *      IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name);
@@ -210,7 +210,6 @@ public:
 	void Release() { IResource_Release(Get()); }
 	uint32_t GetRefCounter() { return IResource_GetRefCounter(Get()); }
 	inline IResource *Get() { return _res.Get(); }
-	const char *GetXML(uint32_t *pSize = nullptr) { return IResource_GetXML(Get(), pSize); }
 };
 
 // ================================================================================== Help macro ===
@@ -305,6 +304,8 @@ public:
 	void RootDir(const wchar_t *path) { IResourceManager_RootDir(_rm, path); }
 
 	void Filter(void(*callback)(IResource *, void *), void *localData, const char *pattern = nullptr, uint32_t typeId = RESID_UNKNOWN) { IResourceManager_Filter(_rm, callback, localData, pattern, typeId); }
+	void Filter(void(*callback)(IResource *, void *), void *localData, const char *pattern, IResource * rootResource, bool caseInsesitive = true) { IResourceManager_FilterByFilename(_rm, callback, localData, pattern, rootResource, caseInsesitive); }
+
 	IResource * Find(const char *name, uint32_t type = RESID_UNKNOWN) { return IResourceManager_FindByName(_rm, name, type); }
 	IResource * Find(const UUID &uid) { return IResourceManager_FindByUID(_rm, uid); }
 

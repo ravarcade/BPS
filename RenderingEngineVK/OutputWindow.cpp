@@ -8,8 +8,7 @@ OutputWindow::OutputWindow() :
 	instance(VK_NULL_HANDLE),
 	window(nullptr),
 	allocator(VK_NULL_HANDLE),
-	device(VK_NULL_HANDLE),
-	renderPass(VK_NULL_HANDLE)
+	device(VK_NULL_HANDLE)
 {
 }
 
@@ -25,7 +24,6 @@ void OutputWindow::Init()
 	graphicsQueue = VK_NULL_HANDLE;
 	presentQueue = VK_NULL_HANDLE;
 	transferQueue = VK_NULL_HANDLE;
-	renderPass = VK_NULL_HANDLE;
 }
 
 // ----------------------------------------------------------------------------
@@ -321,21 +319,21 @@ bool OutputWindow::_CreateSwapChain()
 
 	// ------------------------------------------------------------------------ create color, depth resources
 
-	_CreateAttachment(swapChainImageFormat, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, swapChainExtent, color);
-	_CreateAttachment(_FindDepthFormat(), VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, swapChainExtent, depth);
+	_CreateAttachment(swapChainImageFormat, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, swapChainExtent, forwardFrameBuf.frameBufferAttachments[0]);
+	_CreateAttachment(_FindDepthFormat(), VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, swapChainExtent, forwardFrameBuf.depth);
 
 	// ------------------------------------------------------------------------ create frame buffers
 	swapChainFramebuffers.resize(swapChainImageViews.size());
 
 	for (size_t i = 0; i < swapChainImageViews.size(); i++)
 	{
-		std::vector<VkImageView> attachments = { swapChainImageViews[i], depth.view };
+		std::vector<VkImageView> attachments = { swapChainImageViews[i], forwardFrameBuf.depth.view };
 		if (msaaSamples != VK_SAMPLE_COUNT_1_BIT)
-			attachments = { color.view, depth.view,  swapChainImageViews[i] };
+			attachments = { forwardFrameBuf.frameBufferAttachments[0].view, forwardFrameBuf.depth.view,  swapChainImageViews[i] };
 
 		VkFramebufferCreateInfo framebufferInfo = {};
 		framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		framebufferInfo.renderPass = renderPass;
+		framebufferInfo.renderPass = forwardFrameBuf.renderPass;
 		framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 		framebufferInfo.pAttachments = attachments.data();
 		framebufferInfo.width = swapChainExtent.width;
@@ -769,8 +767,8 @@ void OutputWindow::_CleanupSwapChain()
 	// ... and will set val = nullptr;
 	// same about vkFree
 
-	vkDestroy(color);
-	vkDestroy(depth);
+	vkDestroy(forwardFrameBuf.frameBufferAttachments[0]);
+	vkDestroy(forwardFrameBuf.depth);
 
 	vkFree(commandPool, commandBuffers);
 
@@ -822,7 +820,7 @@ void OutputWindow::_CreateRenderPass()
 void OutputWindow::_CleanupRenderPass()
 {
 	vkDestroy(deferredFrameBuf);
-	vkDestroy(renderPass);	
+	vkDestroy(forwardFrameBuf);
 }
 
 void OutputWindow::_CreateDescriptorPool()
@@ -904,7 +902,7 @@ void OutputWindow::_CreateForwardCommandBuffer(VkCommandBuffer &cb, VkFramebuffe
 
 	VkRenderPassBeginInfo renderPassInfo = {};
 	renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-	renderPassInfo.renderPass = renderPass;
+	renderPassInfo.renderPass = forwardFrameBuf.renderPass;
 	renderPassInfo.framebuffer = frameBuffer;
 
 	renderPassInfo.renderArea.offset = { 0, 0 };
@@ -1052,9 +1050,11 @@ void OutputWindow::_CreateSimpleRenderPass(VkFormat format, VkSampleCountFlagBit
 	renderPassInfo.dependencyCount = 1;
 	renderPassInfo.pDependencies = &dependency;
 
-	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &renderPass) != VK_SUCCESS)
+	if (vkCreateRenderPass(device, &renderPassInfo, allocator, &forwardFrameBuf.renderPass) != VK_SUCCESS)
 		throw std::runtime_error("failed to create render pass!");
 }
+
+// ============================================================================ Deferred Frame Buffer ===
 
 void OutputWindow::_CleanupDeferredFramebuffer()
 {
@@ -1227,6 +1227,8 @@ void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagB
 	_CreateDeferredFramebuffer();
 }
 
+// ============================================================================
+
 void OutputWindow::_LoadShaderPrograms()
 {
 	_CreateDescriptorPool();                            // create descriptor pool for all used shader programs
@@ -1279,7 +1281,6 @@ void OutputWindow::_RecreateSwapChain()
 		_CreateDeferredFramebuffer();
 		shaders.foreach([&](CShaderProgram *&sh) {
 			sh->RebuildAllMiniDescriptorSets(true);
-			//sh->UpdateDescriptorSets();
 		});
 		_CreateCommandBuffers();
 	}
@@ -1402,11 +1403,24 @@ void OutputWindow::DrawFrame()
 
 void OutputWindow::PrepareShader(CShaderProgram *sh)
 {
+	//std::vector<CShaderProgram*> *pass = nullptr;
+	//switch (sh->PrepareShader())
+	//{
+	//case FORWARD: pass = &forwardRenderingShaders; break;
+	//case DEFERRED: pass = &deferredFrameBuf.shaders; break;
+	//}
+	//if (pass)
+	//{
+	//	pass->push_back(sh);
+	//	sh->CreateGraphicsPipeline();
+	//	sh->RebuildAllMiniDescriptorSets();
+	//}
+
 	auto outputNames = sh->GetOutputNames();			// select renderPass base on names of output attachments in fragment shader
 	if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
 	{
 		forwardRenderingShaders.push_back(sh);
-		sh->SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
+		sh->SetRenderPassAndMsaaSamples(forwardFrameBuf.renderPass, msaaSamples);
 		sh->SetDrawOrder(FORWARD);
 	}
 	else
@@ -1416,12 +1430,10 @@ void OutputWindow::PrepareShader(CShaderProgram *sh)
 		sh->SetDrawOrder(DEFERRED);
 	}
 
-	if (renderPass != nullptr)
+	if (forwardFrameBuf.renderPass != nullptr)
 	{
 		// prepare shader to be used.
 		sh->CreateGraphicsPipeline();
-//		sh->CreateDescriptorSets();
-//		sh->UpdateDescriptorSets();
 		sh->RebuildAllMiniDescriptorSets();
 	}
 }
@@ -1445,14 +1457,10 @@ CShaderProgram * OutputWindow::ReloadShader(const char * shader)
 		return nullptr;
 
 	sh->LoadProgram(shader);
-	if (renderPass != nullptr)
+	if (forwardFrameBuf.renderPass != nullptr)
 	{
 		// prepare shader to be used.
-//		sh->SetRenderPassAndMsaaSamples(renderPass, msaaSamples);
-		sh->CreateGraphicsPipeline();
-//		sh->CreateDescriptorSets();
-//		sh->UpdateDescriptorSets();
-		
+		sh->CreateGraphicsPipeline();		
 		BufferRecreationNeeded();
 	}
 	return sh;
@@ -1713,12 +1721,10 @@ ObjectInfo * OutputWindow::AddObject(const char * name, const char * mesh, const
 	if (!sh)
 		return nullptr;
 
-	auto mid = sh->AddMesh(mesh);
-	if (mid == -1)
+	auto oid = sh->AddObject(mesh);
+	if (oid == -1)
 		return nullptr;
-
-	auto oid = sh->AddObject(mid);
-	auto ret = objects.add(name, sh, mid, oid);
+	auto ret = objects.add(name, sh, oid);
 	ret->oid = oid;
 
 	BufferRecreationNeeded();

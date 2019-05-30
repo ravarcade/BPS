@@ -1,6 +1,7 @@
 
 class OutputWindow; // parent output window class with working interface to Vulkan
 
+// ============================================================================ UniformBuffer ===
 struct UniformBuffer
 {
 	uint32_t binding;
@@ -12,7 +13,7 @@ struct UniformBuffer
 	bool isSharedUbo;
 };
 
-// descriptor sets managment
+// ============================================================================ MiniDescriptorSet ===
 struct MiniDescriptorSet
 {
 	VkDescriptorSet descriptorSet;
@@ -46,53 +47,36 @@ struct cmp<const MiniDescriptorSet *> {
 	};
 };
 
+// ============================================================================ CShaderProgram ===
 class CShaderProgram
 {
 public:
-	CShaderProgram() = default;
 	CShaderProgram(OutputWindow *outputWindow) : vk(outputWindow) {}
 
 	void LoadProgram(const char *program);
 	void Release();
+	uint32_t AddObject(const char *meshName);
+	Properties *GetProperties(uint32_t drawObjectId = -1);
 
-	const std::vector<std::string> &GetOutputNames() { return m_reflection.GetOutputNames(); }
-	VkPipelineLayout GetPipelineLayout() const { return m_pipelineLayout; }
-
-	void SetRenderPassAndMsaaSamples(VkRenderPass renderPass, VkSampleCountFlagBits msaaSamples) { m_renderPass = renderPass; m_msaaSamples = msaaSamples; }
+protected:
 	void CreateGraphicsPipeline();
 
-	uint32_t AddMesh(const char *name);
-	uint32_t AddObject(uint32_t meshIdx);
-
-	uint32_t GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSize) { return _GetDescriptorPoolsSize(poolsSize); }
-	void CreateDescriptorSets();
-	void UpdateDescriptorSets();
-	void DrawObjects(VkCommandBuffer &cb);
-
-
-	Properties *GetProperties(uint32_t drawObjectId = -1) 
-	{
-		auto *properties = &m_reflection.GetProperties();
-		if (drawObjectId != -1)
-		{
-			for (auto &p : *properties)
-			{
-				if (p.type != Property::PT_EMPTY)
-				{
-					auto buf = m_paramsBuffers[p.buffer_idx].buffer;
-					p.val = buf + p.buffer_object_stride * drawObjectId + p.buffer_offset;
-				}
-			}
-		}
-		return properties;
-	}
-
-	uint32_t GetObjectCount() { return static_cast<uint32_t>(m_drawObjectData.size()); }
+	const std::vector<std::string> &GetOutputNames() { return m_reflection.GetOutputNames(); }
+	void SetRenderPassAndMsaaSamples(VkRenderPass renderPass, VkSampleCountFlagBits msaaSamples) { m_renderPass = renderPass; m_msaaSamples = msaaSamples; }
 	void SetDrawOrder(uint32_t order) { m_drawOrder = order; }
 	uint32_t GetDrawOrder() { return m_drawOrder; }
+
+	void DrawObjects(VkCommandBuffer &cb);
+	uint32_t GetObjectCount() { return static_cast<uint32_t>(m_drawObjectData.size()); }
+
 	void RebuildAllMiniDescriptorSets(bool forceRebuildMe = false);
+	
+	// is it needed?
+	uint32_t GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSize) { return _GetDescriptorPoolsSize(poolsSize); }
+	friend class OutputWindow;
 
 private:
+	uint32_t _AddMesh(const char *name);
 	std::vector<VkPipelineShaderStageCreateInfo> _Compile();
 	VkPipelineVertexInputStateCreateInfo _GetVertexInputInfo();
 	VkPipelineInputAssemblyStateCreateInfo _GetInputAssembly();
@@ -151,7 +135,6 @@ private:
 
 	void UpdateDescriptorSet(MiniDescriptorSet & mds);
 
-	VkDescriptorSet            m_descriptorSet = nullptr;
 	std::vector<UniformBuffer> m_uniformBuffers;
 
 	struct MeshBufferSet {

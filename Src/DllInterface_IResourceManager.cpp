@@ -73,13 +73,6 @@ extern "C" {
 		return rb ? rb->isLoadable() : false;
 	}
 
-	BAMS_EXPORT const char *IResource_GetXML(IResource *res, uint32_t *pSize)
-	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
-		if (pSize)
-			*pSize = rb->XML.size();
-		return rb->XML.c_str();
-	}
 	// =========================================================================== ResRawData
 
 	BAMS_EXPORT uint8_t * IResRawData_GetData(IResRawData *res) { return Impl<ResRawData>(res)->GetData(); }
@@ -169,6 +162,12 @@ extern "C" {
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
 		resm->Filter(reinterpret_cast<void (*)(ResourceBase *, void *)>(callback), localData, pattern, typeId);
+	}
+
+	BAMS_EXPORT void IResourceManager_FilterByFilename(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, const char * pattern, IResource * rootResource, bool caseInsesitive)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		resm->Filter(reinterpret_cast<void(*)(ResourceBase *, void *)>(callback), localData, pattern, reinterpret_cast<ResourceBase *>(rootResource), caseInsesitive);
 	}
 
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid)
@@ -439,3 +438,4 @@ extern "C" {
 }
 
 }; // BAMS namespace
+

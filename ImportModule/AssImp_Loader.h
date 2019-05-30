@@ -1,7 +1,51 @@
 #pragma once
 
-//using namespace Assimp;
-//using namespace BAMS;
+class CStringStorage
+{
+public:
+	CStringStorage(size_t step = 4096) : _step(step), _first(nullptr) {}
+	~CStringStorage() { clear(); }
+
+	const char *add(const char *txt, size_t len = 0)
+	{
+		if (!len) len = strlen(txt);
+		++len;
+
+		if (!_first || (_first->used + len) > _step)
+		{
+			chunk *last = _first;
+			_first = reinterpret_cast<chunk *>(new char[_step + sizeof(chunk)]);
+			_first->used = 0;
+			_first->next = last;
+		}
+
+		char *dst = reinterpret_cast<char *>(_first + 1) + _first->used;
+		memcpy_s(dst, len, txt, len);
+		_first->used += len;
+		return dst;
+	}
+
+	void clear()
+	{
+		for (chunk *f = _first; f;)
+		{
+			auto d = f;
+			f = f->next;
+			delete d;
+		}
+		_first = nullptr;
+	}
+
+private:
+	size_t _step;
+
+	struct chunk {
+		chunk *next;
+		size_t used;
+	};
+
+	chunk *_first;
+};
 
 class AssImp_Loader 
 {
@@ -11,6 +55,7 @@ public:
 		BAMS::VertexDescription vd;
 		uint32_t hash;
 		bool match;
+		BAMS::MProperties prop;
 	};
 
 	AssImp_Loader();
@@ -40,6 +85,8 @@ public:
 	ImportedMesh *Mesh(uint32_t idx) { return idx < _meshes.size() ? &_meshes[idx] : nullptr; }
 	
 	bool IsLoaded() { return _isLoaded; }
+	void OnFinalize() { Clear(); }
+
 	void Clear() {
 		_aii.FreeScene();
 		u16_indicesData.clear();
@@ -50,6 +97,8 @@ public:
 private:
 	BAMS::U32 _JSHash(BAMS::VertexDescription &vd, BAMS::U32 hash = 0);
 	void AddMesh(aiMesh * mesh);
+	void _AddMaterial(ImportedMesh * m, aiMesh * aiMesh);
+
 	void AddMesh_broken(aiMesh * mesh);
 	void LoadBones();
 	void LoadMeshes();
@@ -76,5 +125,6 @@ private:
 	std::vector<uint32_t> u32_indicesData;
 
 	std::vector<ImportedMesh> _meshes;
-
+	CStringStorage _cstringStorage;
+	void _SafeMProperties(BAMS::MProperties &dst);
 };

@@ -139,6 +139,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 	std::mutex _fileLoadingMutex;
 	WSTR _rootDir;
 	WSTR _manifestFileName;
+	XMLDocument _manifest;
 
 	InternalData() :
 		_worker(nullptr),
@@ -251,6 +252,18 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		return FilterByFilename(fn);
 	}
 
+	WSTR GetResourceAbsoluteDir(ResourceBase *res)
+	{
+		WSTR ret = res->Path;
+		AbsolutePath(ret);
+		auto e = ret.end();
+		auto f = ret.begin();
+		while (e > f && e[-1] != Tools::directorySeparatorChar)
+			--e;
+		ret.resize(static_cast<U32>(e - f));
+		return std::move(ret);
+	}
+
 	bool FindResourceByFilename(ResourceBase **&out, const WSTR &filename)
 	{
 		auto f = out ? ++out : _resources.begin();
@@ -268,7 +281,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 		return false;
 	}
-
 
 	// check all resources if they are modified or removed
 	void CheckForUpdates()
@@ -645,6 +657,8 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		}
 	}
 
+	tinyxml2::XMLElement *NewXMLElement(const char* name) { return _manifest.NewElement(name); }
+
 	void LoadManifest()
 	{
 		WSTR rpath = _rootDir + Tools::wDirectorySeparator;
@@ -655,17 +669,14 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		char *manifest = reinterpret_cast<char *>(Tools::LoadFile(&manifestSize, nullptr, _manifestFileName, GetMemoryAllocator()));
 		if (manifest)
 		{
-			XMLDocument xml;
-			xml.Parse(manifest, manifestSize);
+			_manifest.Parse(manifest, manifestSize);
 
-			auto root = xml.FirstChildElement("ResourcesManifest");
+			auto root = _manifest.FirstChildElement("ResourcesManifest");
 			auto qty = root->IntAttribute("qty");
 			for (auto r = root->FirstChildElement("Resource"); r; r = r->NextSiblingElement())
-			{
+			{				
 				auto res = make_new<ResourceBase>();
-
-				auto innerXML = r->GetText();
-				res->XML = innerXML? innerXML : "";
+				res->XML = r;
 				res->Path.UTF8(r->Attribute("Path"));
 				AbsolutePath(res->Path);
 				res->Name = r->Attribute("Name");
@@ -703,7 +714,16 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			entry->SetAttribute("UID", uidbuf);
 			entry->SetAttribute("Size", (I64)res->_resourceSize);
 			entry->SetAttribute("Path", cvt.c_str());
-			entry->SetText(res->XML.c_str());
+
+			if (res->XML && res->XML->FirstChild())
+			{
+				for (auto child = res->XML->FirstChild(); child; child = child->NextSibling())
+				{
+					auto clone = child->DeepClone(&out);
+					entry->InsertEndChild(clone);
+				}
+			}
+				
 			rm->InsertEndChild(entry);
 		}
 
@@ -786,6 +806,58 @@ void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void *loca
 			(namePattern.size() == 0 || res->Name.wildcard(namePattern)))
 		{
 			callback(res, localData);
+		}
+	}
+}
+
+void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void *localData, CSTR _filenamePattern, ResourceBase *rootResource, bool caseInsesitive)
+{
+	WSTR filenamePattern = _filenamePattern;
+	WSTR path = _data->GetResourceAbsoluteDir(rootResource);
+
+	for (auto &res : _data->_resources)
+	{
+		if (res->Path.startsWith(path))
+		{
+			U32 pos = 0;
+			for (U32 i = res->Path.size(); i > 0; --i)
+			{
+				if (res->Path[i - 1] == Tools::directorySeparatorChar)
+				{
+					pos = i;
+					break;
+				}
+			}
+
+			res->Path.iwildcard(filenamePattern, pos);
+			if (caseInsesitive ? res->Path.iwildcard(filenamePattern, pos) : res->Path.wildcard(filenamePattern, pos))
+				callback(res, localData);
+		}
+	}
+}
+
+void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void *localData, CWSTR _filenamePattern, ResourceBase *rootResource, bool caseInsesitive)
+{
+	WSTR filenamePattern = _filenamePattern;
+	WSTR path = _data->GetResourceAbsoluteDir(rootResource);
+
+	for (auto &res : _data->_resources)
+	{
+		if (res->Path.startsWith(path))
+		{
+			U32 pos = 0;
+			for (U32 i = res->Path.size(); i > 0; --i)
+			{
+				if (res->Path[i - 1] == Tools::directorySeparatorChar)
+				{
+					pos = i;
+					break;
+				}
+			}
+
+			res->Path.iwildcard(filenamePattern, pos);
+			if (caseInsesitive ? res->Path.iwildcard(filenamePattern, pos) : res->Path.wildcard(filenamePattern,pos))
+				callback(res, localData);
 		}
 	}
 }
@@ -898,6 +970,8 @@ void ResourceManager::RefreshResorceFileInfo(ResourceBase *res) { _data->Refresh
 ResourceBase *ResourceManager::Add(CWSTR path) { return _data->AddResource(path); }
 ResourceBase *ResourceManager::Add(CSTR resName, U32 type) { return _data->AddResource(resName, type); }
 void ResourceManager::CreateResourceImplementation(ResourceBase *res) { _data->CreateResourceImplementation(res); }
+tinyxml2::XMLElement * ResourceManager::NewXMLElement(const char* name) { return _data->NewXMLElement(name); }
+
 void ResourceManager::AddDir(CWSTR path) { _data->AddDirToMonitor(path, 0); }
 void ResourceManager::RootDir(CWSTR path) { _data->RootDir(path); }
 void ResourceManager::StartDirectoryMonitor() { _data->StartMonitoring(); }
@@ -905,6 +979,7 @@ void ResourceManager::StopDirectoryMonitor() { _data->StopMonitoring(); }
 
 void ResourceManager::AbsolutePath(WSTR & filename, const WSTR *root) { _data->AbsolutePath(filename, root); }
 void ResourceManager::RelativePath(WSTR & filename, const WSTR *root) { _data->RelativePath(filename, root); }
+WSTR ResourceManager::GetResourceAbsoluteDir(ResourceBase * res) { return std::move(_data->GetResourceAbsoluteDir(res)); }
 WSTR ResourceManager::GetDirPath(const WString & filename) { return std::move(_data->GetDirPath(filename)); }
 
 // ============================================================================ ResourceManagerModule ===

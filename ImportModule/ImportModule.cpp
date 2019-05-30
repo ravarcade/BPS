@@ -52,10 +52,8 @@ private:
 			aiLoader.PreLoad(r.GetPath());
 		}
 
-		bool IsLoaded()
-		{
-			return aiLoader.IsLoaded();
-		}
+		bool IsLoaded() { return aiLoader.IsLoaded(); }
+		void OnFinalize() { aiLoader.OnFinalize(); }
 	};
 
 	Image_Loader imgLoader;
@@ -284,9 +282,9 @@ public:
 			auto *pim = reinterpret_cast<Importer*>(param);
 			
 			CResource r(res);
-			uint32_t rxs = 0;
-			auto rx = r.GetXML(&rxs);
-			STR rxml(rx, rx + rxs);
+//			uint32_t rxs = 0;
+//			auto rx = r.GetXML(&rxs);
+//			STR rxml(rx, rx + rxs);
 
 			// check if mesh mach
 		}, this, nullptr, RESID_MESH);
@@ -303,6 +301,8 @@ public:
 	{
 		imgLoader.OnFinalize();
 		m_modelRepoName2modelRepo.reset();
+		for (auto &repo : m_importedModelRepos)
+			repo->OnFinalize();
 		m_importedModelRepos.clear();
 		WSTR::Finalize();
 		STR::Finalize();

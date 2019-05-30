@@ -23,6 +23,8 @@ public:
 	virtual void Update(ResourceBase *) = 0;
 	virtual void Release(ResourceBase *) = 0;
 	virtual ResourceFactoryInterface *GetFactory() = 0;
+//	virtual void LoadXML() = 0;
+//	virtual void SaveXML() = 0;
 };
 
 class ResourceUpdateNotifier
@@ -152,7 +154,7 @@ public:
 	U32  Type;
 	STR  Name;
 	WSTR Path;
-	STR XML;
+	tinyxml2::XMLElement *XML;
 	
 	/// <summary>
 	/// Initializes a new instance of the <see cref="ResourceBase"/> class.
@@ -166,7 +168,8 @@ public:
 		_refCounter(0),
 		_resourceImplementation(nullptr),
 		Type(RESID_UNKNOWN),
-		UID(Tools::NOUID)
+		UID(Tools::NOUID),
+		XML(nullptr)
 	{};
 
 	~ResourceBase()
@@ -191,6 +194,7 @@ public:
 	inline bool isDeleted() { return _isDeleted; }
 	inline bool isModified() { return _isModified; }
 	inline bool isLoadable() { return _isLoadable; }
+
 
 	
 	void *GetData() { return _resourceData; }
@@ -279,6 +283,7 @@ private:
 
 protected:
 	void CreateResourceImplementation(ResourceBase *res);
+
 	friend class ResourceBase;
 
 public:
@@ -288,7 +293,9 @@ public:
 	static ResourceManager *Create();
 	static void Destroy(ResourceManager *);
 
-	void Filter(void (*callback)(ResourceBase *, void *), void *localData, CSTR namePattern = nullptr, U32 typeId = RESID_UNKNOWN);
+	void Filter(void(*callback)(ResourceBase *, void *), void *localData, CSTR namePattern = nullptr, U32 typeId = RESID_UNKNOWN);
+	void Filter(void(*callback)(ResourceBase *, void *), void *localData, CSTR filenamePattern, ResourceBase *rootResource, bool caseInsesitive = true);
+	void Filter(void(*callback)(ResourceBase *, void *), void *localData, CWSTR filenamePattern, ResourceBase *rootResource, bool caseInsesitive = true);
 	ResourceBase *GetByFilename(const WSTR &filename, U32 typeId = RESID_UNKNOWN);
 	ResourceBase *Get(const STR &resName, U32 typeId = RESID_UNKNOWN);
 	ResourceBase *Get(CSTR resName, U32 typeId = RESID_UNKNOWN) { return Get(STR(resName), typeId); };
@@ -313,7 +320,10 @@ public:
 	void StopDirectoryMonitor();
 	void AbsolutePath(WSTR &filename, const WSTR *_root = nullptr);
 	void RelativePath(WSTR &filename, const WSTR *_root = nullptr);
+	WSTR GetResourceAbsoluteDir(ResourceBase *res);
 	WSTR GetDirPath(const WString &filename);
+
+	tinyxml2::XMLElement *NewXMLElement(const char* name);
 };
 
 
