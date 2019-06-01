@@ -810,40 +810,39 @@ void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void *loca
 	}
 }
 
-void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void *localData, CSTR _filenamePattern, ResourceBase *rootResource, bool caseInsesitive)
+void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void * localData, BAMS::Property *prop, ResMesh *mesh, bool caseInsesitive)
 {
-	WSTR filenamePattern = _filenamePattern;
-	WSTR path = _data->GetResourceAbsoluteDir(rootResource);
+	WSTR pattern;
+	pattern.UTF8(reinterpret_cast<CSTR>(prop->val));
 
-	for (auto &res : _data->_resources)
-	{
-		if (res->Path.startsWith(path))
-		{
-			U32 pos = 0;
-			for (U32 i = res->Path.size(); i > 0; --i)
-			{
-				if (res->Path[i - 1] == Tools::directorySeparatorChar)
-				{
-					pos = i;
-					break;
-				}
-			}
+	auto &p = mesh->GetMeshSrc()->Path;
+	auto f = p.c_str();
+	auto e = f + p.size();
+	while (e > f && e[-1] != Tools::directorySeparatorChar)
+		--e;
 
-			res->Path.iwildcard(filenamePattern, pos);
-			if (caseInsesitive ? res->Path.iwildcard(filenamePattern, pos) : res->Path.wildcard(filenamePattern, pos))
-				callback(res, localData);
-		}
-	}
+	auto &rootPath = ToBasicString(f, static_cast<U32>(e - f));
+	Filter(callback, localData, pattern.ToBasicString(), rootPath, caseInsesitive);
 }
 
-void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void *localData, CWSTR _filenamePattern, ResourceBase *rootResource, bool caseInsesitive)
+void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void * localData, CSTR pattern, CWSTR rootPath, bool caseInsesitive)
 {
-	WSTR filenamePattern = _filenamePattern;
-	WSTR path = _data->GetResourceAbsoluteDir(rootResource);
+	// pattern is utf8. conversion is needed.
+	WSTR _pattern;
+	_pattern.UTF8(pattern);
+	Filter(callback, localData, _pattern, ToBasicString(rootPath), caseInsesitive);
+}
 
+void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void * localData, CWSTR pattern, CWSTR rootPath, bool caseInsesitive)
+{
+	Filter(callback, localData, ToBasicString(pattern), ToBasicString(rootPath), caseInsesitive);
+}
+
+void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void * localData, const WSTR::_B &pattern, const WSTR::_B &rootPath, bool caseInsesitive)
+{
 	for (auto &res : _data->_resources)
 	{
-		if (res->Path.startsWith(path))
+		if (res->Path.startsWith(rootPath))
 		{
 			U32 pos = 0;
 			for (U32 i = res->Path.size(); i > 0; --i)
@@ -855,8 +854,7 @@ void ResourceManager::Filter(void(*callback)(ResourceBase *, void *), void *loca
 				}
 			}
 
-			res->Path.iwildcard(filenamePattern, pos);
-			if (caseInsesitive ? res->Path.iwildcard(filenamePattern, pos) : res->Path.wildcard(filenamePattern,pos))
+			if (caseInsesitive ? res->Path.iwildcard(pattern, pos) : res->Path.wildcard(pattern, pos))
 				callback(res, localData);
 		}
 	}

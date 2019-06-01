@@ -232,10 +232,14 @@ public:
 
 			if (pimr->IsLoaded()) 
 			{
-				auto pvd = reinterpret_cast<VertexDescription *>(m.GetVertexDescription(false)); // we don't want trigger "loading", because we are doing it now, so pass false to GetVertexDescription
+				auto pvd = reinterpret_cast<VertexDescription *>(m.GetVertexDescription(false));	// we don't want trigger "loading", because we are doing it now, so pass false to GetVertexDescription
+				auto pmp = reinterpret_cast<MProperties *>(m.GetMeshProperties(false));				// we don't want trigger "loading", because we are doing it now, so pass false to GetVertexDescription
 				auto pim = pimr->aiLoader.Mesh(m.GetMeshIdx());
 				if (pim)
+				{
 					*pvd = pim->vd;
+					*pmp = pim->prop;
+				}
 
 			}
 		}
@@ -282,11 +286,6 @@ public:
 			auto *pim = reinterpret_cast<Importer*>(param);
 			
 			CResource r(res);
-//			uint32_t rxs = 0;
-//			auto rx = r.GetXML(&rxs);
-//			STR rxml(rx, rx + rxs);
-
-			// check if mesh mach
 		}, this, nullptr, RESID_MESH);
 	}
 

@@ -10,6 +10,7 @@ class ResourceBase;
 class ResourceImplementationInterface;
 class ResourceFactoryInterface;
 class ResourceManager;
+class ResMesh;
 
 extern ResourceManager *globalResourceManager;
 
@@ -161,6 +162,7 @@ public:
 	/// It is empty resource without assigned any file on disk.
 	/// </summary>
 	ResourceBase() :
+		_resourceData(nullptr),
 		_isLoaded(false), 
 		_isDeleted(false),
 		_isModified(false),
@@ -294,8 +296,11 @@ public:
 	static void Destroy(ResourceManager *);
 
 	void Filter(void(*callback)(ResourceBase *, void *), void *localData, CSTR namePattern = nullptr, U32 typeId = RESID_UNKNOWN);
-	void Filter(void(*callback)(ResourceBase *, void *), void *localData, CSTR filenamePattern, ResourceBase *rootResource, bool caseInsesitive = true);
-	void Filter(void(*callback)(ResourceBase *, void *), void *localData, CWSTR filenamePattern, ResourceBase *rootResource, bool caseInsesitive = true);
+	void Filter(void(*callback)(ResourceBase *, void *), void * localData, CSTR pattern, CWSTR rootPath, bool caseInsesitive);
+	void Filter(void(*callback)(ResourceBase *, void *), void * localData, CWSTR pattern, CWSTR rootPath, bool caseInsesitive);
+	void Filter(void(*callback)(ResourceBase *, void *), void * localData, const WSTR::_B &pattern, const WSTR::_B &rootPath, bool caseInsesitive);
+	void Filter(void(*callback)(ResourceBase *, void *), void * localData, BAMS::Property *prop, ResMesh *mesh, bool caseInsesitive);
+
 	ResourceBase *GetByFilename(const WSTR &filename, U32 typeId = RESID_UNKNOWN);
 	ResourceBase *Get(const STR &resName, U32 typeId = RESID_UNKNOWN);
 	ResourceBase *Get(CSTR resName, U32 typeId = RESID_UNKNOWN) { return Get(STR(resName), typeId); };

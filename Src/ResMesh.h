@@ -10,15 +10,16 @@ class ResMesh : public ResoureImpl<ResMesh, RESID_MESH, false>
 {
 	ResourceBase *rb;
 	VertexDescription vd;
+	MProperties meshProperties;
 	U32 meshIdx;
 	U32 meshHash;
 	ResourceBase *meshSrc;
-	bool isVertexDescriptionDataSet;
+	bool isMeshLoaded;
 	void _LoadXML();
 	void _SaveXML();
 
 public:
-	ResMesh(ResourceBase *res) : rb(res), meshSrc(nullptr), meshIdx(-1), meshHash(0), isVertexDescriptionDataSet(false) {
+	ResMesh(ResourceBase *res) : rb(res), meshSrc(nullptr), meshIdx(-1), meshHash(0), isMeshLoaded(false) {
 		if (res->XML->FirstChild())
 			_LoadXML(); // XML is readed from manifest, so no need to load any file from disk
 	}
@@ -30,6 +31,7 @@ public:
 	void SetVertexDescription(VertexDescription *pvd, U32 _meshHash, ResourceBase *_meshSrc, U32 _meshIdx);
 
 	VertexDescription *GetVertexDescription(bool loadASAP = false);
+	MProperties *GetMeshProperties(bool loadASAP = false);
 	ResourceBase *GetMeshSrc() { return meshSrc; }
 	U32 GetMeshIdx() { return meshIdx; }
 	void SetMeshIdx(U32 idx) { meshIdx = idx; }

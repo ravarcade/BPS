@@ -375,6 +375,33 @@ void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
 {
 	static const char *meshes[] = { "Mesh_1", "Mesh_2", "Mesh_4", "Mesh_5", "Mesh_6", "Mesh_7" };
 	static const char *colorTextures[] = {"flipper-t1-white-red",  "test", "guard1_body", "test", "test", "test" };
+	static bool meshesChecked[100] = { false };
+	static const char *colorTexturePropertyName[] = { "file", "albedo" };
+	if (!meshesChecked[i])
+	{
+		meshesChecked[i] = true;
+		CResourceManager rm;
+
+		CResMesh mesh = rm.Get<CResMesh>(meshes[i]);
+		auto mp = mesh.GetMeshProperties(true);
+		for (auto ctn : colorTexturePropertyName)
+		{
+			auto p = FindProp(*mp, ctn);
+			if (p) 
+			{
+				rm.Filter([](BAMS::IResource *res, void *local) {
+					CResource r(res);
+					*reinterpret_cast<const char **>(local) = r.GetName();
+					TRACE(r.GetName());
+//					TRACEW(r.GetPath());
+				}, &colorTextures[i], p, mesh);
+				break;
+			}
+		}
+
+		Tools::Dump(mp);
+	}
+
 	uint32_t oid = -1;
 	Properties *pprop = nullptr;
 	PADD_MESH addMeshParams = { wnd, "name is irrelevant", meshes[i], "basic", &pprop, &oid };

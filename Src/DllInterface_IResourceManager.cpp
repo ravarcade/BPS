@@ -100,11 +100,12 @@ extern "C" {
 			meshIdx);
 	}
 
-	BAMS_EXPORT IVertexDescription *IResMesh_GetVertexDescription(IResMesh * res, bool loadASAP) { return Impl<ResMesh>(res)->GetVertexDescription(loadASAP); }
-	BAMS_EXPORT IResource * IResMesh_GetMeshSrc(IResMesh * res)                                  { return Impl<ResMesh>(res)->GetMeshSrc(); }
-	BAMS_EXPORT uint32_t IResMesh_GetMeshIdx(IResMesh * res)                                     { return Impl<ResMesh>(res)->GetMeshIdx(); }
-	BAMS_EXPORT void IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx)                           { return Impl<ResMesh>(res)->SetMeshIdx(idx); }
-	BAMS_EXPORT uint32_t IResMesh_GetMeshHash(IResMesh * res)                                    { return Impl<ResMesh>(res)->GetMeshHash(); }
+	BAMS_EXPORT IVertexDescription * IResMesh_GetVertexDescription(IResMesh * res, bool loadASAP) { return Impl<ResMesh>(res)->GetVertexDescription(loadASAP); }
+	BAMS_EXPORT IMProperties * IResMesh_GetMeshProperties(IResMesh * res, bool loadASAP)          { return Impl<ResMesh>(res)->GetMeshProperties(loadASAP); }
+	BAMS_EXPORT IResource * IResMesh_GetMeshSrc(IResMesh * res)                                   { return Impl<ResMesh>(res)->GetMeshSrc(); }
+	BAMS_EXPORT uint32_t IResMesh_GetMeshIdx(IResMesh * res)                                      { return Impl<ResMesh>(res)->GetMeshIdx(); }
+	BAMS_EXPORT void IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx)                            { return Impl<ResMesh>(res)->SetMeshIdx(idx); }
+	BAMS_EXPORT uint32_t IResMesh_GetMeshHash(IResMesh * res)                                     { return Impl<ResMesh>(res)->GetMeshHash(); }
 
 	// =========================================================================== ResImage
 
@@ -164,10 +165,22 @@ extern "C" {
 		resm->Filter(reinterpret_cast<void (*)(ResourceBase *, void *)>(callback), localData, pattern, typeId);
 	}
 
-	BAMS_EXPORT void IResourceManager_FilterByFilename(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, const char * pattern, IResource * rootResource, bool caseInsesitive)
+	BAMS_EXPORT void IResourceManager_FilterByFilename(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, const wchar_t * pattern, const wchar_t * rootPath, bool caseInsesitive)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->Filter(reinterpret_cast<void(*)(ResourceBase *, void *)>(callback), localData, pattern, reinterpret_cast<ResourceBase *>(rootResource), caseInsesitive);
+		resm->Filter(reinterpret_cast<void(*)(ResourceBase *, void *)>(callback), localData, pattern, rootPath, caseInsesitive);
+	}
+
+	BAMS_EXPORT void IResourceManager_FilterByFilenameUTF8(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, const char * pattern, const wchar_t * rootPath, bool caseInsesitive)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		resm->Filter(reinterpret_cast<void(*)(ResourceBase *, void *)>(callback), localData, pattern, rootPath, caseInsesitive);
+	}
+
+	BAMS_EXPORT void IResourceManager_FilterByMeshProperty(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, BAMS::Property * prop, IResMesh * mesh, bool caseInsesitive)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		resm->Filter(reinterpret_cast<void(*)(ResourceBase *, void *)>(callback), localData, prop, Impl<ResMesh>(mesh), caseInsesitive);
 	}
 
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid)

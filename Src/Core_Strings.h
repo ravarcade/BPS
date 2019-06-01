@@ -472,7 +472,7 @@ public:
 			}
 		}
 
-		return pos != _used;
+		return pos == _used;
 	}
 
 	template <typename V>
@@ -507,7 +507,7 @@ public:
 			}
 		}
 
-		return pos != _used;
+		return pos == _used;
 	}
 
 };
@@ -648,6 +648,16 @@ typedef simple_string<char, U32> SimpleString;
 
 typedef basic_string_base<wchar_t, U32> WString;
 typedef basic_string_base<char, U32> String;
+
+
+template<typename T>
+const basic_string_base<T, U32> ToBasicString(const T *t, U32 l = 0) { return std::move(basic_string_base<T, U32>(const_cast<T*>(t), l)); }
+template<typename T>
+const basic_string_base<T, U32> ToBasicString(T *t, U32 l = 0) { return std::move(basic_string_base<T, U32>(t, l)); }
+
+//template<typename T>
+//auto ToBasicString(T * t, U32 l = 0) { basic_string_base<T, U32> v(t, l); return std::move(v); }
+
 
 /**
  * STR & WSTR should be used as standard strings. It store: 1x pointer, 2x 32-bit for length of string and length of buffer.

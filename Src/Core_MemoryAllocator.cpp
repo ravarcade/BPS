@@ -187,8 +187,6 @@ namespace MemoryAllocatorsPrivate {
 			if (DebugStats.Last)
 				DebugStats.Last->next = ext;
 			DebugStats.Last = ext;
-			if (ext->counter == 418)
-				TRACE("panic");
 
 			TRACE_MEMORY_LEAKS("++ [" << ext->counter << "]: allocate(" << ext->size << ")\n");
 			return ext + 1;

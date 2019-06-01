@@ -125,7 +125,7 @@ void ResMesh::SetVertexDescription(VertexDescription * pvd, U32 _meshHash, Resou
 	meshIdx = _meshIdx; 
 
 	// mark, that we don't need to load this mesh again.
-	isVertexDescriptionDataSet = true;  
+	isMeshLoaded = true;  
 
 	// save settings to XML
 	_SaveXML(); 
@@ -133,15 +133,23 @@ void ResMesh::SetVertexDescription(VertexDescription * pvd, U32 _meshHash, Resou
 
 VertexDescription * ResMesh::GetVertexDescription(bool loadASAP)
 {
-	if (!isVertexDescriptionDataSet && loadASAP)
+	if (!isMeshLoaded && loadASAP)
 	{
 		CEngine::SendMsg(IMPORTMODULE_LOADMESH, IMPORT_MODULE, 0, rb);
-
-		// mark, that we don't need to load this mesh again.
-		isVertexDescriptionDataSet = true;
+		isMeshLoaded = true;
 	}
 
 	return &vd;
+}
+
+MProperties *ResMesh::GetMeshProperties(bool loadASAP)
+{
+	if (!isMeshLoaded && loadASAP)
+	{
+		CEngine::SendMsg(IMPORTMODULE_LOADMESH, IMPORT_MODULE, 0, rb);
+		isMeshLoaded = true;
+	}
+	return &meshProperties;
 }
 
 // ==========================================================
@@ -150,6 +158,7 @@ void ResImportModel::IdentifyResourceType(ResourceBase * res)
 {
 	if (res->Type != RESID_UNKNOWN)
 		return;
+
 	PIDETIFY_RESOURCE ir = {
 		res->Path.c_str(),
 		&res->Type,
