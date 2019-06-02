@@ -4,6 +4,25 @@
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
 
+uint32_t CDescriptorPool::default_AvailableDesciprotrSets = 100;
+uint32_t CDescriptorPool::default_DescriptorSizes[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = {
+	100, // VK_DESCRIPTOR_TYPE_SAMPLER = 0,
+	100, // VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER = 1,
+	100, // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE = 2,
+	100, // VK_DESCRIPTOR_TYPE_STORAGE_IMAGE = 3,
+	10,  // VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER = 4,
+	10,  // VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER = 5,
+	50,  // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
+	10,  // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
+	20,  // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
+	10,  // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
+	20,  // VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT = 10, 
+};
+uint32_t CDescriptorPool::stats_UsedDescriptorSets = 0;
+uint32_t CDescriptorPool::stats_UsedDescriptors[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = { 0 };
+
+// ----------------------------------------------------------------------------
+
 OutputWindow::OutputWindow() :
 	instance(VK_NULL_HANDLE),
 	window(nullptr),

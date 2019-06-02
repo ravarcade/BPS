@@ -174,7 +174,7 @@ Properties *GetShaderParams(BAMS::CEngine &en, uint32_t wnd, const char *shaderN
 
 Properties * GetObjectParams(BAMS::CEngine &en, uint32_t wnd, const char *objectName, uint32_t objectIdx = 0)
 {
-	Properties *prop;
+	Properties *prop = nullptr;
 	PGET_OBJECT_PARAMS p = { wnd, objectName, objectIdx, &prop };
 	en.SendMsg(GET_OBJECT_PARAMS, RENDERING_ENGINE, 0, &p);
 
@@ -392,14 +392,14 @@ void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
 				rm.Filter([](BAMS::IResource *res, void *local) {
 					CResource r(res);
 					*reinterpret_cast<const char **>(local) = r.GetName();
-					TRACE(r.GetName());
+//					TRACE(r.GetName());
 //					TRACEW(r.GetPath());
 				}, &colorTextures[i], p, mesh);
 				break;
 			}
 		}
 
-		Tools::Dump(mp);
+//		Tools::Dump(mp);
 	}
 
 	uint32_t oid = -1;

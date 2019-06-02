@@ -58,6 +58,9 @@ public:
 	uint32_t AddObject(const char *meshName);
 	Properties *GetProperties(uint32_t drawObjectId = -1);
 
+	// is it needed?
+	uint32_t GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSize) { return _GetDescriptorPoolsSize(poolsSize); }
+
 protected:
 	void CreateGraphicsPipeline();
 
@@ -71,8 +74,6 @@ protected:
 
 	void RebuildAllMiniDescriptorSets(bool forceRebuildMe = false);
 	
-	// is it needed?
-	uint32_t GetDescriptorPoolsSize(std::vector<uint32_t>& poolsSize) { return _GetDescriptorPoolsSize(poolsSize); }
 	friend class OutputWindow;
 
 private:

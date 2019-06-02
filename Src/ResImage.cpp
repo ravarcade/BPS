@@ -28,12 +28,14 @@ void ResImage::Update(ResourceBase * res) {
 
 	if (!rb->isLoaded())
 	{
+//		TRACE("LOADED: " << rb->Name.c_str());
 		CEngine::SendMsg(IMPORTMODULE_UPDATEIMAGE, IMPORT_MODULE, 0, rb);
 	}
 }
 
 void ResImage::Release(ResourceBase * res)
 {
+//	TRACE("REL: " << rb->Name.c_str());
 	img.Release();
 	ReleaseSrc();
 }
