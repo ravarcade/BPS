@@ -34,7 +34,6 @@ public:
 	VkDebugUtilsMessengerEXT _debugMessengerCallback = VK_NULL_HANDLE;
 
 
-
 	// ------------------------------------
 
 	void _ListVKExtensions(std::ostream &out);

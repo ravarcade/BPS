@@ -4,8 +4,106 @@
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
 
-uint32_t CDescriptorPool::default_AvailableDesciprotrSets = 100;
-uint32_t CDescriptorPool::default_DescriptorSizes[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = {
+void CDescriptorPools::Prepare(OutputWindow *ow)
+{
+	vk = ow;
+
+	// check default values and compare with limits:
+	VkPhysicalDeviceProperties physicalDeviceProperties;
+	vkGetPhysicalDeviceProperties(vk->physicalDevice, &physicalDeviceProperties);
+
+	auto &SetLimit = [&](uint32_t maxLimit, std::initializer_list<VkDescriptorType> desc) 
+	{
+		maxLimit /= 5; // we use max 20% of available resources... never ask for more.
+		for (auto i : desc)
+		{
+			if (default_DescriptorSizes[i] > maxLimit)
+				default_DescriptorSizes[i] = maxLimit;
+		}
+	};
+
+	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetSamplers, { VK_DESCRIPTOR_TYPE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER });
+	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetSampledImages, { VK_DESCRIPTOR_TYPE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER});
+	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetStorageImages, { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER });
+	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetUniformBuffers, { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER });
+	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetUniformBuffersDynamic, { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER });
+	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetStorageBuffers, { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC });
+	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetStorageBuffersDynamic, { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC });
+	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetInputAttachments, { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT });
+	
+	_CreateNewDescriptorPool();
+}
+
+void CDescriptorPools::Clear()
+{
+	vk->vkDestroy(descriptorPool);
+	for (auto &dp : oldDescriptorPools)
+		vk->vkDestroy(dp);
+	oldDescriptorPools.clear();
+	availableDescriptorSets = 0;
+}
+
+VkDescriptorSet CDescriptorPools::CreateDescriptorSets(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts)
+{
+	VkDescriptorSet descriptorSet = nullptr;
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = static_cast<uint32_t>(descriptorSetLayouts.size());
+	allocInfo.pSetLayouts = descriptorSetLayouts.data();
+
+	if (vkAllocateDescriptorSets(vk->device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
+		throw std::runtime_error("failed to allocate descriptor set!");
+	}
+
+	return descriptorSet;
+}
+
+void CDescriptorPools::_CreateNewDescriptorPool()
+{
+	availableDescriptorSets = default_AvailableDesciprotrSets;
+	for (uint32_t i = 0; i < VK_DESCRIPTOR_TYPE_RANGE_SIZE; ++i)
+	{
+		poolSizes[i].type = static_cast<VkDescriptorType>(VK_DESCRIPTOR_TYPE_BEGIN_RANGE + i);
+		poolSizes[i].descriptorCount = default_DescriptorSizes[i];
+	}
+
+	//		_AddOldLimits(shaders, count);
+
+	VkDescriptorPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = static_cast<uint32_t>(COUNT_OF(poolSizes));
+	poolInfo.pPoolSizes = poolSizes;
+	poolInfo.maxSets = availableDescriptorSets;
+
+	if (vkCreateDescriptorPool(vk->device, &poolInfo, vk->allocator, &descriptorPool) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create descriptor pool!");
+	}
+}
+
+void CDescriptorPools::_AddOldLimits(CShaderProgram **shaders, uint32_t count)
+{
+	std::vector<uint32_t> pool;
+	pool.resize(VK_DESCRIPTOR_TYPE_RANGE_SIZE);
+	uint32_t s = 0;
+	uint32_t numShaderPrograms = 0;
+	for (uint32_t i = 0; i < count; ++i)
+	{
+		shaders[i]->GetDescriptorPoolsSize(pool);
+		++numShaderPrograms;
+	}
+
+	for (uint32_t i = 0; i < pool.size(); ++i)
+	{
+		if (i < COUNT_OF(poolSizes))
+			poolSizes[i].descriptorCount += pool[i];
+	}
+	availableDescriptorSets += numShaderPrograms;
+}
+
+
+uint32_t CDescriptorPools::default_AvailableDesciprotrSets = 100;
+uint32_t CDescriptorPools::default_DescriptorSizes[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = {
 	100, // VK_DESCRIPTOR_TYPE_SAMPLER = 0,
 	100, // VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER = 1,
 	100, // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE = 2,
@@ -18,8 +116,8 @@ uint32_t CDescriptorPool::default_DescriptorSizes[VK_DESCRIPTOR_TYPE_RANGE_SIZE]
 	10,  // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
 	20,  // VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT = 10, 
 };
-uint32_t CDescriptorPool::stats_UsedDescriptorSets = 0;
-uint32_t CDescriptorPool::stats_UsedDescriptors[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = { 0 };
+uint32_t CDescriptorPools::stats_UsedDescriptorSets = 0;
+uint32_t CDescriptorPools::stats_UsedDescriptors[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = { 0 };
 
 // ----------------------------------------------------------------------------
 
@@ -178,22 +276,6 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 		_LoadShaderPrograms();
 		_CreateCommandBuffers();
 	}
-}
-
-VkDescriptorSet OutputWindow::CreateDescriptorSets(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts)
-{
-	VkDescriptorSet descriptorSet = nullptr;
-	VkDescriptorSetAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocInfo.descriptorPool = descriptorPool;
-	allocInfo.descriptorSetCount = static_cast<uint32_t>(descriptorSetLayouts.size());
-	allocInfo.pSetLayouts = descriptorSetLayouts.data();
-
-	if (vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet) != VK_SUCCESS) {
-		throw std::runtime_error("failed to allocate descriptor set!");
-	}
-	
-	return descriptorSet;
 }
 
 void OutputWindow::Close(GLFWwindow* wnd)
@@ -761,7 +843,7 @@ void OutputWindow::_Cleanup()
 		_CleanupSwapChain();
 		_CleanupRenderPass();
 
-		vkDestroy(descriptorPool);
+		descriptorPool.Clear();
 
 		vkDestroy(renderFinishedSemaphore);
 		vkDestroy(imageAvailableSemaphore);
@@ -840,44 +922,6 @@ void OutputWindow::_CleanupRenderPass()
 {
 	vkDestroy(deferredFrameBuf);
 	vkDestroy(forwardFrameBuf);
-}
-
-void OutputWindow::_CreateDescriptorPool()
-{
-	std::vector<uint32_t> pools;
-	uint32_t s = 0;
-	uint32_t numShaderPrograms = 0;
-	shaders.foreach([&](CShaderProgram *&sh) {
-		s = sh->GetDescriptorPoolsSize(pools);
-		++numShaderPrograms;
-	});
-
-	if (true)  // force add 5 descriptors to pool
-	{
-		pools.resize(VK_DESCRIPTOR_TYPE_RANGE_SIZE);
-		for (auto &x : pools)
-			x += 15;
-		numShaderPrograms += 5;
-		s = static_cast<uint32_t>(pools.size());
-	}
-
-	std::vector<VkDescriptorPoolSize> poolSizes(s);
-	for (uint32_t i = 0; i < pools.size(); ++i) {
-		if (pools[i]) {
-			poolSizes[i].type = static_cast<VkDescriptorType>(VK_DESCRIPTOR_TYPE_BEGIN_RANGE + i);
-			poolSizes[i].descriptorCount = pools[i];
-		}
-	}
-
-	VkDescriptorPoolCreateInfo poolInfo = {};
-	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-	poolInfo.pPoolSizes = poolSizes.data();
-	poolInfo.maxSets = numShaderPrograms;
-
-	if (vkCreateDescriptorPool(device, &poolInfo, allocator, &descriptorPool) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create descriptor pool!");
-	}
 }
 
 // ------------------------------------------------------------------------
@@ -1250,7 +1294,7 @@ void OutputWindow::_CreateDeferredRenderPass(VkFormat format, VkSampleCountFlagB
 
 void OutputWindow::_LoadShaderPrograms()
 {
-	_CreateDescriptorPool();                            // create descriptor pool for all used shader programs
+	descriptorPool.Prepare(this);
 
 	shaders.foreach([&](CShaderProgram *&s) 
 	{

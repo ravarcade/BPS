@@ -1,4 +1,7 @@
 
+class OutputWindow;
+class CDescriptorPools;
+
 enum EDrawOrder {
 	DEFERRED = 0,
 	FORWARD,
@@ -12,57 +15,32 @@ struct ObjectInfo {
 	Properties *GetProperties() { return shader->GetProperties(oid); }
 };
 
-struct CDescriptorPool {
+class CDescriptorPools {
+public:
+	CDescriptorPools() : vk(nullptr), descriptorPool(VK_NULL_HANDLE) {}
+	~CDescriptorPools() { Clear(); }
+
+	void Prepare(OutputWindow *ow);
+	void Clear();
+	VkDescriptorSet CreateDescriptorSets(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts);
+
+private:
 	VkDescriptorPoolSize poolSizes[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
 	uint32_t availableDescriptorSets;
 	VkDescriptorPool descriptorPool;
+	std::vector<VkDescriptorPool> oldDescriptorPools;
 
-	void CreatePool(CShaderProgram **shaders, uint32_t count)
-	{
-		availableDescriptorSets = default_AvailableDesciprotrSets;
-		for (uint32_t i = 0; i < VK_DESCRIPTOR_TYPE_RANGE_SIZE; ++i)
-		{
-			poolSizes[i].type = static_cast<VkDescriptorType>(VK_DESCRIPTOR_TYPE_BEGIN_RANGE + i);
-			poolSizes[i].descriptorCount = default_DescriptorSizes[i];
-		}
+	OutputWindow *vk;
 
-		_AddOldLimits(shaders, count);
-
-
-		VkDescriptorPoolCreateInfo poolInfo = {};
-		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = static_cast<uint32_t>(COUNT_OF(poolSizes));
-		poolInfo.pPoolSizes = poolSizes;
-		poolInfo.maxSets = availableDescriptorSets;
-		
-		//if (vkCreateDescriptorPool(device, &poolInfo, allocator, &descriptorPool) != VK_SUCCESS) {
-		//	throw std::runtime_error("failed to create descriptor pool!");
-		//}
-	}
-
-	void _AddOldLimits(CShaderProgram **shaders, uint32_t count)
-	{
-		std::vector<uint32_t> pool;
-		pool.resize(VK_DESCRIPTOR_TYPE_RANGE_SIZE);
-		uint32_t s = 0;
-		uint32_t numShaderPrograms = 0;
-		for (uint32_t i = 0; i < count; ++i)
-		{
-			shaders[i]->GetDescriptorPoolsSize(pool);
-			++numShaderPrograms;
-		}
-
-		for (uint32_t i = 0; i < pool.size(); ++i)
-		{
-			if (i < COUNT_OF(poolSizes))
-				poolSizes[i].descriptorCount += pool[i];
-		}
-		availableDescriptorSets += numShaderPrograms;
-	}
-
-	// stats:
+	void _CreateNewDescriptorPool();
+	void _AddOldLimits(CShaderProgram **shaders, uint32_t count);
+	
+	// params:
 	static uint32_t default_AvailableDesciprotrSets;
 	static uint32_t default_DescriptorSizes[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
+
+
+	// stats:
 	static uint32_t stats_UsedDescriptorSets;
 	static uint32_t stats_UsedDescriptors[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
 };
@@ -162,7 +140,7 @@ private:
 	VkViewport viewport;
 	VkRect2D scissor;
 	// === for demo cube ===
-	VkDescriptorPool descriptorPool;
+	CDescriptorPools descriptorPool;
 	VkDescriptorSet currentDescriptorSet;
 	std::vector<VkCommandBuffer> commandBuffers;
 	bool resizeWindow = false;
@@ -199,9 +177,7 @@ private:
 
 	void _CreateRenderPass();
 	void _CleanupRenderPass();
-
-	void _CreateDescriptorPool();
-
+	
 	void _CreateDeferredCommandBuffer(VkCommandBuffer & cb);
 	void _CreateForwardCommandBuffer(VkCommandBuffer & cb, VkFramebuffer & frameBuffer);
 	
@@ -237,7 +213,7 @@ public:
 	~OutputWindow() { _Cleanup(); }
 	void Init();
 	void Prepare(VkInstance _instance, GLFWwindow* _window, const VkAllocationCallbacks* _allocator);
-	VkDescriptorSet CreateDescriptorSets(std::vector<VkDescriptorSetLayout> &descriptorSetLayouts);
+	VkDescriptorSet CreateDescriptorSets(std::vector<VkDescriptorSetLayout> &descriptorSetLayouts) { return descriptorPool.CreateDescriptorSets(descriptorSetLayouts); }
 	void Close(GLFWwindow *wnd = nullptr);
 
 	void UpdateUniformBuffer();
@@ -340,6 +316,7 @@ public:
 	}
 	CStringHastable<CTexture2d> textures;
 
+	friend CDescriptorPools;
 	friend CShaderProgram;
 	friend CTexture2d;
 };
