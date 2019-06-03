@@ -22,11 +22,12 @@ public:
 
 	void Prepare(OutputWindow *ow);
 	void Clear();
-	VkDescriptorSet CreateDescriptorSets(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts);
+	VkDescriptorSet CreateDescriptorSets(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts, std::vector<VkDescriptorPoolSize> &descriptorRequirments);
 
 private:
-	VkDescriptorPoolSize poolSizes[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
+	VkDescriptorPoolSize availableDescriptorTypes[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
 	uint32_t availableDescriptorSets;
+
 	VkDescriptorPool descriptorPool;
 	std::vector<VkDescriptorPool> oldDescriptorPools;
 
@@ -41,8 +42,8 @@ private:
 
 
 	// stats:
-	static uint32_t stats_UsedDescriptorSets;
-	static uint32_t stats_UsedDescriptors[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
+	static uint32_t stats_usedDescriptorSets;
+	static uint32_t stats_usedDescriptorTypes[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
 };
 
 class OutputWindow
@@ -213,7 +214,7 @@ public:
 	~OutputWindow() { _Cleanup(); }
 	void Init();
 	void Prepare(VkInstance _instance, GLFWwindow* _window, const VkAllocationCallbacks* _allocator);
-	VkDescriptorSet CreateDescriptorSets(std::vector<VkDescriptorSetLayout> &descriptorSetLayouts) { return descriptorPool.CreateDescriptorSets(descriptorSetLayouts); }
+	VkDescriptorSet CreateDescriptorSets(std::vector<VkDescriptorSetLayout> &descriptorSetLayouts, std::vector<VkDescriptorPoolSize> &descriptorRequirments) { return descriptorPool.CreateDescriptorSets(descriptorSetLayouts, descriptorRequirments); }
 	void Close(GLFWwindow *wnd = nullptr);
 
 	void UpdateUniformBuffer();

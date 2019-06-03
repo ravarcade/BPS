@@ -14,7 +14,7 @@ void CDescriptorPools::Prepare(OutputWindow *ow)
 
 	auto &SetLimit = [&](uint32_t maxLimit, std::initializer_list<VkDescriptorType> desc) 
 	{
-		maxLimit /= 5; // we use max 20% of available resources... never ask for more.
+		maxLimit = maxLimit > 10 ? maxLimit / 5 : maxLimit / 2; // we use max 20% of available resources... never ask for more.
 		for (auto i : desc)
 		{
 			if (default_DescriptorSizes[i] > maxLimit)
@@ -25,8 +25,8 @@ void CDescriptorPools::Prepare(OutputWindow *ow)
 	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetSamplers, { VK_DESCRIPTOR_TYPE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER });
 	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetSampledImages, { VK_DESCRIPTOR_TYPE_SAMPLER, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER});
 	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetStorageImages, { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER });
-	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetUniformBuffers, { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER });
-	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetUniformBuffersDynamic, { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER });
+	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetUniformBuffers, { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC });
+	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetUniformBuffersDynamic, { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC });
 	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetStorageBuffers, { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC });
 	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetStorageBuffersDynamic, { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC });
 	SetLimit(physicalDeviceProperties.limits.maxDescriptorSetInputAttachments, { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT });
@@ -43,8 +43,27 @@ void CDescriptorPools::Clear()
 	availableDescriptorSets = 0;
 }
 
-VkDescriptorSet CDescriptorPools::CreateDescriptorSets(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts)
+VkDescriptorSet CDescriptorPools::CreateDescriptorSets(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts, std::vector<VkDescriptorPoolSize> &descriptorRequirments)
 {
+	// check if we need new pool
+	bool needNewPool = descriptorPool == VK_NULL_HANDLE || !availableDescriptorSets;
+	for (uint32_t i = 0; i < descriptorRequirments.size(); ++i)
+	{
+		if (needNewPool || availableDescriptorTypes[descriptorRequirments[i].type].descriptorCount < descriptorRequirments[i].descriptorCount)
+		{
+			_CreateNewDescriptorPool();
+			break;
+		}
+	}
+
+	--availableDescriptorSets;
+	++stats_usedDescriptorSets;
+	for (auto &req : descriptorRequirments)
+	{
+		availableDescriptorTypes[req.type].descriptorCount -= req.descriptorCount;
+		stats_usedDescriptorTypes[req.type] += req.descriptorCount;
+	}
+
 	VkDescriptorSet descriptorSet = nullptr;
 	VkDescriptorSetAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -61,19 +80,24 @@ VkDescriptorSet CDescriptorPools::CreateDescriptorSets(std::vector<VkDescriptorS
 
 void CDescriptorPools::_CreateNewDescriptorPool()
 {
+	if (descriptorPool != VK_NULL_HANDLE) {
+		oldDescriptorPools.push_back(descriptorPool);
+		descriptorPool = VK_NULL_HANDLE;
+	}
+
 	availableDescriptorSets = default_AvailableDesciprotrSets;
 	for (uint32_t i = 0; i < VK_DESCRIPTOR_TYPE_RANGE_SIZE; ++i)
 	{
-		poolSizes[i].type = static_cast<VkDescriptorType>(VK_DESCRIPTOR_TYPE_BEGIN_RANGE + i);
-		poolSizes[i].descriptorCount = default_DescriptorSizes[i];
+		availableDescriptorTypes[i].type = static_cast<VkDescriptorType>(VK_DESCRIPTOR_TYPE_BEGIN_RANGE + i);
+		availableDescriptorTypes[i].descriptorCount = default_DescriptorSizes[i];
 	}
 
 	//		_AddOldLimits(shaders, count);
 
 	VkDescriptorPoolCreateInfo poolInfo = {};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = static_cast<uint32_t>(COUNT_OF(poolSizes));
-	poolInfo.pPoolSizes = poolSizes;
+	poolInfo.poolSizeCount = static_cast<uint32_t>(COUNT_OF(availableDescriptorTypes));
+	poolInfo.pPoolSizes = availableDescriptorTypes;
 	poolInfo.maxSets = availableDescriptorSets;
 
 	if (vkCreateDescriptorPool(vk->device, &poolInfo, vk->allocator, &descriptorPool) != VK_SUCCESS) {
@@ -83,41 +107,41 @@ void CDescriptorPools::_CreateNewDescriptorPool()
 
 void CDescriptorPools::_AddOldLimits(CShaderProgram **shaders, uint32_t count)
 {
-	std::vector<uint32_t> pool;
-	pool.resize(VK_DESCRIPTOR_TYPE_RANGE_SIZE);
-	uint32_t s = 0;
-	uint32_t numShaderPrograms = 0;
-	for (uint32_t i = 0; i < count; ++i)
-	{
-		shaders[i]->GetDescriptorPoolsSize(pool);
-		++numShaderPrograms;
-	}
+	//std::vector<uint32_t> pool;
+	//pool.resize(VK_DESCRIPTOR_TYPE_RANGE_SIZE);
+	//uint32_t s = 0;
+	//uint32_t numShaderPrograms = 0;
+	//for (uint32_t i = 0; i < count; ++i)
+	//{
+	//	shaders[i]->_SetDescriptorRequirments(pool);
+	//	++numShaderPrograms;
+	//}
 
-	for (uint32_t i = 0; i < pool.size(); ++i)
-	{
-		if (i < COUNT_OF(poolSizes))
-			poolSizes[i].descriptorCount += pool[i];
-	}
-	availableDescriptorSets += numShaderPrograms;
+	//for (uint32_t i = 0; i < pool.size(); ++i)
+	//{
+	//	if (i < COUNT_OF(poolSizes))
+	//		poolSizes[i].descriptorCount += pool[i];
+	//}
+	//availableDescriptorSets += numShaderPrograms;
 }
 
 
 uint32_t CDescriptorPools::default_AvailableDesciprotrSets = 100;
 uint32_t CDescriptorPools::default_DescriptorSizes[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = {
-	100, // VK_DESCRIPTOR_TYPE_SAMPLER = 0,
-	100, // VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER = 1,
-	100, // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE = 2,
-	100, // VK_DESCRIPTOR_TYPE_STORAGE_IMAGE = 3,
-	10,  // VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER = 4,
-	10,  // VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER = 5,
-	50,  // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
-	10,  // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
-	20,  // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
-	10,  // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
-	20,  // VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT = 10, 
+	0,  // VK_DESCRIPTOR_TYPE_SAMPLER = 0,
+	20, // VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER = 1,
+	0,  // VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE = 2,
+	0,  // VK_DESCRIPTOR_TYPE_STORAGE_IMAGE = 3,
+	0,  // VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER = 4,
+	0,  // VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER = 5,
+	10, // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
+	0,  // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
+	0,  // VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
+	0,  // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
+	0,  // VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT = 10, 
 };
-uint32_t CDescriptorPools::stats_UsedDescriptorSets = 0;
-uint32_t CDescriptorPools::stats_UsedDescriptors[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = { 0 };
+uint32_t CDescriptorPools::stats_usedDescriptorSets = 0;
+uint32_t CDescriptorPools::stats_usedDescriptorTypes[VK_DESCRIPTOR_TYPE_RANGE_SIZE] = { 0 };
 
 // ----------------------------------------------------------------------------
 
