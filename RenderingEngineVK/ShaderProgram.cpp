@@ -454,107 +454,14 @@ VkRenderPass CShaderProgram::_GetRenderPass()
 	return m_renderPass;
 }
 
-void CShaderProgram::_SetDescriptorRequirments()
-{
-	auto layout = m_reflection.GetLayout();
-
-	//
-	m_descriptorsRequirments.clear();
-#define SETDESCRIPTORSREQUIRMENTS(t,x) \
-	{ \
-		uint32_t num = 0; \
-		for (auto &set : layout.descriptorSets) \
-		{ \
-			if (set.##x) \
-				num += Utils::count_bits(set.##x); \
-		} \
-		if (num) \
-			m_descriptorsRequirments.push_back({t,num}); \
-	}
-
-	SETDESCRIPTORSREQUIRMENTS(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, uniform_buffer_mask);
-	SETDESCRIPTORSREQUIRMENTS(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, sampled_image_mask);
-	// add other descriptor types
-}
-
 VkPipelineLayout CShaderProgram::_GetPipelineLayout()
 {
 	if (m_pipelineLayout != VK_NULL_HANDLE)
 		return m_pipelineLayout;
 
-	m_descriptorSetLayout.clear();
-
-	uint32_t lastSet = 0, i = 0;
 	auto layout = m_reflection.GetLayout();
-	for (auto &set : layout.descriptorSets)
-	{
-		if (set.uniform_buffer_mask ||
-			set.sampled_image_mask)
-			lastSet = i;
-		++i;
-	}
-
-	_SetDescriptorRequirments();
-
-	for (uint32_t setNo = 0; setNo <= lastSet; ++setNo)
-	{
-		auto &set = layout.descriptorSets[setNo];
-		std::vector<VkDescriptorSetLayoutBinding> bindings;
-
-		if (set.uniform_buffer_mask)
-		{
-			for (unsigned i = 0; i < VULKAN_NUM_BINDINGS; i++)
-			{
-				uint32_t bitMask = 1u << i;
-				uint32_t descriptorCount = set.descriptorCount[i];
-				uint32_t stages = set.stages[i];
-
-				if (set.uniform_buffer_mask & bitMask) {
-					bindings.push_back({ i, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, descriptorCount, stages, nullptr });
-				}
-			}
-		}
-
-		if (set.sampled_image_mask)
-		{
-			for (unsigned i = 0; i < VULKAN_NUM_BINDINGS; i++)
-			{
-				uint32_t bitMask = 1u << i;
-				uint32_t descriptorCount = set.descriptorCount[i];
-				uint32_t stages = set.stages[i];
-
-				if (set.sampled_image_mask & bitMask) {
-					bindings.push_back({ i, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, descriptorCount, stages, nullptr });
-				}
-			}
-
-		}
-
-		if (bindings.size())
-		{
-			VkDescriptorSetLayoutCreateInfo layoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-			layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-			layoutInfo.pBindings = bindings.data();
-
-			VkDescriptorSetLayout descriptorSetLayout;
-			
-			if (vkCreateDescriptorSetLayout(vk->device, &layoutInfo, vk->allocator, &descriptorSetLayout) != VK_SUCCESS)
-				throw std::runtime_error("failed to create descriptor set layout!");
-
-			m_descriptorSetLayout.push_back(descriptorSetLayout);
-		}
-	}
-
-	// add empty set
-	if (false) {
-		VkDescriptorSetLayoutCreateInfo layoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-		layoutInfo.bindingCount = 0;
-		layoutInfo.pBindings = nullptr;
-		VkDescriptorSetLayout descriptorSetLayout;
-		if (vkCreateDescriptorSetLayout(vk->device, &layoutInfo, vk->allocator, &descriptorSetLayout) != VK_SUCCESS)
-			throw std::runtime_error("failed to create descriptor set layout!");
-		m_descriptorSetLayout.push_back(descriptorSetLayout);
-	}
+	m_descriptorSetLayout    = vk->GetDescriptorSetsManager()->CreateDescriptorSetLayouts(layout);
+	m_descriptorsRequirments = vk->GetDescriptorSetsManager()->CreateDescriptorRequirments(layout);
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(m_descriptorSetLayout.size());
@@ -913,7 +820,7 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool forceRebuildMe)
 						freeDescriptorSets.resize(freeDescriptorSets.size() - 1);
 					}
 					else { // create new descriptor set
-						m_miniDescriptorSets[lastUsedIdx].descriptorSet = vk->CreateDescriptorSets(m_descriptorSetLayout, m_descriptorsRequirments);
+						m_miniDescriptorSets[lastUsedIdx].descriptorSet = vk->GetDescriptorSetsManager()->CreateDescriptorSets(m_descriptorSetLayout, m_descriptorsRequirments);
 					}
 					m_miniDescriptorSets[lastUsedIdx].rebuildMe = true;
 				}
@@ -944,7 +851,7 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool forceRebuildMe)
 		uint32_t cnt = static_cast<uint32_t>(m_miniDescriptorSets.size());
 		for (uint32_t i = numOfExistingDescriptorSets; i < cnt; ++i)
 		{
-			m_miniDescriptorSets[i].descriptorSet = vk->CreateDescriptorSets(m_descriptorSetLayout, m_descriptorsRequirments);
+			m_miniDescriptorSets[i].descriptorSet = vk->GetDescriptorSetsManager()->CreateDescriptorSets(m_descriptorSetLayout, m_descriptorsRequirments);
 //			TRACE("[cr:" << m_miniDescriptorSets[i].descriptorSet << ", l=(");
 //			for (auto &x : m_descriptorSetLayout)
 //				TRACE(", " << x);

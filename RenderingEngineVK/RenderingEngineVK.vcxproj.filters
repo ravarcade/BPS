@@ -79,6 +79,9 @@
     <ClInclude Include="Texture2d.h">
       <Filter>Src</Filter>
     </ClInclude>
+    <ClInclude Include="DescriptorSetsManager.h">
+      <Filter>Src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -130,6 +133,9 @@
       <Filter>Src</Filter>
     </ClCompile>
     <ClCompile Include="Texture2d.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="DescriptorSetsManager.cpp">
       <Filter>Src</Filter>
     </ClCompile>
   </ItemGroup>

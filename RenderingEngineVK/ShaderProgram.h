@@ -86,7 +86,7 @@ private:
 	VkPipelineDynamicStateCreateInfo _GetDynamicState();
 	VkPipelineLayout _GetPipelineLayout();
 	VkRenderPass _GetRenderPass();
-	void _SetDescriptorRequirments();
+
 	void _CreateUniformBuffers();
 	void _BuildShaderDataBuffers();
 

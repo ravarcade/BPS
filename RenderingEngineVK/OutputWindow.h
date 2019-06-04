@@ -1,6 +1,5 @@
 
 class OutputWindow;
-class CDescriptorPools;
 
 enum EDrawOrder {
 	DEFERRED = 0,
@@ -13,37 +12,6 @@ struct ObjectInfo {
 	uint32_t oid;
 	ObjectInfo(CShaderProgram *_shader, uint32_t _oid) : shader(_shader), oid(_oid) {}
 	Properties *GetProperties() { return shader->GetProperties(oid); }
-};
-
-class CDescriptorPools {
-public:
-	CDescriptorPools() : vk(nullptr), descriptorPool(VK_NULL_HANDLE) {}
-	~CDescriptorPools() { Clear(); }
-
-	void Prepare(OutputWindow *ow);
-	void Clear();
-	VkDescriptorSet CreateDescriptorSets(std::vector<VkDescriptorSetLayout>& descriptorSetLayouts, std::vector<VkDescriptorPoolSize> &descriptorRequirments);
-
-private:
-	VkDescriptorPoolSize availableDescriptorTypes[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
-	uint32_t availableDescriptorSets;
-
-	VkDescriptorPool descriptorPool;
-	std::vector<VkDescriptorPool> oldDescriptorPools;
-
-	OutputWindow *vk;
-
-	void _CreateNewDescriptorPool();
-	void _AddOldLimits(CShaderProgram **shaders, uint32_t count);
-	
-	// params:
-	static uint32_t default_AvailableDesciprotrSets;
-	static uint32_t default_DescriptorSizes[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
-
-
-	// stats:
-	static uint32_t stats_usedDescriptorSets;
-	static uint32_t stats_usedDescriptorTypes[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
 };
 
 class OutputWindow
@@ -140,9 +108,11 @@ private:
 	//		CShadersReflections cubeShader;
 	VkViewport viewport;
 	VkRect2D scissor;
-	// === for demo cube ===
-	CDescriptorPools descriptorPool;
+
+	CDescriptorSetsMananger descriptorSetsManager;
+
 	VkDescriptorSet currentDescriptorSet;
+
 	std::vector<VkCommandBuffer> commandBuffers;
 	bool resizeWindow = false;
 
@@ -214,7 +184,9 @@ public:
 	~OutputWindow() { _Cleanup(); }
 	void Init();
 	void Prepare(VkInstance _instance, GLFWwindow* _window, const VkAllocationCallbacks* _allocator);
-	VkDescriptorSet CreateDescriptorSets(std::vector<VkDescriptorSetLayout> &descriptorSetLayouts, std::vector<VkDescriptorPoolSize> &descriptorRequirments) { return descriptorPool.CreateDescriptorSets(descriptorSetLayouts, descriptorRequirments); }
+	
+	CDescriptorSetsMananger *GetDescriptorSetsManager() { return &descriptorSetsManager; }
+
 	void Close(GLFWwindow *wnd = nullptr);
 
 	void UpdateUniformBuffer();
@@ -317,7 +289,7 @@ public:
 	}
 	CStringHastable<CTexture2d> textures;
 
-	friend CDescriptorPools;
+	friend CDescriptorSetsMananger;
 	friend CShaderProgram;
 	friend CTexture2d;
 };
