@@ -72,7 +72,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(VK_SDK_PATH)\Include;..\Src;..\3rdParty;C:\Work\Tests\VK\3rdPartyLibs\tinyobjloader-master;C:\Work\Tests\VK\3rdPartyLibs\stb-master;$(IncludePath)</IncludePath>
+    <IncludePath>$(VK_SDK_PATH)\Include;..\BAMEngine;..\3rdParty;$(IncludePath)</IncludePath>
     <LibraryPath>$(VK_SDK_PATH)\lib;..\Lib;..\3rdParty;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

@@ -163,6 +163,13 @@ void wait_for_esc()
 
 // ================================================================= 
 
+void AddModel(BAMS::CEngine &en, uint32_t wnd, const char *repoResourceName, uint32_t idx = 0)
+{
+	PADD_MODEL p = { wnd, repoResourceName, idx };
+	en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &p);
+	return;
+}
+
 Properties *GetShaderParams(BAMS::CEngine &en, uint32_t wnd, const char *shaderName)
 {
 	Properties *prop;
@@ -369,6 +376,26 @@ void Spin(BAMS::CEngine &en)
 			}
 		}
 	}
+}
+
+void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, const char *repoResourceName, uint32_t idx = 0)
+{
+	AddModel(en, wnd, repoResourceName, idx);
+	// set params:
+
+
+	//if (pprop)
+	//{
+	//	int num = static_cast<int>(onWnd[wnd].size());
+	//	SetParams(pprop, num);
+	//	onWnd[wnd].push_back(*pprop);
+	//	auto pTex = FindProp(*pprop, "samplerColor");
+	//	if (pTex)
+	//	{
+	//		PADD_TEXTURE addTexParams = { wnd, pTex->val, colorTextures[i] };
+	//		en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
+	//	}
+	//}
 }
 
 void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
@@ -650,6 +677,7 @@ void testloop(BAMS::CEngine &en)
 				case VK_NUMPAD6: AddToWnd(en, 0, 4);	break;
 				case VK_NUMPAD3: AddToWnd(en, 0, 5);	break;
 				case VK_NUMPAD0: ChangeDebugView(en);	break;
+				case VK_ADD: AddModelToWnd(en, 0, "boblampclean2", 0);
 
 //				default:					TRACE("KEY: " << i << "\n");
 				}
@@ -672,79 +700,79 @@ int main()
 
 
 		BAMS::DoTests();
-			BAMS::CResourceManager rm;
-			rm.RootDir(L"C:\\Work\\test");
-			rm.LoadSync();
-			ToggleWnd(en,0); // show first window
+		BAMS::CResourceManager rm;
+		rm.RootDir(L"C:\\Work\\test");
+		rm.LoadSync();
+		ToggleWnd(en, 0); // show first window
 
-			CResImage ri = rm.Find("test", RESID_IMAGE);
-			auto img = ri.GetImage(true);
+		CResImage ri = rm.Find("test", RESID_IMAGE);
+		auto img = ri.GetImage(true);
 
-			CResMesh m1 = rm.Find("Mesh_1", RESID_MESH);
-			auto vd = m1.GetVertexDescription(true);
-			rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
-			
-			// default shader program ... not needed any more
-			auto s = rm.GetShaderByName("deferred");
-			s.AddProgram(L"/Shaders/deferred/deferred.vert.glsl");
-			s.AddProgram(L"/Shaders/deferred/deferred.frag.glsl");
-			//			auto s = rm.GetShaderByName("default");
+		CResMesh m1 = rm.Find("Mesh_1", RESID_MESH);
+		auto vd = m1.GetVertexDescription(true);
+		rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
+
+		// default shader program ... not needed any more
+		auto s = rm.GetShaderByName("deferred");
+		s.AddProgram(L"/Shaders/deferred/deferred.vert.glsl");
+		s.AddProgram(L"/Shaders/deferred/deferred.frag.glsl");
+		//			auto s = rm.GetShaderByName("default");
 //			s.AddProgram(L"/Shaders/default.vert.glsl");
 //			s.AddProgram(L"/Shaders/default.frag.glsl");
 
-			auto r = rm.GetRawData("ReadMe");
-			printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
-			rm.LoadSync();
-			printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
-			auto ruid = r.GetUID();
-			auto rpath = r.GetPath();
-			auto rname = r.GetName();
-			auto rdata = r.GetData();
-			auto rsize = r.GetSize();
+		auto r = rm.GetRawData("ReadMe");
+		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
+		rm.LoadSync();
+		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
+		auto ruid = r.GetUID();
+		auto rpath = r.GetPath();
+		auto rname = r.GetName();
+		auto rdata = r.GetData();
+		auto rsize = r.GetSize();
 
-			CResource res = rm.Find("ReadMe");
-			auto uid = res.GetUID();
-			auto path = res.GetPath();
-			auto name = res.GetName();
+		CResource res = rm.Find("ReadMe");
+		auto uid = res.GetUID();
+		auto path = res.GetPath();
+		auto name = res.GetName();
 
-			auto rr = rm.GetRawData(uid);
-			uid = rr.GetUID();
-			path = rr.GetPath();
-			name = rr.GetName();
+		auto rr = rm.GetRawData(uid);
+		uid = rr.GetUID();
+		path = rr.GetPath();
+		name = rr.GetName();
 
 
-			// loop
-			testloop(en);
+		// loop
+		testloop(en);
 
-			rm.LoadSync();
+		rm.LoadSync();
 
-			uint32_t resCount = 0;
-			rm.Filter([](IResource *res, void *prm) {
+		uint32_t resCount = 0;
+		rm.Filter([](IResource *res, void *prm) {
 
-				BAMS::CResourceManager &rm = *static_cast<BAMS::CResourceManager *>(prm);
-				BAMS::CResource r(res);
-				if (!r.IsLoaded())
-					rm.LoadSync();
-				printf("%3d: \"%s\", %#010x, %s", 0, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
-				wprintf(L", \"%s\"\n", r.GetPath());
-				if (r.IsLoadable())
-				{
-					auto rd = rm.GetRawData(r.GetName());
-					auto rdata = rd.GetData();
-					auto rsize = rd.GetSize();
-					if (rsize > 32)
-						rsize = 32;
-					printf("     ");
-					if (!rdata && rsize > 0)
-						printf("[NO LOADING NEEDED]");
-					if (rdata)
-						DumpHex(rdata, rsize);
-				}
-				else {
+			BAMS::CResourceManager &rm = *static_cast<BAMS::CResourceManager *>(prm);
+			BAMS::CResource r(res);
+			if (!r.IsLoaded())
+				rm.LoadSync();
+			printf("%3d: \"%s\", %#010x, %s", 0, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
+			wprintf(L", \"%s\"\n", r.GetPath());
+			if (r.IsLoadable())
+			{
+				auto rd = rm.GetRawData(r.GetName());
+				auto rdata = rd.GetData();
+				auto rsize = rd.GetSize();
+				if (rsize > 32)
+					rsize = 32;
+				printf("     ");
+				if (!rdata && rsize > 0)
 					printf("[NO LOADING NEEDED]");
-				}
-				printf("\n");
-			}, &rm);
+				if (rdata)
+					DumpHex(rdata, rsize);
+			}
+			else {
+				printf("[NO LOADING NEEDED]");
+			}
+			printf("\n");
+		}, &rm);
 	}
 
 	BAMS::Finalize();

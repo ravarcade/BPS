@@ -73,22 +73,22 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <SourcePath>$(SourcePath)</SourcePath>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\Src;.</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);.</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <SourcePath>$(SourcePath)</SourcePath>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\Src;$(ProjectDir)</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <SourcePath>$(SourcePath)</SourcePath>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\Src;</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <SourcePath>$(SourcePath)</SourcePath>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);..\Src;</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -167,33 +167,34 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\3rdParty\tinyxml2\tinyxml2.h" />
-    <ClInclude Include="..\Src\BAMEngine.h" />
-    <ClInclude Include="..\Src\BAMEngineInternal.h" />
-    <ClInclude Include="..\Src\Core_Array.h" />
-    <ClInclude Include="..\Src\Core_BasicTypes.h" />
-    <ClInclude Include="..\Src\Core_DirectoryChangeNotifier.h" />
-    <ClInclude Include="..\Src\Core_Engine.h" />
-    <ClInclude Include="..\Src\Core_Hash.h" />
-    <ClInclude Include="..\Src\Core_Hashtable.h" />
-    <ClInclude Include="..\Src\Core_Helpers.h" />
-    <ClInclude Include="..\Src\Core_List.h" />
-    <ClInclude Include="..\Src\Core_MemoryAllocator.h" />
-    <ClInclude Include="..\Src\Core_Message.h" />
-    <ClInclude Include="..\Src\Core_Module.h" />
-    <ClInclude Include="..\Src\Core_Properties.h" />
-    <ClInclude Include="..\Src\Core_Queue.h" />
-    <ClInclude Include="..\Src\ResRawData.h" />
-    <ClInclude Include="..\Src\RenderingEngine_Image.h" />
-    <ClInclude Include="..\Src\ResImage.h" />
-    <ClInclude Include="..\Src\ResMesh.h" />
-    <ClInclude Include="..\Src\ResourceManager.h" />
-    <ClInclude Include="..\Src\Core_Strings.h" />
-    <ClInclude Include="..\Src\Core_Tools.h" />
-    <ClInclude Include="..\Src\Core_Types.h" />
-    <ClInclude Include="..\Src\DllInterface_IResourceManager.h" />
-    <ClInclude Include="..\Src\RenderingEngine_Config.h" />
-    <ClInclude Include="..\Src\RenderingEngine_VertexDescription.h" />
-    <ClInclude Include="..\Src\ResShader.h" />
+    <ClInclude Include="BAMEngine.h" />
+    <ClInclude Include="BAMEngineInternal.h" />
+    <ClInclude Include="Core_Array.h" />
+    <ClInclude Include="Core_BasicTypes.h" />
+    <ClInclude Include="Core_DirectoryChangeNotifier.h" />
+    <ClInclude Include="Core_Engine.h" />
+    <ClInclude Include="Core_Hash.h" />
+    <ClInclude Include="Core_Hashtable.h" />
+    <ClInclude Include="Core_Helpers.h" />
+    <ClInclude Include="Core_List.h" />
+    <ClInclude Include="Core_MemoryAllocator.h" />
+    <ClInclude Include="Core_Message.h" />
+    <ClInclude Include="Core_Module.h" />
+    <ClInclude Include="Core_Properties.h" />
+    <ClInclude Include="Core_Queue.h" />
+    <ClInclude Include="ResModel.h" />
+    <ClInclude Include="ResRawData.h" />
+    <ClInclude Include="RenderingEngine_Image.h" />
+    <ClInclude Include="ResImage.h" />
+    <ClInclude Include="ResMesh.h" />
+    <ClInclude Include="ResourceManager.h" />
+    <ClInclude Include="Core_Strings.h" />
+    <ClInclude Include="Core_Tools.h" />
+    <ClInclude Include="Core_Types.h" />
+    <ClInclude Include="DllInterface_IResourceManager.h" />
+    <ClInclude Include="RenderingEngine_Config.h" />
+    <ClInclude Include="RenderingEngine_VertexDescription.h" />
+    <ClInclude Include="ResShader.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -204,21 +205,22 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\Src\BAMEngine.cpp" />
-    <ClCompile Include="..\Src\Core_DirectoryChangeNotifier.cpp" />
-    <ClCompile Include="..\Src\Core_Engine.cpp" />
-    <ClCompile Include="..\Src\Core_MemoryAllocator.cpp" />
-    <ClCompile Include="..\Src\Core_Module.cpp" />
-    <ClCompile Include="..\Src\RenderingEngine_Image.cpp" />
-    <ClCompile Include="..\Src\RenderingEngine_VertexDescription.cpp" />
-    <ClCompile Include="..\Src\ResImage.cpp" />
-    <ClCompile Include="..\Src\ResMesh.cpp" />
-    <ClCompile Include="..\Src\ResourceManager.cpp" />
-    <ClCompile Include="..\Src\Core_Tools.cpp" />
-    <ClCompile Include="..\Src\Core_Types.cpp" />
-    <ClCompile Include="..\Src\DllInterface_IResourceManager.cpp" />
-    <ClCompile Include="..\Src\RenderingEngine_Config.cpp" />
-    <ClCompile Include="..\Src\ResShader.cpp" />
+    <ClCompile Include="BAMEngine.cpp" />
+    <ClCompile Include="Core_DirectoryChangeNotifier.cpp" />
+    <ClCompile Include="Core_Engine.cpp" />
+    <ClCompile Include="Core_MemoryAllocator.cpp" />
+    <ClCompile Include="Core_Module.cpp" />
+    <ClCompile Include="RenderingEngine_Image.cpp" />
+    <ClCompile Include="RenderingEngine_VertexDescription.cpp" />
+    <ClCompile Include="ResImage.cpp" />
+    <ClCompile Include="ResMesh.cpp" />
+    <ClCompile Include="ResModel.cpp" />
+    <ClCompile Include="ResourceManager.cpp" />
+    <ClCompile Include="Core_Tools.cpp" />
+    <ClCompile Include="Core_Types.cpp" />
+    <ClCompile Include="DllInterface_IResourceManager.cpp" />
+    <ClCompile Include="RenderingEngine_Config.cpp" />
+    <ClCompile Include="ResShader.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

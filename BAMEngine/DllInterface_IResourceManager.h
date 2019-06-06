@@ -431,6 +431,7 @@ enum { // msgId
 	UPDATE_DRAW_COMMANDS  = 0x20008,
 	SET_CAMERA            = 0x20009,
 	ADD_TEXTURE           = 0x2000a,
+	ADD_MODEL             = 0x2000b,
 
 	// to IMPORT_MODULE (or everyone?)
 	IDENTIFY_RESOURCE        = 0x40001,
@@ -509,4 +510,10 @@ struct PADD_TEXTURE {
 	uint32_t wnd;
 	void *propVal;
 	const char *textureResourceName;
+};
+
+struct PADD_MODEL {
+	uint32_t wnd;
+	const char *repoResourceName;
+	uint32_t modelIdx;
 };

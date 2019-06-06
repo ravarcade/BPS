@@ -722,9 +722,9 @@ void CShaderProgram::_ImportMeshData(const VertexDescription *srcVD, void *dstBu
 	vd.Dump();
 }
 
-void CShaderProgram::RebuildAllMiniDescriptorSets(bool forceRebuildMe)
+void CShaderProgram::RebuildAllMiniDescriptorSets(bool force)
 {
-	if (m_paramsBuffers.rbegin()->type != TEXTURES && !forceRebuildMe)
+	if (m_paramsBuffers.rbegin()->type != TEXTURES && !force)
 	{
 		// we dont have textures! go simple path
 		return;
@@ -739,7 +739,7 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool forceRebuildMe)
 	for (MiniDescriptorSet &mds : m_miniDescriptorSets)
 	{
 		mds.refCounter = 0;
-		mds.rebuildMe = forceRebuildMe;
+		mds.rebuildMe = force;
 	}
 	m_uniqMiniDescriptoSets.clear();
 

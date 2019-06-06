@@ -59,6 +59,7 @@ public:
 	Properties *GetProperties(uint32_t drawObjectId = -1);
 
 protected:
+	// called from OutputWindow
 	void CreateGraphicsPipeline();
 
 	const std::vector<std::string> &GetOutputNames() { return m_reflection.GetOutputNames(); }
@@ -69,7 +70,7 @@ protected:
 	void DrawObjects(VkCommandBuffer &cb);
 	uint32_t GetObjectCount() { return static_cast<uint32_t>(m_drawObjectData.size()); }
 
-	void RebuildAllMiniDescriptorSets(bool forceRebuildMe = false);
+	void RebuildAllMiniDescriptorSets(bool force = false);
 	
 	friend class OutputWindow;
 

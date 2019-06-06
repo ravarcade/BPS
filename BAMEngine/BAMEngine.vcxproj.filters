@@ -32,10 +32,10 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\Src\BAMEngine.h">
+    <ClInclude Include="BAMEngine.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\BAMEngineInternal.h">
+    <ClInclude Include="BAMEngineInternal.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="stdafx.h">
@@ -44,82 +44,85 @@
     <ClInclude Include="targetver.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\DllInterface_IResourceManager.h">
+    <ClInclude Include="DllInterface_IResourceManager.h">
       <Filter>DllInterface</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Array.h">
+    <ClInclude Include="Core_Array.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_BasicTypes.h">
+    <ClInclude Include="Core_BasicTypes.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_DirectoryChangeNotifier.h">
+    <ClInclude Include="Core_DirectoryChangeNotifier.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Hash.h">
+    <ClInclude Include="Core_Hash.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Hashtable.h">
+    <ClInclude Include="Core_Hashtable.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Helpers.h">
+    <ClInclude Include="Core_Helpers.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_List.h">
+    <ClInclude Include="Core_List.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_MemoryAllocator.h">
+    <ClInclude Include="Core_MemoryAllocator.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Message.h">
+    <ClInclude Include="Core_Message.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Module.h">
+    <ClInclude Include="Core_Module.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Queue.h">
+    <ClInclude Include="Core_Queue.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Strings.h">
+    <ClInclude Include="Core_Strings.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Tools.h">
+    <ClInclude Include="Core_Tools.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Types.h">
+    <ClInclude Include="Core_Types.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Engine.h">
+    <ClInclude Include="Core_Engine.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="..\3rdParty\tinyxml2\tinyxml2.h">
       <Filter>3rdParty\TinyXML2</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\RenderingEngine_Config.h">
+    <ClInclude Include="RenderingEngine_Config.h">
       <Filter>RenderingEngine</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\RenderingEngine_VertexDescription.h">
+    <ClInclude Include="RenderingEngine_VertexDescription.h">
       <Filter>RenderingEngine</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\ResourceManager.h">
+    <ClInclude Include="ResourceManager.h">
       <Filter>ResourceManager</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\ResShader.h">
+    <ClInclude Include="ResShader.h">
       <Filter>ResourceManager</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\Core_Properties.h">
+    <ClInclude Include="Core_Properties.h">
       <Filter>Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\ResMesh.h">
+    <ClInclude Include="ResMesh.h">
       <Filter>ResourceManager</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\RenderingEngine_Image.h">
+    <ClInclude Include="RenderingEngine_Image.h">
       <Filter>RenderingEngine</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\ResImage.h">
+    <ClInclude Include="ResImage.h">
       <Filter>ResourceManager</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\ResRawData.h">
+    <ClInclude Include="ResRawData.h">
+      <Filter>ResourceManager</Filter>
+    </ClInclude>
+    <ClInclude Include="ResModel.h">
       <Filter>ResourceManager</Filter>
     </ClInclude>
   </ItemGroup>
@@ -130,52 +133,55 @@
     <ClCompile Include="dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\BAMEngine.cpp">
+    <ClCompile Include="BAMEngine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\DllInterface_IResourceManager.cpp">
+    <ClCompile Include="DllInterface_IResourceManager.cpp">
       <Filter>DllInterface</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core_DirectoryChangeNotifier.cpp">
+    <ClCompile Include="Core_DirectoryChangeNotifier.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core_MemoryAllocator.cpp">
+    <ClCompile Include="Core_MemoryAllocator.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core_Tools.cpp">
+    <ClCompile Include="Core_Tools.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core_Types.cpp">
+    <ClCompile Include="Core_Types.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core_Engine.cpp">
+    <ClCompile Include="Core_Engine.cpp">
       <Filter>Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\Core_Module.cpp">
+    <ClCompile Include="Core_Module.cpp">
       <Filter>Core</Filter>
     </ClCompile>
     <ClCompile Include="..\3rdParty\tinyxml2\tinyxml2.cpp">
       <Filter>3rdParty\TinyXML2</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\RenderingEngine_Config.cpp">
+    <ClCompile Include="RenderingEngine_Config.cpp">
       <Filter>RenderingEngine</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\ResourceManager.cpp">
+    <ClCompile Include="ResourceManager.cpp">
       <Filter>ResourceManager</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\ResShader.cpp">
+    <ClCompile Include="ResShader.cpp">
       <Filter>ResourceManager</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\ResMesh.cpp">
+    <ClCompile Include="ResMesh.cpp">
       <Filter>ResourceManager</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\RenderingEngine_VertexDescription.cpp">
+    <ClCompile Include="RenderingEngine_VertexDescription.cpp">
       <Filter>RenderingEngine</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\RenderingEngine_Image.cpp">
+    <ClCompile Include="RenderingEngine_Image.cpp">
       <Filter>RenderingEngine</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\ResImage.cpp">
+    <ClCompile Include="ResImage.cpp">
+      <Filter>ResourceManager</Filter>
+    </ClCompile>
+    <ClCompile Include="ResModel.cpp">
       <Filter>ResourceManager</Filter>
     </ClCompile>
   </ItemGroup>
