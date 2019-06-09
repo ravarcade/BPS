@@ -143,7 +143,7 @@ ResShader::File * ResShader::AddProgram(WSTR filename)
 		rm->LoadSync(rb);
 	}
 
-	ResourceBase *res = nullptr;
+	ResBase *res = nullptr;
 	U32 stage = 0;
 	bool isSrc = true;
 	if (_ParseFilename(filename, &stage, &isSrc))
@@ -153,7 +153,7 @@ ResShader::File * ResShader::AddProgram(WSTR filename)
 		if (p->Filename != filename)
 		{
 			isModified = true;
-			res = rm->GetByFilename(filename, isSrc ? ResShaderSrc::GetTypeId() : ResShaderBin::GetTypeId()); // create resource (if not exist)
+			res = rm->FindOrCreate_withFilename(filename, isSrc ? ResShaderSrc::GetTypeId() : ResShaderBin::GetTypeId()); // create resource (if not exist)
 			p->Filename = filename;
 			p->SetResource(res, this);
 			// Timestamp = 0 will trigger compilation of source code or build of final shader program
@@ -178,7 +178,7 @@ WSTR & ResShader::GetBinaryFilename(U32 stage)
 	return Binary[stage].Filename;
 }
 
-void ResShader::Update(ResourceBase * res)
+void ResShader::Update(ResBase * res)
 {
 	isUpdateRecived = true;
 	_LoadXML();
@@ -215,7 +215,7 @@ void ResShader::Update(ResourceBase * res)
 	}
 }
 
-void ResShader::Save(ResourceBase * res)
+void ResShader::Save(ResBase * res)
 {
 	if (!isModified && isUpdateRecived)
 		return;
@@ -249,7 +249,7 @@ U32 ResShader::GetSourceCount()
 	return cnt;
 }
 
-ResourceBase * ResShader::GetBinary(U32 idx)
+ResBase * ResShader::GetBinary(U32 idx)
 {
 	for (auto &p : Binary)
 	{
@@ -326,7 +326,7 @@ void ResShader::Delete(File * p)
 /// </summary>
 /// <param name="res">The resource (with shader program).</param>
 /// <param name="type">The type.</param>
-void ResShader::Notify(ResourceBase * res, U64 type)
+void ResShader::Notify(ResBase * res, U64 type)
 {
 	bool isResModified = false;
 	auto getFile = [&](auto &files) {
@@ -363,7 +363,7 @@ void ResShader::Notify(ResourceBase * res, U64 type)
 	}
 }
 
-void ResShader::IdentifyResourceType(ResourceBase *res)
+void ResShader::IdentifyResourceType(ResBase *res)
 {
 	if (res->Type == RESID_UNKNOWN)
 		return;

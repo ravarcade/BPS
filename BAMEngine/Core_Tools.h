@@ -35,4 +35,7 @@ public:
 	static UUID NOUID;
 
 	static void Dump(BAMS::Properties *prop);
+
+	static void XMLWriteValue(tinyxml2::XMLElement * out, F32 *v, U32 count);
+	static U32 XMLReadValue(tinyxml2::XMLElement * src, F32 *out, U32 max = 0);
 };

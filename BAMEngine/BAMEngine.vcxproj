@@ -182,7 +182,10 @@
     <ClInclude Include="Core_Module.h" />
     <ClInclude Include="Core_Properties.h" />
     <ClInclude Include="Core_Queue.h" />
+    <ClInclude Include="ResBase.h" />
+    <ClInclude Include="ResImp.h" />
     <ClInclude Include="ResModel.h" />
+    <ClInclude Include="ResourceNotifier.h" />
     <ClInclude Include="ResRawData.h" />
     <ClInclude Include="RenderingEngine_Image.h" />
     <ClInclude Include="ResImage.h" />
@@ -212,6 +215,7 @@
     <ClCompile Include="Core_Module.cpp" />
     <ClCompile Include="RenderingEngine_Image.cpp" />
     <ClCompile Include="RenderingEngine_VertexDescription.cpp" />
+    <ClCompile Include="ResBase.cpp" />
     <ClCompile Include="ResImage.cpp" />
     <ClCompile Include="ResMesh.cpp" />
     <ClCompile Include="ResModel.cpp" />

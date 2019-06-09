@@ -3,7 +3,7 @@
 namespace BAMS {
 namespace CORE {
 
-ResImage::ResImage(ResourceBase *res)
+ResImage::ResImage(ResBase *res)
 	: rb(res)
 {
 	if (res->XML->FirstChild())
@@ -24,7 +24,7 @@ void ResImage::_SaveXML()
 {
 }
 
-void ResImage::Update(ResourceBase * res) {
+void ResImage::Update(ResBase * res) {
 
 	if (!rb->isLoaded())
 	{
@@ -33,7 +33,7 @@ void ResImage::Update(ResourceBase * res) {
 	}
 }
 
-void ResImage::Release(ResourceBase * res)
+void ResImage::Release(ResBase * res)
 {
 //	TRACE("REL: " << rb->Name.c_str());
 	img.Release();

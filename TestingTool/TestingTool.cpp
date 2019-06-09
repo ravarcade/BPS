@@ -380,6 +380,17 @@ void Spin(BAMS::CEngine &en)
 
 void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, const char *repoResourceName, uint32_t idx = 0)
 {
+	BAMS::CResourceManager rm;
+	
+	// new bob model
+	auto bobModel = rm.Get<CResModel>("bob");
+	bobModel.AddMesh("Mesh_4");
+	bobModel.AddMesh("Mesh_5");
+	bobModel.AddMesh("Mesh_6");
+	bobModel.AddMesh("Mesh_7");
+	bobModel.AddMesh("Mesh_8");
+	bobModel.AddMesh("Mesh_9");
+
 	AddModel(en, wnd, repoResourceName, idx);
 	// set params:
 
@@ -416,12 +427,13 @@ void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
 			auto p = FindProp(*mp, ctn);
 			if (p) 
 			{
-				rm.Filter([](BAMS::IResource *res, void *local) {
+				rm.Filter(mesh, p, &colorTextures[i],
+					[](BAMS::IResource *res, void *local) {
 					CResource r(res);
 					*reinterpret_cast<const char **>(local) = r.GetName();
 //					TRACE(r.GetName());
 //					TRACEW(r.GetPath());
-				}, &colorTextures[i], p, mesh);
+				});// , &colorTextures[i], p, mesh);
 				break;
 			}
 		}

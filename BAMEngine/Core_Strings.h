@@ -614,14 +614,11 @@ public:
 	const T * end() { auto &v = GetValue();  return v._buf + v._used; }
 	basic_string_base<T, U> substr(I32 start, I32 len = 0x7fffffff) const { return GetValue().substr(start, len); }
 
-	bool wildcard(const shared_string& pat, U pos = 0, U patPos = 0) const { return GetValue().wildcard(pat.ToBasicString(), pos, patPos); }
-	bool iwildcard(const shared_string& pat, U pos = 0, U patPos = 0) const { return GetValue().iwildcard(pat.ToBasicString(), pos, patPos); }
+
+	bool wildcard(const shared_string& pat, bool caseinsesitive = false, U pos = 0, U patPos = 0) const { return caseinsesitive ? GetValue().iwildcard(pat.ToBasicString(), pos, patPos) : GetValue().wildcard(pat.ToBasicString(), pos, patPos); }
 
 	template <typename V>
-	bool wildcard(const basic_string_base<T, V>& pat, U pos = 0, V patPos = 0) const { return GetValue().wildcard(pat, pos, patPos); }
-
-	template <typename V>
-	bool iwildcard(const basic_string_base<T, V>& pat, U pos = 0, V patPos = 0) const { return GetValue().iwildcard(pat, pos, patPos); }
+	bool wildcard(const basic_string_base<T, V>& pat, bool caseinsesitive = false, U pos = 0, V patPos = 0) const { return caseinsesitive ? GetValue().iwildcard(pat, pos, patPos) : GetValue().wildcard(pat, pos, patPos); }
 
 	void UTF8(const basic_string_base<wchar_t, U> &s) { NeedUniq(); GetValue().UTF8(s); }
 	void UTF8(const basic_string_base<char, U> &s)    { NeedUniq(); GetValue().UTF8(s); }
@@ -651,9 +648,22 @@ typedef basic_string_base<char, U32> String;
 
 
 template<typename T>
-const basic_string_base<T, U32> ToBasicString(const T *t, U32 l = 0) { return std::move(basic_string_base<T, U32>(const_cast<T*>(t), l)); }
+const basic_string_base<T, U32> ToBasicString(const T *t, U32 l = 0) 
+{ 
+	if (!l && t) 
+		l = static_cast<U32>(basic_string_base<T, U32>::length(t)); 
+
+	return std::move(basic_string_base<T, U32>(const_cast<T*>(t), l)); 
+}
+
 template<typename T>
-const basic_string_base<T, U32> ToBasicString(T *t, U32 l = 0) { return std::move(basic_string_base<T, U32>(t, l)); }
+const basic_string_base<T, U32> ToBasicString(T *t, U32 l = 0) 
+{ 
+	if (!l && t) 
+		l = static_cast<U32>(basic_string_base<T, U32>::length(t));
+
+	return std::move(basic_string_base<T, U32>(t, l)); 
+}
 
 //template<typename T>
 //auto ToBasicString(T * t, U32 l = 0) { basic_string_base<T, U32> v(t, l); return std::move(v); }

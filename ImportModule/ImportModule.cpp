@@ -92,7 +92,8 @@ private:
 
 		// we have hash calculated for every mesh... so we want: 
 		// (1) remove broken meshes from RM: hash is wrong or something
-		rm.Filter([](IResource *res, void *param) {
+		rm.Filter(RESID_MESH, pimr,
+			[](IResource *res, void *param) {
 			auto *pimr = reinterpret_cast<ImportedModelRepo*>(param);
 
 			CResMesh r(res);
@@ -131,10 +132,11 @@ private:
 					}
 				}
 			}
-		}, pimr, nullptr, RESID_MESH);
+		});
 
 		// (2) second pass... assign all meshes in RM even if "hash" is not matching, but only if it is not used. So, update of one mesh should works fine.
-		rm.Filter([](IResource *res, void *param) {
+		rm.Filter(RESID_MESH, pimr,
+			[](IResource *res, void *param) {
 			auto *pimr = reinterpret_cast<ImportedModelRepo*>(param);
 
 			CResMesh r(res);
@@ -150,7 +152,7 @@ private:
 					r.SetMeshIdx(-1);  // mark it as "broken"
 				}
 			}
-		}, pimr, nullptr, RESID_MESH);
+		});
 
 		// (3) add new meshes
 		uint32_t num = 0;
@@ -275,18 +277,20 @@ public:
 		CResourceManager rm;
 
 		// add all modelRepos
-		rm.Filter([](IResource *res, void *param) {
+		rm.Filter(RESID_IMPORTMODEL, this,
+			[](IResource *res, void *param) {
 			auto *pim = reinterpret_cast<Importer*>(param);
 			pim->m_modelRepoName2modelRepo.add(IResource_GetPath(res), res);
-		}, this, nullptr, RESID_IMPORTMODEL);
+		});
 
 		// add all meshes
 		if (false) // right now, we don't need to do anything with meshes... maybe in "vaidation"
-		rm.Filter([](IResource *res, void *param) {
+		rm.Filter(RESID_MESH, this,
+			[](IResource *res, void *param) {
 			auto *pim = reinterpret_cast<Importer*>(param);
 			
 			CResource r(res);
-		}, this, nullptr, RESID_MESH);
+		});
 	}
 
 	void Initialize()

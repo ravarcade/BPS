@@ -9,7 +9,7 @@
 typedef TResRawData<RESID_SHADER_SRC> ResShaderSrc;
 typedef TResRawData<RESID_SHADER_BIN> ResShaderBin;
 
-class ResShader : public ResoureImpl<ResShader, RESID_SHADER>
+class ResShader : public ResImp<ResShader, RESID_SHADER>
 {
 	static constexpr char *SubprogramTypes[] = { "Vert", "Frag", "Geom", "Ctrl", "Eval" };
 	static constexpr SIZE_T NumSubprogramTypes = COUNT_OF(SubprogramTypes);
@@ -32,7 +32,7 @@ class ResShader : public ResoureImpl<ResShader, RESID_SHADER>
 
 	// ----------------------------------------------------------------------------------
 
-	ResourceBase *rb;
+	ResBase *rb;
 	U8 *Data;
 	SIZE_T Size;
 
@@ -79,8 +79,8 @@ class ResShader : public ResoureImpl<ResShader, RESID_SHADER>
 			return false;
 		}
 
-		ResourceBase *GetResource() { return  UpdateNotifyReciver.GetResource();  }
-		void SetResource(ResourceBase *res, ResShader *owner) { UpdateNotifyReciver.SetResource(res, owner); }
+		ResBase *GetResource() { return  UpdateNotifyReciver.GetResource();  }
+		void SetResource(ResBase *res, ResShader *owner) { UpdateNotifyReciver.SetResource(res, owner); }
 		
 	};
 
@@ -95,13 +95,13 @@ class ResShader : public ResoureImpl<ResShader, RESID_SHADER>
 	void _SaveXML();
 
 public:
-	ResShader(ResourceBase *res) : rb(res), Data(nullptr), Size(0), isModified(true), isUpdateRecived(false) {}
+	ResShader(ResBase *res) : rb(res), Data(nullptr), Size(0), isModified(true), isUpdateRecived(false) {}
 	~ResShader() { Release(rb); }
 
 	U8 *GetData() { return Data; }
 	SIZE_T GetSize() { return Size; }
 
-	void Release(ResourceBase *res)
+	void Release(ResBase *res)
 	{
 		Save(res);
 		res->ResourceLoad(nullptr);
@@ -115,12 +115,12 @@ public:
 	File * AddProgram(WSTR filename);
 	WSTR &GetSourceFilename(U32 stage);
 	WSTR &GetBinaryFilename(U32 stage);
-	void Update(ResourceBase *res);
-	void Save(ResourceBase *res);
+	void Update(ResBase *res);
+	void Save(ResBase *res);
 
 	U32 GetBinaryCount();
 	U32 GetSourceCount();
-	ResourceBase *GetBinary(U32 idx);
+	ResBase *GetBinary(U32 idx);
 
 
 	void Compile(File *p);
@@ -128,7 +128,7 @@ public:
 	PRELOAD_SHADER reloadShaderMessageData;
 	void Link(File *p);
 	void Delete(File *p);
-	void Notify(ResourceBase *res, U64 type);
+	void Notify(ResBase *res, U64 type);
 
-	static void IdentifyResourceType(ResourceBase *res);
+	static void IdentifyResourceType(ResBase *res);
 };

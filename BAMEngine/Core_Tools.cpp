@@ -559,6 +559,81 @@ void Tools::Dump(BAMS::Properties * prop)
 	}
 }
 
+// lame float to string, string to float functions
+void f32toa(char *out, float v) { sprintf_s(out, 15, "%1.8e", v); }
+void atof32(const char *in, float &v) { sscanf_s(in, "%f", &v); }
+
+const char *matrixNames[] = {
+	"m11", "m12", "m13", "m14",
+	"m21", "m22", "m23", "m24",
+	"m31", "m32", "m33", "m34",
+	"m41", "m42", "m43", "m44",
+};
+
+const char xmlValueSeparator = ';';
+
+void Tools::XMLWriteValue(tinyxml2::XMLElement * out, F32 * v, U32 count)
+{
+	if (count != 1)
+		out->SetAttribute("count", count);
+
+	if (count == 16)
+	{ // matrix
+		for (uint32_t i = 0; i < count; ++i)
+			out->SetAttribute(matrixNames[i], v[i]);
+	}
+	else 
+	{
+		char *buf = new char[count * 15];
+		char *p = buf;
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			if (i != 0)
+				*p = xmlValueSeparator;
+			++p;
+
+			f32toa(p, v[i]);
+			while (*p) ++p;			
+
+		}
+		out->SetAttribute("value", static_cast<const char *>(buf));
+		delete buf;
+	}
+}
+
+U32 Tools::XMLReadValue(tinyxml2::XMLElement * src, F32 *out, U32 max)
+{
+	U32 cnt = 0;
+	cnt = src->IntAttribute("count", 1);
+	max = !max ? cnt : (cnt < max ? cnt : max);
+
+	if (out)
+	{
+		if (cnt == 16 && max == 16)
+		{ // matrix
+			for (uint32_t i = 0; i < cnt; ++i)
+			{
+				out[i] = src->FloatAttribute(matrixNames[i], 0.0f);
+			}
+		}
+		else
+		{
+			auto buf = src->Attribute("value");
+			if (buf)
+			{
+				auto p = buf;
+				for (uint32_t i = 0; i < max; ++i)
+				{
+					atof32(p, out[i]);
+					while (*p && *p != xmlValueSeparator) ++p;
+				}
+			}
+
+		}
+	}
+	return cnt;
+}
+
 UUID Tools::NOUID = { 0 };
 
 }; // BAMS namespace

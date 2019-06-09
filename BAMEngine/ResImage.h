@@ -6,20 +6,20 @@
 *
 */
 
-class ResImage : public ResoureImpl<ResImage, RESID_IMAGE>
+class ResImage : public ResImp<ResImage, RESID_IMAGE>
 {
-	ResourceBase *rb;
+	ResBase *rb;
 	Image img;
 
 	void _LoadXML();
 	void _SaveXML();
 
 public:
-	ResImage(ResourceBase *res);
+	ResImage(ResBase *res);
 	~ResImage();
 
-	void Update(ResourceBase *res);
-	void Release(ResourceBase *res);
+	void Update(ResBase *res);
+	void Release(ResBase *res);
 
 	Image *GetImage(bool loadASAP = false);
 	void Updated();

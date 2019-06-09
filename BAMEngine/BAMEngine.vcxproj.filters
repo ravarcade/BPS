@@ -24,7 +24,7 @@
     <Filter Include="RenderingEngine">
       <UniqueIdentifier>{e7041efe-79b5-48c8-88e4-475b721f1c72}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ResourceManager">
+    <Filter Include="ResMan">
       <UniqueIdentifier>{1f31e7c3-b1fa-48c8-aef9-86613d3dfd50}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -102,28 +102,37 @@
       <Filter>RenderingEngine</Filter>
     </ClInclude>
     <ClInclude Include="ResourceManager.h">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
     </ClInclude>
     <ClInclude Include="ResShader.h">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
     </ClInclude>
     <ClInclude Include="Core_Properties.h">
       <Filter>Core</Filter>
     </ClInclude>
     <ClInclude Include="ResMesh.h">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
     </ClInclude>
     <ClInclude Include="RenderingEngine_Image.h">
       <Filter>RenderingEngine</Filter>
     </ClInclude>
     <ClInclude Include="ResImage.h">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
     </ClInclude>
     <ClInclude Include="ResRawData.h">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
     </ClInclude>
     <ClInclude Include="ResModel.h">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
+    </ClInclude>
+    <ClInclude Include="ResBase.h">
+      <Filter>ResMan</Filter>
+    </ClInclude>
+    <ClInclude Include="ResourceNotifier.h">
+      <Filter>ResMan</Filter>
+    </ClInclude>
+    <ClInclude Include="ResImp.h">
+      <Filter>ResMan</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -164,13 +173,13 @@
       <Filter>RenderingEngine</Filter>
     </ClCompile>
     <ClCompile Include="ResourceManager.cpp">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
     </ClCompile>
     <ClCompile Include="ResShader.cpp">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
     </ClCompile>
     <ClCompile Include="ResMesh.cpp">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
     </ClCompile>
     <ClCompile Include="RenderingEngine_VertexDescription.cpp">
       <Filter>RenderingEngine</Filter>
@@ -179,10 +188,13 @@
       <Filter>RenderingEngine</Filter>
     </ClCompile>
     <ClCompile Include="ResImage.cpp">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
     </ClCompile>
     <ClCompile Include="ResModel.cpp">
-      <Filter>ResourceManager</Filter>
+      <Filter>ResMan</Filter>
+    </ClCompile>
+    <ClCompile Include="ResBase.cpp">
+      <Filter>ResMan</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

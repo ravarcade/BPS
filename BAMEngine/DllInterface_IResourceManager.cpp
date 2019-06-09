@@ -8,7 +8,7 @@ template<typename T>
 T *Impl(void *res)
 {
 	assert(res);
-	auto ret = reinterpret_cast<T *>(reinterpret_cast<ResourceBase *>(res)->GetImplementation());
+	auto ret = reinterpret_cast<T *>(reinterpret_cast<ResBase *>(res)->GetImplementation());
 	assert(ret);
 	return ret;
 }
@@ -38,37 +38,37 @@ extern "C" {
 
 	// =========================================================================== Resource
 
-	BAMS_EXPORT void IResource_AddRef(IResource *res) { assert(res); reinterpret_cast<ResourceBase *>(res)->AddRef(); }
-	BAMS_EXPORT void IResource_Release(IResource *res) { assert(res); reinterpret_cast<ResourceBase *>(res)->Release(); }
-	BAMS_EXPORT uint32_t IResource_GetRefCounter(IResource *res) { assert(res); return reinterpret_cast<ResourceBase *>(res)->GetRefCounter(); }
-	BAMS_EXPORT UUID IResource_GetUID(IResource *res) { assert(res); return reinterpret_cast<ResourceBase *>(res)->UID; }
+	BAMS_EXPORT void IResource_AddRef(IResource *res) { assert(res); reinterpret_cast<ResBase *>(res)->AddRef(); }
+	BAMS_EXPORT void IResource_Release(IResource *res) { assert(res); reinterpret_cast<ResBase *>(res)->Release(); }
+	BAMS_EXPORT uint32_t IResource_GetRefCounter(IResource *res) { assert(res); return reinterpret_cast<ResBase *>(res)->GetRefCounter(); }
+	BAMS_EXPORT UUID IResource_GetUID(IResource *res) { assert(res); return reinterpret_cast<ResBase *>(res)->UID; }
 	BAMS_EXPORT const char * IResource_GetName(IResource *res)
 	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		auto *rb = reinterpret_cast<ResBase *>(res);
 		return rb ? rb->Name.c_str() : "";
 	}
 
 	BAMS_EXPORT const wchar_t * IResource_GetPath(IResource *res)
 	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		auto *rb = reinterpret_cast<ResBase *>(res);
 		return rb ? rb->Path.c_str() : L"";
 	}
 
 	BAMS_EXPORT bool IResource_IsLoaded(IResource *res)
 	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		auto *rb = reinterpret_cast<ResBase *>(res);
 		return rb ? rb->isLoaded() : false;
 	}
 
 	BAMS_EXPORT uint32_t IResource_GetType(IResource *res)
 	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		auto *rb = reinterpret_cast<ResBase *>(res);
 		return rb ? rb->Type : false;
 	}
 
 	BAMS_EXPORT bool IResource_IsLoadable(IResource *res)
 	{
-		auto *rb = reinterpret_cast<ResourceBase *>(res);
+		auto *rb = reinterpret_cast<ResBase *>(res);
 		return rb ? rb->isLoadable() : false;
 	}
 
@@ -84,7 +84,7 @@ extern "C" {
 	BAMS_EXPORT void IResShader_AddProgram(IResShader *res, const wchar_t *fileName)    {        Impl<ResShader>(res)->AddProgram(fileName); }
 	BAMS_EXPORT const wchar_t * IResShader_GetSourceFilename(IResShader *res, int type) { return Impl<ResShader>(res)->GetSourceFilename(type).c_str(); }
 	BAMS_EXPORT const wchar_t * IResShader_GetBinaryFilename(IResShader *res, int type) { return Impl<ResShader>(res)->GetBinaryFilename(type).c_str(); }
-	BAMS_EXPORT void IResShader_Save(IResShader *res)                                   {        Impl<ResShader>(res)->Save(reinterpret_cast<ResourceBase *>(res));}
+	BAMS_EXPORT void IResShader_Save(IResShader *res)                                   {        Impl<ResShader>(res)->Save(reinterpret_cast<ResBase *>(res));}
 	BAMS_EXPORT uint32_t IResShader_GetBinaryCount(IResShader *res)                     { return Impl<ResShader>(res)->GetBinaryCount(); }
 	BAMS_EXPORT IResRawData *IResShader_GetBinary(IResShader *res, uint32_t idx)        { return Impl<ResShader>(res)->GetBinary(idx); }
 
@@ -95,7 +95,7 @@ extern "C" {
 		Impl<ResMesh>(res)->SetVertexDescription( 
 			reinterpret_cast<VertexDescription *>(vd), 
 			meshHash, 
-			reinterpret_cast<ResourceBase *>(meshSrc), 
+			reinterpret_cast<ResBase *>(meshSrc), 
 			meshIdx);
 	}
 
@@ -105,6 +105,10 @@ extern "C" {
 	BAMS_EXPORT uint32_t IResMesh_GetMeshIdx(IResMesh * res)                                      { return Impl<ResMesh>(res)->GetMeshIdx(); }
 	BAMS_EXPORT void IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx)                            { return Impl<ResMesh>(res)->SetMeshIdx(idx); }
 	BAMS_EXPORT uint32_t IResMesh_GetMeshHash(IResMesh * res)                                     { return Impl<ResMesh>(res)->GetMeshHash(); }
+
+	// =========================================================================== ResModel
+	
+	BAMS_EXPORT void IResModel_AddMesh(IResModel * res, const char * meshResName, const float * m) { Impl<ResModel>(res)->AddMesh(meshResName, m); }
 
 	// =========================================================================== ResImage
 
@@ -158,40 +162,31 @@ extern "C" {
 		return resm->Get(name, type);
 	}
 
-	BAMS_EXPORT void IResourceManager_Filter(IResourceManager *rm, void(*callback)(IResource *, void *), void *localData, const char * pattern, uint32_t typeId)
+	BAMS_EXPORT void IResourceManager_Filter(
+		IResourceManager *rm,
+		void(*callback)(IResource *, void *),
+		void * localData,
+		const char * namePattern,
+		const wchar_t * filenamePattern,
+		const char * filenamePatternUTF8,
+		const wchar_t * rootPath,
+		uint32_t typeId,
+		bool caseInsesitive)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->Filter(reinterpret_cast<void (*)(ResourceBase *, void *)>(callback), localData, pattern, typeId);
-	}
-
-	BAMS_EXPORT void IResourceManager_FilterByFilename(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, const wchar_t * pattern, const wchar_t * rootPath, bool caseInsesitive)
-	{
-		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->Filter(reinterpret_cast<void(*)(ResourceBase *, void *)>(callback), localData, pattern, rootPath, caseInsesitive);
-	}
-
-	BAMS_EXPORT void IResourceManager_FilterByFilenameUTF8(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, const char * pattern, const wchar_t * rootPath, bool caseInsesitive)
-	{
-		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->Filter(reinterpret_cast<void(*)(ResourceBase *, void *)>(callback), localData, pattern, rootPath, caseInsesitive);
-	}
-
-	BAMS_EXPORT void IResourceManager_FilterByMeshProperty(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, BAMS::Property * prop, IResMesh * mesh, bool caseInsesitive)
-	{
-		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->Filter(reinterpret_cast<void(*)(ResourceBase *, void *)>(callback), localData, prop, Impl<ResMesh>(mesh), caseInsesitive);
+		resm->Filter(reinterpret_cast<void(*)(ResBase *, void *)>(callback), localData, namePattern, filenamePattern, filenamePatternUTF8, rootPath, typeId, caseInsesitive);
 	}
 
 	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->Get(uid);
+		return resm->FindOrCreate_WithUID(uid);
 	}
 
 	BAMS_EXPORT IResRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID & uid)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->Get(uid);
+		return resm->FindOrCreate_WithUID(uid);
 	}
 
 	BAMS_EXPORT IResRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name)
@@ -203,13 +198,13 @@ extern "C" {
 	BAMS_EXPORT void IResourceManager_LoadSync(IResourceManager *rm, IResource *res)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->LoadSync(reinterpret_cast<ResourceBase *>(res));
+		resm->LoadSync(reinterpret_cast<ResBase *>(res));
 	}
 
 	BAMS_EXPORT void IResourceManager_RefreshResorceFileInfo(IResourceManager *rm, IResource *res)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		resm->RefreshResorceFileInfo(reinterpret_cast<ResourceBase *>(res));
+		resm->RefreshResorceFileInfo(reinterpret_cast<ResBase *>(res));
 	}
 
 	BAMS_EXPORT void IResourceManager_StartDirectoryMonitor(IResourceManager *rm)
@@ -450,4 +445,3 @@ extern "C" {
 }
 
 }; // BAMS namespace
-

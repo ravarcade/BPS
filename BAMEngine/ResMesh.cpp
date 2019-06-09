@@ -3,7 +3,6 @@
 namespace BAMS {
 namespace CORE {
 
-using tinyxml2::XMLPrinter;
 using tinyxml2::XMLDocument;
 
 // ----------------------------------------------------
@@ -18,7 +17,7 @@ void ResMesh::_LoadXML()
 	WSTR srcFileName;
 	srcFileName.UTF8(r->Attribute("src"));
 	rm->AbsolutePath(srcFileName);
-	meshSrc = rm->GetByFilename(srcFileName, RESID_IMPORTMODEL);
+	meshSrc = rm->FindOrCreate_withFilename(srcFileName, RESID_IMPORTMODEL);
 	meshIdx = r->IntAttribute("idx", 0);
 	meshHash = r->IntAttribute("hash", 0);
 	vd.m_numVertices = r->IntAttribute("vertices", 0);
@@ -63,15 +62,10 @@ void ResMesh::_LoadXML()
 
 void ResMesh::_SaveXML() 
 { 
-//	STR ResMesh::_BuildXML(VertexDescription *pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
-//	{
-//	using tinyxml2::XMLPrinter;
-//	using tinyxml2::XMLDocument;
 
 	auto &rm = globalResourceManager;
-	auto out = rb->XML ? rb->XML : rm->NewXMLElement("temp");
+	auto out = rb->XML ? rb->XML : rm->NewXMLElement();
 	out->DeleteChildren();
-//	XMLDocument out;
 	auto *r = rm->NewXMLElement("Mesh");
 	STR cvt;
 	WSTR msf = meshSrc->Path;
@@ -116,7 +110,7 @@ void ResMesh::_SaveXML()
 	rb->SetTimestamp(); 
 }
 
-void ResMesh::SetVertexDescription(VertexDescription * pvd, U32 _meshHash, ResourceBase * _meshSrc, U32 _meshIdx)
+void ResMesh::SetVertexDescription(VertexDescription * pvd, U32 _meshHash, ResBase * _meshSrc, U32 _meshIdx)
 { 
 	// set new mesh data
 	vd = *pvd; 
@@ -154,7 +148,7 @@ MProperties *ResMesh::GetMeshProperties(bool loadASAP)
 
 // ==========================================================
 
-void ResImportModel::IdentifyResourceType(ResourceBase * res)
+void ResImportModel::IdentifyResourceType(ResBase * res)
 {
 	if (res->Type != RESID_UNKNOWN)
 		return;

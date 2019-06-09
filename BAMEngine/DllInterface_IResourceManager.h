@@ -31,6 +31,7 @@ extern "C" {
 	typedef void IResRawData;
 	typedef void IResShader;
 	typedef void IResMesh;
+	typedef void IResModel;
 	typedef void IResImage;
 	typedef void IResourceManager;
 
@@ -70,10 +71,18 @@ extern "C" {
 	BAMS_EXPORT void               IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT void               IResourceManager_RootDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT IResource *        IResourceManager_FindByName(IResourceManager *rm, const char *name, uint32_t type = 0);
-	BAMS_EXPORT void               IResourceManager_Filter(IResourceManager *rm, void(*callback)(IResource *, void *), void * localData, const char * pattern = nullptr, uint32_t typeId = RESID_UNKNOWN);
-	BAMS_EXPORT void               IResourceManager_FilterByFilename(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, const wchar_t * pattern, const wchar_t * rootPath, bool caseInsesitive = true);
-	BAMS_EXPORT void               IResourceManager_FilterByFilenameUTF8(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, const char * pattern, const wchar_t * rootPath, bool caseInsesitive = true);
-	BAMS_EXPORT void               IResourceManager_FilterByMeshProperty(IResourceManager * rm, void(*callback)(IResource *, void *), void * localData, BAMS::Property * prop, IResMesh * mesh, bool caseInsesitive = true);
+
+	BAMS_EXPORT void               IResourceManager_Filter(
+		IResourceManager *rm,
+		void(*callback)(IResource *, void *),
+		void * localData,
+		const char * namePattern = nullptr,
+		const wchar_t * filenamePattern = nullptr,
+		const char * filenamePatternUTF8 = nullptr,
+		const wchar_t * rootPath = nullptr,
+		uint32_t typeId = RESID_UNKNOWN,
+		bool caseInsesitive = false);
+
 	BAMS_EXPORT IResource *        IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IResRawData *      IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID &uid);
 	BAMS_EXPORT IResRawData *      IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name);
@@ -104,6 +113,9 @@ extern "C" {
 	BAMS_EXPORT uint32_t             IResMesh_GetMeshIdx(IResMesh * res);
 	BAMS_EXPORT uint32_t             IResMesh_GetMeshHash(IResMesh * res);
 	BAMS_EXPORT void                 IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx);
+
+	// ResModel
+	BAMS_EXPORT void                 IResModel_AddMesh(IResModel *res, const char *meshResName, const float *m = nullptr);
 
 	// Image
 	BAMS_EXPORT Image *   IResImage_GetImage(IResImage *res, bool loadASAP = false);
@@ -214,6 +226,8 @@ public:
 	void Release() { IResource_Release(Get()); }
 	uint32_t GetRefCounter() { return IResource_GetRefCounter(Get()); }
 	inline IResource *Get() { return _res.Get(); }
+	template<typename T>
+	T *Get() { return static_cast<T*>(_res.Get()); }
 };
 
 // ================================================================================== Help macro ===
@@ -226,17 +240,18 @@ public:
 		virtual ~C##x() {} \
 		C##x & operator = (const C##x &src) { _res = src._res; return *this; } \
 		C##x & operator = (C##x &&src) { _res = std::move(src._res); return *this; } \
-		static uint32_t GetType() { return resTypeId; }
+		static uint32_t GetType() { return resTypeId; } \
+		I##x *Self() { return Get<I##x>(); }
 
 	// ================================================================================== CResRawData ===
 
 class CResRawData : public CResource
 {
 public:
-	CRESOURCEEXT(ResRawData, RESID_RAWDATA)
+	CRESOURCEEXT(ResRawData, RESID_RAWDATA);
 
-		unsigned char *GetData() { return IResRawData_GetData(static_cast<IResRawData*>(Get())); }
-	size_t GetSize() { return IResRawData_GetSize(static_cast<IResRawData*>(Get())); }
+	unsigned char *GetData() { return IResRawData_GetData(Self()); }
+	size_t GetSize() { return IResRawData_GetSize(Self()); }
 };
 
 // ================================================================================== CResShader ===
@@ -244,19 +259,19 @@ public:
 class CResShader : public CResource
 {
 public:
-	CRESOURCEEXT(ResShader, RESID_SHADER)
+	CRESOURCEEXT(ResShader, RESID_SHADER);
 
-		unsigned char *GetData() { return IResShader_GetData(static_cast<IResShader*>(Get())); }
-	size_t GetSize() { return IResShader_GetSize(static_cast<IResShader*>(Get())); }
+	unsigned char *GetData() { return IResShader_GetData( Self() ); }
+	size_t GetSize() { return IResShader_GetSize( Self() ); }
 
-	void AddProgram(const wchar_t *fileName) { IResShader_AddProgram(static_cast<IResShader*>(Get()), fileName); }
-	const wchar_t *GetSourceFilename(int type) { return IResShader_GetSourceFilename(static_cast<IResShader*>(Get()), type); }
-	const wchar_t *GetBinaryFilename(int type) { return IResShader_GetBinaryFilename(static_cast<IResShader*>(Get()), type); }
+	void AddProgram(const wchar_t *fileName) { IResShader_AddProgram( Self(), fileName); }
+	const wchar_t *GetSourceFilename(int type) { return IResShader_GetSourceFilename( Self(), type); }
+	const wchar_t *GetBinaryFilename(int type) { return IResShader_GetBinaryFilename( Self(), type); }
 
-	uint32_t GetBinaryCount() { return IResShader_GetBinaryCount(static_cast<IResShader*>(Get())); }
-	CResRawData GetBinary(uint32_t idx) { CResRawData prg(IResShader_GetBinary(static_cast<IResShader*>(Get()), idx)); return  std::move(prg); }
+	uint32_t GetBinaryCount() { return IResShader_GetBinaryCount( Self()); }
+	CResRawData GetBinary(uint32_t idx) { CResRawData prg(IResShader_GetBinary( Self(), idx)); return  std::move(prg); }
 
-	void Save() { IResShader_Save(static_cast<IResShader*>(Get())); }
+	void Save() { IResShader_Save( Self()); }
 };
 
 // ================================================================================== CResMesh ===
@@ -264,28 +279,37 @@ public:
 class CResMesh : public CResource
 {
 public:
-	CRESOURCEEXT(ResMesh, RESID_MESH)
+	CRESOURCEEXT(ResMesh, RESID_MESH);
 
-		void SetVertexDescription(IVertexDescription *vd, uint32_t meshHash, CResource &meshRes, uint32_t meshIdx) { IResMesh_SetVertexDescription(static_cast<IResMesh*>(Get()), vd, meshHash, meshRes.Get(), meshIdx); }
-	void SetVertexDescription(IVertexDescription *vd, uint32_t meshHash, IResource *meshRes, uint32_t meshIdx) { IResMesh_SetVertexDescription(static_cast<IResMesh*>(Get()), vd, meshHash, meshRes, meshIdx); }
-	IVertexDescription *GetVertexDescription(bool loadASAP = false) { return IResMesh_GetVertexDescription(static_cast<IResMesh*>(Get()), loadASAP); }
-	BAMS::MProperties *GetMeshProperties(bool loadASAP = false) { return reinterpret_cast<MProperties *>(IResMesh_GetMeshProperties(static_cast<IResMesh*>(Get()), loadASAP)); }
-	IResource *GetMeshSrc() { return IResMesh_GetMeshSrc(static_cast<IResMesh*>(Get())); }
-	uint32_t GetMeshIdx() { return IResMesh_GetMeshIdx(static_cast<IResMesh*>(Get())); }
-	uint32_t GetMeshHash() { return IResMesh_GetMeshHash(static_cast<IResMesh*>(Get())); }
-	void SetMeshIdx(uint32_t idx) { IResMesh_SetMeshIdx(static_cast<IResMesh*>(Get()), idx); }
+	void SetVertexDescription(IVertexDescription *vd, uint32_t meshHash, CResource &meshRes, uint32_t meshIdx) { IResMesh_SetVertexDescription(Self(), vd, meshHash, meshRes.Get(), meshIdx); }
+	void SetVertexDescription(IVertexDescription *vd, uint32_t meshHash, IResource *meshRes, uint32_t meshIdx) { IResMesh_SetVertexDescription(Self(), vd, meshHash, meshRes, meshIdx); }
+	IVertexDescription *GetVertexDescription(bool loadASAP = false) { return IResMesh_GetVertexDescription(Self(), loadASAP); }
+	BAMS::MProperties *GetMeshProperties(bool loadASAP = false) { return reinterpret_cast<MProperties *>(IResMesh_GetMeshProperties(Self(), loadASAP)); }
+	IResource *GetMeshSrc() { return IResMesh_GetMeshSrc(Self()); }
+	uint32_t GetMeshIdx() { return IResMesh_GetMeshIdx(Self()); }
+	uint32_t GetMeshHash() { return IResMesh_GetMeshHash(Self()); }
+	void SetMeshIdx(uint32_t idx) { IResMesh_SetMeshIdx(Self(), idx); }
 };
 
+// ================================================================================== CResModel ===
+
+class CResModel : public CResource
+{
+public:
+	CRESOURCEEXT(ResModel, RESID_MODEL);
+
+	void AddMesh(const char * meshResName, const float * m = nullptr) { IResModel_AddMesh(Self(), meshResName, m); }
+};
 
 // ================================================================================== CResImage ===
 
 class CResImage : public CResource
 {
 public:
-	CRESOURCEEXT(ResImage, RESID_IMAGE)
+	CRESOURCEEXT(ResImage, RESID_IMAGE);
 
-	Image *GetImage(bool loadASAP = false) { return IResImage_GetImage(static_cast<IResImage*>(Get()), loadASAP); }
-	void Updated() { IResImage_Updated(static_cast<IResImage*>(Get())); }
+	Image *GetImage(bool loadASAP = false) { return IResImage_GetImage(Self(), loadASAP); }
+	void Updated() { IResImage_Updated(Self()); }
 	uint8_t *GetSrcData() { return IResImage_GetSrcData(Get()); }
 	size_t GetSrcSize() { return IResImage_GetSrcSize(Get()); }
 	void ReleaseSrc() { return IResImage_ReleaseSrc(Get()); }
@@ -308,11 +332,14 @@ public:
 	void AddDir(const wchar_t *path) { IResourceManager_AddDir(_rm, path); }
 	void RootDir(const wchar_t *path) { IResourceManager_RootDir(_rm, path); }
 
-	void Filter(void(*callback)(IResource *, void *), void *localData, const char *pattern = nullptr, uint32_t typeId = RESID_UNKNOWN) { IResourceManager_Filter(_rm, callback, localData, pattern, typeId); }
-	void Filter(void(*callback)(IResource *, void *), void *localData, const wchar_t *pattern, const wchar_t * rootPath, bool caseInsesitive = true) { IResourceManager_FilterByFilename(_rm, callback, localData, pattern, rootPath, caseInsesitive); }
-	void Filter(void(*callback)(IResource *, void *), void *localData, const char *pattern, const wchar_t * rootPath, bool caseInsesitive = true) { IResourceManager_FilterByFilenameUTF8(_rm, callback, localData, pattern, rootPath, caseInsesitive); }
-	void Filter(void(*callback)(IResource *, void *), void *localData, BAMS::Property *prop, CResMesh &mesh , bool caseInsesitive = true) { IResourceManager_FilterByMeshProperty(_rm, callback, localData, prop, mesh.Get(), caseInsesitive); }
+	void Filter(void(*callback)(IResource *, void *), void *localData, const char * namePattern = nullptr, const wchar_t * filenamePattern = nullptr, const char * filenamePatternUTF8 = nullptr, const wchar_t * rootPath = nullptr, uint32_t typeId = RESID_UNKNOWN, bool caseInsesitive = false)
+	{ IResourceManager_Filter(_rm, callback, localData, namePattern, filenamePattern, filenamePatternUTF8, rootPath, typeId, caseInsesitive); }
 
+	// version used to find all resources given typeid
+	void Filter(uint32_t typeId, void *localData, void(*callback)(IResource *, void *)) { IResourceManager_Filter(_rm, callback, localData, nullptr, nullptr, nullptr, nullptr, typeId, false); }
+	// version used to find textures for mesh property
+	void Filter(CResMesh &mesh, BAMS::Property *prop, void *localData, void(*callback)(IResource *, void *)) { IResourceManager_Filter(_rm, callback, localData, nullptr, nullptr, reinterpret_cast<CSTR>(prop->val), IResource_GetPath(mesh.GetMeshSrc()), RESID_UNKNOWN, true); }
+	
 	IResource * Find(const char *name, uint32_t type = RESID_UNKNOWN) { return IResourceManager_FindByName(_rm, name, type); }
 	IResource * Find(const UUID &uid) { return IResourceManager_FindByUID(_rm, uid); }
 
