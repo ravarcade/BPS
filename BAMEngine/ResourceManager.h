@@ -40,6 +40,10 @@ public:
 		U32 typeId = RESID_UNKNOWN, 
 		bool caseInsesitive = false);
 
+	ResBase *Find(const CSTR name);
+	ResBase *Find(const UUID &resUID);
+	ResBase *Find(const CWSTR filename);
+
 	ResBase *FindOrCreate_withFilename(const WSTR &filename, U32 typeId = RESID_UNKNOWN);
 	ResBase *Get(const STR &resName, U32 typeId = RESID_UNKNOWN);
 	ResBase *Get(CSTR resName, U32 typeId = RESID_UNKNOWN) { return Get(STR(resName), typeId); };

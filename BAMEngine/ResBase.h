@@ -40,8 +40,9 @@ public:
 	/// Initializes a new instance of the <see cref="ResBase"/> class.
 	/// It is empty resource without assigned any file on disk.
 	/// </summary>
-	ResBase(tinyxml2::XMLElement *xml) :
+	ResBase(CSTR name, tinyxml2::XMLElement *xml) :
 		_resData(nullptr),
+		_resSize(0),
 		_isLoaded(false),
 		_isDeleted(false),
 		_isModified(false),
@@ -50,6 +51,7 @@ public:
 		_pResImp(nullptr),
 		Type(RESID_UNKNOWN),
 		UID(Tools::NOUID),
+		Name(name),
 		XML(xml)
 	{};
 
@@ -59,8 +61,8 @@ public:
 			_pResImp->GetFactory()->Destroy(_pResImp);
 	};
 
-	void Init(CWSTR path);
-	void Init(CSTR name);
+//	void Init(CWSTR path);
+//	void Init(CSTR name);
 
 	void ResourceLoad(void *data, SIZE_T size = -1)
 	{

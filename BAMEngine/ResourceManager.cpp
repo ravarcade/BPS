@@ -71,7 +71,9 @@ ResourceFactoryChain * ResourceFactoryChain::First = nullptr;
 
 struct ResourceManager::InternalData : public Allocators::Ext<>
 {
-	basic_array<ResBase *, Allocators::default> _resources;
+	CStringHastable<ResBase> _resources;
+//	basic_array<ResBase *, Allocators::default> _resources;
+	
 	DirectoryChangeNotifier _monitoredDirs;
 	std::thread *_worker;
 	bool _killWorkerFlag;
@@ -89,66 +91,87 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 	{
 		StopMonitoring();
 		SaveManifest();
-		for (auto *pRes : _resources)
-		{
-			make_delete<ResBase>(pRes);
-		}
+		//for (auto *pRes : _resources)
+		//{
+		//	make_delete<ResBase>(pRes);
+		//}
 		_resources.clear();
 	}
 
-	inline ResBase *NewResBase(tinyxml2::XMLElement * xml = nullptr) { return make_new<ResBase>(xml ? xml : NewXMLElement()); }
+	inline ResBase *NewResBase(CSTR name, tinyxml2::XMLElement * xml = nullptr) 
+	{ 
+		return _resources.add(name, name, xml);
+	}
 
-	void MakeNameUniq(ResBase *res)
+	inline ResBase *NewResBase(CWSTR path) // creates uniq resource
 	{
-		bool repeat = true;
-		while (repeat)
+		CWSTR e = path;
+		CWSTR lastDot = nullptr;
+		CWSTR lastSlash = nullptr;
+		
+		while (*e) 
 		{
-			repeat = false;
-			for (auto &r : _resources)
-			{
-				if (r != res && r->Name == res->Name)
-				{
-					repeat = true;
-				}
-			}
-
-			if (repeat)
-			{
-				// number at end of file name
-				auto e = res->Name.end();
-				auto f = res->Name.begin();
-				int num = 2;
-				while (f < e && std::isdigit(e[-1]))
-					--e;
-				if (e != res->Name.end())
-				{
-					auto ee = res->Name.end();
-					auto ef = e;
-					num = 0;
-					while (ef < ee)
-					{
-						num = num * 10 + (*ef) - '0';
-						++ef;
-					}
-					++num;
-				}
-				res->Name.resize(static_cast<U32>(e - f));
-				res->Name += num;
-			}
+			if (*e == '.')
+				lastDot = e;
+			if (*e == '\\' || *e == '/')
+				lastSlash = e + 1;
+			++e;
 		}
+		if (lastDot == nullptr)
+			lastDot = e;
+		if (lastSlash == nullptr)
+			lastSlash = path;
+
+		WString n(lastSlash, lastSlash);
+		STR possibleName;
+		possibleName.UTF8(n);
+		MakeNameUniq(possibleName);
+		auto ret = NewResBase(possibleName.c_str());
+		WSTR p = path;
+		Tools::NormalizePath(p);
+		AbsolutePath(p);
+		ret->Path = p;
+		return ret;
 	}
 
-	ResBase *AddResource(ResBase *res)
+	void MakeNameUniq(STR &name)
 	{
-		res->ResourceLoad(nullptr, 0);
-		MakeNameUniq(res);
-		_resources.push_back(res);
-		return res;
+		while (!_resources.findIdx(name.c_str()))
+		{
+			// number at end of file name
+			auto e = name.end();
+			auto f = name.begin();
+			int num = 2;
+			while (f < e && std::isdigit(e[-1]))
+				--e;
+			if (e != name.end())
+			{
+				auto ee = name.end();
+				auto ef = e;
+				num = 0;
+				while (ef < ee)
+				{
+					num = num * 10 + (*ef) - '0';
+					++ef;
+				}
+				++num;
+			}
+			name.resize(static_cast<U32>(e - f));
+			name += num;
+		}		
 	}
+
+	//ResBase *AddResource(ResBase *res)
+	//{
+	//	res->ResourceLoad(nullptr, 0);
+	//	MakeNameUniq(res);
+	//	_resources.push_back(res);
+	//	return res;
+	//}
 
 	bool IsUniqFile(CWSTR path)
 	{
-		return FilterByFilename(path) == nullptr;
+		return FilterByFilename(ToBasicString(path)) == nullptr;
 	}
 
 	ResBase *AddResource(CWSTR path)
@@ -156,25 +179,36 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		if (!IsUniqFile(path))
 			return nullptr;
 
-		auto res = NewResBase();
-		res->Init(path);
-		MakeNameUniq(res);
-		_resources.push_back(res);
+		auto res = NewResBase(path);
+		Tools::CreateUUID(res->UID);
 		return res;
 	}
 
 	ResBase *AddResource(CSTR resName, U32 type)
 	{
-		auto res = NewResBase();
-		res->Init(resName);
+		auto res = NewResBase(resName);
+		Tools::CreateUUID(res->UID);
 		res->Type = type;
-		MakeNameUniq(res);
-		_resources.push_back(res);
 		CreateResourceImplementation(res);
 		return res;
 	}
 
-	ResBase *FilterByFilename(WSTR &filename)
+	ResBase *Find(const String &name)
+	{
+		return nullptr;
+	}
+
+	ResBase *Find(const UUID &resUID)
+	{
+		return nullptr;
+	}
+
+	ResBase *Find(const WString &filename)
+	{
+		return nullptr;
+	}
+
+	ResBase *FilterByFilename(const WString &filename)
 	{
 		for (auto &res : _resources)
 		{
@@ -187,11 +221,11 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 	}
 
 
-	ResBase *FilterByFilename(CWSTR filename)
-	{
-		WSTR fn(filename);
-		return FilterByFilename(fn);
-	}
+	//ResBase *FilterByFilename(CWSTR filename)
+	//{
+	//	WSTR fn(filename);
+	//	return FilterByFilename(fn);
+	//}
 
 	WSTR GetResourceAbsoluteDir(ResBase *res)
 	{
@@ -616,16 +650,14 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			auto qty = root->IntAttribute("qty");
 			for (auto r = root->FirstChildElement("Resource"); r; r = r->NextSiblingElement())
 			{				
-				auto res = NewResBase(r);
+				auto res = NewResBase(r->Attribute("Name"), r);
 				res->Path.UTF8(r->Attribute("Path"));
 				AbsolutePath(res->Path);
-				res->Name = r->Attribute("Name");
 				SetResourceType(res, r->UnsignedAttribute("Type", RESID_UNKNOWN));
 				const char *uid = r->Attribute("UID");
 				Tools::String2UUID(res->UID, uid);
 				res->_resTimestamp = r->Int64Attribute("Update", 0);
 				res->_resSize = r->Int64Attribute("Size", 0);
-				_resources.push_back(res);
 			}
 			GetMemoryAllocator()->deallocate(manifest);			
 		}
@@ -784,6 +816,10 @@ void ResourceManager::Filter(void(*callback)(ResBase *, void *), void * localDat
 	}
 }
 
+ResBase * ResourceManager::Find(const CSTR name) { return _data->Find(ToBasicString(name)); }
+ResBase * ResourceManager::Find(const UUID & resUID) { return _data->Find(resUID); }
+ResBase * ResourceManager::Find(const CWSTR filename) { return _data->Find(ToBasicString(filename)); }
+
 ResBase *ResourceManager::FindOrCreate_withFilename(const WSTR &filename, U32 typeId)
 {
 	ResBase *ret = nullptr;
@@ -800,10 +836,9 @@ ResBase *ResourceManager::FindOrCreate_withFilename(const WSTR &filename, U32 ty
 
 	if (!ret)
 	{
-		ret = _data->NewResBase();
-		ret->Init(filename.c_str());
+		ret = _data->NewResBase(filename.c_str());
+		Tools::CreateUUID(ret->UID);
 		ret->Type = typeId;
-		_data->AddResource(ret);
 	}
 
 	// if we don't have type set, when set one.
@@ -843,10 +878,8 @@ ResBase * ResourceManager::Get(const STR & resName, U32 typeId)
 
 	if (!ret)
 	{
-		ret = _data->NewResBase();
-		ret->Init(resName.c_str());
+		ret = _data->NewResBase(resName.c_str());
 		ret->Type = typeId;
-		_data->AddResource(ret);
 	}
 
 	// if we don't have type set, when set one.
@@ -871,15 +904,6 @@ ResBase * ResourceManager::FindOrCreate_WithUID(const UUID & resUID)
 			ret = res;
 			break;
 		}
-	}
-
-	// no resource... create one... well it is "generic", so it is more/less ony name and file.
-	if (!ret)
-	{
-		auto res = _data->NewResBase();
-		res->UID = resUID;
-		_data->AddResource(res);
-		ret = res;
 	}
 
 	return ret;

@@ -256,6 +256,10 @@ public:
 		alloc = nullptr;
 	}
 
+	T ** begin() { return table.begin(); }
+	T ** end() { return table.end(); }
+	SIZE_T size() { return this->table.size(); }
+
 	T * find(const K *s) { auto pIdx = ht.find(s); return pIdx ? table[*pIdx] : nullptr; }
 	SIZE_T * findIdx(const K *s) { return ht.find(s); }
 

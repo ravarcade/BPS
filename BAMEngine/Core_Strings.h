@@ -19,7 +19,22 @@ struct basic_string_base
 	basic_string_base(T* buf, U used, U reserved) : _buf(buf), _reserved(reserved), _used(used) {}
 	basic_string_base(T *buf, U used) : _buf(buf), _used(used), _reserved(used) {}
 	basic_string_base(T* buf) : _buf(buf) { _used = buf ? static_cast<U>(length(buf)) : 0; _reserved = _used; }
+	basic_string_base(T* buf, T *end) : _buf(buf) { _used = static_cast<U>((end - buf) / sizeof(T)) ; _reserved = _used; }
 	basic_string_base(basic_string_base &src) : _buf(src._buf), _used(src._used), _reserved(src._reserved) {} // copy contructor
+
+	basic_string_base(const T *buf, const T *end)
+	{
+		_buf = const_cast<T*>(buf);
+		_used = static_cast<U>((end - buf) / sizeof(T));
+		_reserved = 0;
+	}
+
+	basic_string_base(const T *buf, U used) 
+	{
+		_buf = const_cast<T*>(buf);
+		_used = buf ? static_cast<U>(length(buf)) : 0;
+		_reserved = 0;
+	}
 
 	inline const basic_string_base &ToBasicString() const { return *this; }
 
@@ -656,14 +671,6 @@ const basic_string_base<T, U32> ToBasicString(const T *t, U32 l = 0)
 	return std::move(basic_string_base<T, U32>(const_cast<T*>(t), l)); 
 }
 
-template<typename T>
-const basic_string_base<T, U32> ToBasicString(T *t, U32 l = 0) 
-{ 
-	if (!l && t) 
-		l = static_cast<U32>(basic_string_base<T, U32>::length(t));
-
-	return std::move(basic_string_base<T, U32>(t, l)); 
-}
 
 //template<typename T>
 //auto ToBasicString(T * t, U32 l = 0) { basic_string_base<T, U32> v(t, l); return std::move(v); }

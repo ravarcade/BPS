@@ -11,17 +11,18 @@ void ResBase::_CreateResourceImplementation()
 	globalResourceManager->CreateResourceImplementation(this);
 }
 
+/*
 void ResBase::Init(CWSTR path)
 {
 	_resData = nullptr;
 	_resSize = 0;
 	_isLoaded = false;
 	_refCounter = 0;
+	Tools::CreateUUID(UID);
 
 	WSTR normalizedPath = path;
 	Tools::NormalizePath(normalizedPath);
 
-	Tools::CreateUUID(UID);
 	Path = normalizedPath;
 	CWSTR pPathEnd = Path.end();
 	CWSTR pPathBegin = Path.begin();
@@ -64,6 +65,6 @@ void ResBase::Init(CSTR name)
 	Name = name;
 	Tools::CreateUUID(UID);
 }
-
+*/
 }; // CORE namespace
 }; // BAMS namespace
