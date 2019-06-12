@@ -40,23 +40,16 @@ public:
 		U32 typeId = RESID_UNKNOWN, 
 		bool caseInsesitive = false);
 
-	ResBase *Find(const CSTR name);
-	ResBase *Find(const UUID &resUID);
-	ResBase *Find(const CWSTR filename);
-
-	ResBase *FindOrCreate_withFilename(const WSTR &filename, U32 typeId = RESID_UNKNOWN);
-	ResBase *Get(const STR &resName, U32 typeId = RESID_UNKNOWN);
-	ResBase *Get(CSTR resName, U32 typeId = RESID_UNKNOWN) { return Get(STR(resName), typeId); };
-	ResBase *FindOrCreate_WithUID(const UUID &resUID);
-
+	ResBase *Create(CSTR name, U32 type);
+	ResBase *FindOrCreate(CSTR name, U32 type = RESID_FORBIDEN);
+	ResBase *FindOrCreate(const UUID &resUID, U32 type = RESID_FORBIDEN);
+	ResBase *FindOrCreate(CWSTR filename, U32 type = RESID_FORBIDEN);
 	template<class T>
-	ResBase *Get(const STR &resName) { return Get(resName, T::GetTypeId()); }
+	ResBase *FindOrCreate(CSTR resName) { return FindOrCreate(resName, T::GetTypeId()); }
 
-	template<class T>
-	ResBase *Get(CSTR resName) { return Get(resName, T::GetTypeId()); }
-
-	ResBase *Add(CWSTR path);
-	ResBase *Add(CSTR resName, U32 type = 0);
+	ResBase *FindExisting(CSTR name, U32 type);
+	ResBase *FindExisting(CWSTR filename, U32 type);
+	ResBase *FindExisting(const UUID &resUID, U32 type);
 
 	void AddDir(CWSTR path);
 	void RootDir(CWSTR path);
@@ -68,7 +61,7 @@ public:
 	void StopDirectoryMonitor();
 	void AbsolutePath(WSTR &filename, const WSTR *_root = nullptr);
 	void RelativePath(WSTR &filename, const WSTR *_root = nullptr);
-	WSTR GetResourceAbsoluteDir(ResBase *res);
+
 	WSTR GetDirPath(const WString &filename);
 
 	tinyxml2::XMLElement *NewXMLElement(const char* name = "");

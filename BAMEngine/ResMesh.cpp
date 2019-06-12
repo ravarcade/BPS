@@ -17,7 +17,7 @@ void ResMesh::_LoadXML()
 	WSTR srcFileName;
 	srcFileName.UTF8(r->Attribute("src"));
 	rm->AbsolutePath(srcFileName);
-	meshSrc = rm->FindOrCreate_withFilename(srcFileName, RESID_IMPORTMODEL);
+	meshSrc = rm->FindExisting(srcFileName.c_str(), RESID_IMPORTMODEL);
 	meshIdx = r->IntAttribute("idx", 0);
 	meshHash = r->IntAttribute("hash", 0);
 	vd.m_numVertices = r->IntAttribute("vertices", 0);

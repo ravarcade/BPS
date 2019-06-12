@@ -132,16 +132,46 @@ extern "C" {
 //		BAMS::ResourceManager::Destroy(reinterpret_cast<ResourceManager *>(rm));
 	}
 
-	BAMS_EXPORT IResource *IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path)
+	BAMS_EXPORT IResource * IResourceManager_CreateResource(IResourceManager *rm, const char *resName, uint32_t type)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->Add(path);
+		return resm->Create(resName, type);
 	}
 
-	BAMS_EXPORT IResource *IResourceManager_AddResourceWithoutFile(IResourceManager *rm, const char *resName, uint32_t type)
+	BAMS_EXPORT IResource * IResourceManager_FindOrCreate(IResourceManager *rm, const char *resName, uint32_t type)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->Add(resName, type);
+		return resm->FindOrCreate(resName, type);
+	}
+
+	BAMS_EXPORT IResource * IResourceManager_FindOrCreateByFilename(IResourceManager *rm, const wchar_t *path, uint32_t type)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		return resm->FindOrCreate(path, type);
+	}
+
+	BAMS_EXPORT IResource * IResourceManager_FindOrCreateByUID(IResourceManager *rm, const UUID &uid, uint32_t type)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		return resm->FindOrCreate(uid, type);
+	}
+
+	BAMS_EXPORT IResource * IResourceManager_FindExisting(IResourceManager *rm, const char *resName, uint32_t type)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		return resm->FindExisting(resName, type);
+	}
+
+	BAMS_EXPORT IResource * IResourceManager_FindExistingByFilename(IResourceManager *rm, const wchar_t *path, uint32_t type)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		return resm->FindExisting(path, type);
+	}
+
+	BAMS_EXPORT IResource * IResourceManager_FindExistingByUID(IResourceManager *rm, const UUID &uid, uint32_t type)
+	{
+		auto *resm = reinterpret_cast<ResourceManager *>(rm);
+		return resm->FindExisting(uid, type);
 	}
 
 	BAMS_EXPORT void IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path)
@@ -156,11 +186,6 @@ extern "C" {
 		resm->RootDir(path);
 	}
 
-	BAMS_EXPORT IResource *IResourceManager_FindByName(IResourceManager *rm, const char *name, uint32_t type)
-	{
-		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->Get(name, type);
-	}
 
 	BAMS_EXPORT void IResourceManager_Filter(
 		IResourceManager *rm,
@@ -175,24 +200,6 @@ extern "C" {
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
 		resm->Filter(reinterpret_cast<void(*)(ResBase *, void *)>(callback), localData, namePattern, filenamePattern, filenamePatternUTF8, rootPath, typeId, caseInsesitive);
-	}
-
-	BAMS_EXPORT IResource *IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid)
-	{
-		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->FindOrCreate_WithUID(uid);
-	}
-
-	BAMS_EXPORT IResRawData *IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID & uid)
-	{
-		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->FindOrCreate_WithUID(uid);
-	}
-
-	BAMS_EXPORT IResRawData *IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name)
-	{
-		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->Get<ResRawData>(name);
 	}
 
 	BAMS_EXPORT void IResourceManager_LoadSync(IResourceManager *rm, IResource *res)
@@ -445,3 +452,4 @@ extern "C" {
 }
 
 }; // BAMS namespace
+

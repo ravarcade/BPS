@@ -7,6 +7,8 @@
 */
 
 enum {
+	RESID_FORBIDEN = 0,
+
 	RESID_CORE_RESOURCES = 0x00010000,
 	RESID_UNKNOWN,
 	RESID_RAWDATA,
@@ -66,11 +68,17 @@ extern "C" {
 	// ResourceManager
 	BAMS_EXPORT IResourceManager * IResourceManager_Create();
 	BAMS_EXPORT void               IResourceManager_Destroy(IResourceManager *);
-	BAMS_EXPORT IResource *        IResourceManager_AddResource(IResourceManager *rm, const wchar_t *path);
-	BAMS_EXPORT IResource *        IResourceManager_AddResourceWithoutFile(IResourceManager *rm, const char *resName, uint32_t type = 0);
+	BAMS_EXPORT IResource *        IResourceManager_CreateResource(IResourceManager *rm, const char *resName, uint32_t type);
+	BAMS_EXPORT IResource *        IResourceManager_FindOrCreate(IResourceManager *rm, const char *resName, uint32_t type = RESID_FORBIDEN);
+	BAMS_EXPORT IResource *        IResourceManager_FindOrCreateByFilename(IResourceManager *rm, const wchar_t *path, uint32_t type = RESID_FORBIDEN);
+	BAMS_EXPORT IResource *        IResourceManager_FindOrCreateByUID(IResourceManager *rm, const UUID &uid, uint32_t type = RESID_FORBIDEN);
+
+	BAMS_EXPORT IResource *        IResourceManager_FindExisting(IResourceManager *rm, const char *resName, uint32_t type);
+	BAMS_EXPORT IResource *        IResourceManager_FindExistingByFilename(IResourceManager *rm, const wchar_t *path, uint32_t type);
+	BAMS_EXPORT IResource *        IResourceManager_FindExistingByUID(IResourceManager *rm, const UUID &uid, uint32_t type);
+
 	BAMS_EXPORT void               IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path);
 	BAMS_EXPORT void               IResourceManager_RootDir(IResourceManager *rm, const wchar_t *path);
-	BAMS_EXPORT IResource *        IResourceManager_FindByName(IResourceManager *rm, const char *name, uint32_t type = 0);
 
 	BAMS_EXPORT void               IResourceManager_Filter(
 		IResourceManager *rm,
@@ -83,9 +91,6 @@ extern "C" {
 		uint32_t typeId = RESID_UNKNOWN,
 		bool caseInsesitive = false);
 
-	BAMS_EXPORT IResource *        IResourceManager_FindByUID(IResourceManager *rm, const UUID &uid);
-	BAMS_EXPORT IResRawData *      IResourceManager_GetRawDataByUID(IResourceManager *rm, const UUID &uid);
-	BAMS_EXPORT IResRawData *      IResourceManager_GetRawDataByName(IResourceManager *rm, const char *name);
 	BAMS_EXPORT void               IResourceManager_LoadSync(IResourceManager *rm, IResource *res = nullptr);
 	BAMS_EXPORT void               IResourceManager_RefreshResorceFileInfo(IResourceManager *rm, IResource *res);
 	BAMS_EXPORT void               IResourceManager_StartDirectoryMonitor(IResourceManager *rm);
@@ -326,8 +331,15 @@ public:
 	CResourceManager(IResourceManager *rm) : _rm(rm) {};
 	~CResourceManager() { IResourceManager_Destroy(_rm); _rm = nullptr; }
 
-	IResource * AddResource(const wchar_t *path) { return IResourceManager_AddResource(_rm, path); }
-	IResource * AddResource(const char *resName, uint32_t type = 0) { return IResourceManager_AddResourceWithoutFile(_rm, resName, type); }
+	IResource * Create(const char *resName, uint32_t type) { return IResourceManager_CreateResource(_rm, resName, type); }
+
+	IResource * FindOrCreate(const char *resName, uint32_t type = RESID_FORBIDEN) { return IResourceManager_FindOrCreate(_rm, resName, type); }
+	IResource * FindOrCreate(const wchar_t *path, uint32_t type = RESID_FORBIDEN) { return IResourceManager_FindOrCreateByFilename(_rm, path, type); }
+	IResource * FindOrCreate(const UUID &uid, uint32_t type = RESID_FORBIDEN) { return IResourceManager_FindOrCreateByUID(_rm, uid, type); }
+
+	IResource * FindExisting(const char *resName, uint32_t type) { return IResourceManager_FindExisting(_rm, resName, type); }
+	IResource * FindExisting(const wchar_t *path, uint32_t type) { return IResourceManager_FindExistingByFilename(_rm, path, type); }
+	IResource * FindExisting(const UUID &uid, uint32_t type) { return IResourceManager_FindExistingByUID(_rm, uid, type); }
 
 	void AddDir(const wchar_t *path) { IResourceManager_AddDir(_rm, path); }
 	void RootDir(const wchar_t *path) { IResourceManager_RootDir(_rm, path); }
@@ -337,22 +349,15 @@ public:
 
 	// version used to find all resources given typeid
 	void Filter(uint32_t typeId, void *localData, void(*callback)(IResource *, void *)) { IResourceManager_Filter(_rm, callback, localData, nullptr, nullptr, nullptr, nullptr, typeId, false); }
+
 	// version used to find textures for mesh property
 	void Filter(CResMesh &mesh, BAMS::Property *prop, void *localData, void(*callback)(IResource *, void *)) { IResourceManager_Filter(_rm, callback, localData, nullptr, nullptr, reinterpret_cast<CSTR>(prop->val), IResource_GetPath(mesh.GetMeshSrc()), RESID_UNKNOWN, true); }
 	
-	IResource * Find(const char *name, uint32_t type = RESID_UNKNOWN) { return IResourceManager_FindByName(_rm, name, type); }
-	IResource * Find(const UUID &uid) { return IResourceManager_FindByUID(_rm, uid); }
-
-	CResRawData GetRawData(const char *name) { CResRawData res(IResourceManager_GetRawDataByName(_rm, name)); return std::move(res); }
-	CResRawData GetRawData(const UUID &uid) { CResRawData res(IResourceManager_GetRawDataByUID(_rm, uid)); return std::move(res); }
-
-	CResShader GetShaderByName(const char *name) { CResShader res(IResourceManager_FindByName(_rm, name, RESID_SHADER)); return std::move(res); }
+	template<typename T>
+	T Get(const char *name) { T res(FindOrCreate(name, T::GetType())); return std::move(res); }
 
 	template<typename T>
-	T Get(const char *name) { T res(IResourceManager_FindByName(_rm, name, T::GetType())); return std::move(res); }
-
-	template<typename T>
-	T Get(const UUID &uid) { T res(IResourceManager_FindByUID(_rm, uid)); return std::move(res); }
+	T Get(const UUID &uid) { T res(FindOrCreate(uid, T::GetType())); return std::move(res); }
 
 	void LoadSync() { IResourceManager_LoadSync(_rm, nullptr); }
 	void LoadSync(CResource &res) { IResourceManager_LoadSync(_rm, res.Get()); }

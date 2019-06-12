@@ -14,7 +14,7 @@ static F32 I[16] = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
 void ResModel::AddMesh(CSTR meshResourceName, const float * m)
 {
 	auto &rm = globalResourceManager;
-	auto mesh = rm->Get(meshResourceName, RESID_MESH);
+	auto mesh = rm->FindExisting(meshResourceName, RESID_MESH);
 	if (mesh)
 	{
 		auto entry = meshes.add_empty();
@@ -36,8 +36,8 @@ void ResModel::_LoadXML()
 	meshes.clear();
 	for (auto xmlEntry = rb->XML->FirstChildElement(); xmlEntry; xmlEntry = xmlEntry->NextSiblingElement())
 	{
-		auto mesh = rm->Get(xmlEntry->Name(), RESID_MESH);
-		if (mesh)
+		auto mesh = rm->FindOrCreate(xmlEntry->Name());
+		if (mesh && mesh->Type == RESID_MESH)
 		{
 			auto entry = meshes.add_empty();
 			entry->mesh = mesh;

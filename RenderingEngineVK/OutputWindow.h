@@ -136,7 +136,6 @@ private:
 
 	void _CreateBufferAndCopy(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, const void * srcData, VkBuffer & buffer, VkDeviceMemory & bufferMemory);
 	void _CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset = 0, VkDeviceSize dstOffset = 0);
-	VkShaderModule _CreateShaderModule(const char * shaderName);
 
 	VkExtent2D _GetVkExtentSize();
 

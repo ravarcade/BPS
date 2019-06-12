@@ -509,7 +509,7 @@ VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
 	// TODO: Load mesh from resources
 	static VertexDescription vd;
 	BAMS::CResourceManager rm;
-	if (auto res = rm.Find(name, RESID_MESH))
+	if (auto res = rm.FindExisting(name, RESID_MESH))
 	{
 		CResMesh m(res);
 		auto pvd = reinterpret_cast<VertexDescription*>(m.GetVertexDescription(true)); // we need loaded mesh now.

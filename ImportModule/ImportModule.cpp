@@ -155,11 +155,15 @@ private:
 		});
 
 		// (3) add new meshes
-		uint32_t num = 0;
+		int32_t num = 0;
+		BAMS::STR resName = BAMS::IResource_GetName(pimr->res);
+		resName += "_";
+		BAMS::STR tmpName;
 		pimr->aiLoader.ForEachMesh([&](AssImp_Loader::ImportedMesh &m) {
 			if (!m.match) 
 			{ // add new mesh
-				CResMesh mesh(rm.AddResource("Mesh_1", RESID_MESH));
+				BAMS::STR tmp = resName + (num + 1);
+				CResMesh mesh(rm.Create(tmp.c_str(), RESID_MESH));
 				mesh.SetVertexDescription(&m.vd, m.hash, res, num);
 			}
 			++num;

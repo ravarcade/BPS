@@ -12,8 +12,14 @@ CTexture2d::~CTexture2d()
 void CTexture2d::LoadTexture(const char * textureResourceName)
 {
 	CResourceManager rm;
-	auto res = rm.Get<CResImage>(textureResourceName);
-	auto img = res.GetImage(true);
+	auto res = rm.FindExisting(textureResourceName, CResImage::GetType());
+	if (!res)
+	{
+		TRACE("ERROR: Missing \"" << textureResourceName << "\" texture.\n");
+		assert(res != nullptr);
+	}
+	CResImage resImg(res);
+	auto img = resImg.GetImage(true);
 	uint32_t mipmapLevels = 0;
 	VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
 

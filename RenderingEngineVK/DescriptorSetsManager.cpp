@@ -180,10 +180,21 @@ void CDescriptorSetsMananger::_CreateNewDescriptorPool()
 
 	//		_AddOldLimits(shaders, count);
 
+	VkDescriptorPoolSize neededDescriptors[VK_DESCRIPTOR_TYPE_RANGE_SIZE];
+	uint32_t neededDescriptorsCount = 0;
+	for (auto &desc : availableDescriptorTypes)
+	{
+		if (desc.descriptorCount > 0)
+		{
+			neededDescriptors[neededDescriptorsCount] = desc;
+			++neededDescriptorsCount;
+		}
+	}
+
 	VkDescriptorPoolCreateInfo poolInfo = {};
 	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	poolInfo.poolSizeCount = static_cast<uint32_t>(COUNT_OF(availableDescriptorTypes));
-	poolInfo.pPoolSizes = availableDescriptorTypes;
+	poolInfo.poolSizeCount = neededDescriptorsCount;
+	poolInfo.pPoolSizes = neededDescriptors;
 	poolInfo.maxSets = availableDescriptorSets;
 
 	if (vkCreateDescriptorPool(vk->device, &poolInfo, vk->allocator, &descriptorPool) != VK_SUCCESS) {

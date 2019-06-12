@@ -153,7 +153,7 @@ ResShader::File * ResShader::AddProgram(WSTR filename)
 		if (p->Filename != filename)
 		{
 			isModified = true;
-			res = rm->FindOrCreate_withFilename(filename, isSrc ? ResShaderSrc::GetTypeId() : ResShaderBin::GetTypeId()); // create resource (if not exist)
+			res = rm->FindOrCreate(filename.c_str(), isSrc ? ResShaderSrc::GetTypeId() : ResShaderBin::GetTypeId()); // create resource (if not exist)
 			p->Filename = filename;
 			p->SetResource(res, this);
 			// Timestamp = 0 will trigger compilation of source code or build of final shader program

@@ -695,27 +695,6 @@ void OutputWindow::_CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceS
 	vkFreeCommandBuffers(device, allocInfo.commandPool, 1, &commandBuffer);
 }
 
-VkShaderModule OutputWindow::_CreateShaderModule(const char *shaderName)
-{
-	BAMS::CResourceManager rm;
-	auto code = rm.GetRawData(shaderName);
-	if (!code.IsLoaded())
-		rm.LoadSync();
-
-	VkShaderModuleCreateInfo createInfo = {};
-	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	createInfo.codeSize = code.GetSize();
-	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.GetData());
-
-	VkShaderModule shaderModule;
-	if (vkCreateShaderModule(device, &createInfo, allocator, &shaderModule) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create shader module!");
-	}
-
-	return shaderModule;
-}
-
-
 // ----------------------------------------------------------------------------
 
 void OutputWindow::_Cleanup()

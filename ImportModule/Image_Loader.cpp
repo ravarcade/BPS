@@ -57,56 +57,6 @@ void Image_Loader::Load(CResImage & res)
 	res.ReleaseSrc();
 }
 
-/*
-#define EXT4(a,b,c,d) a<<24|b<<16|c<<8|d
-#define EXT3(a,b,c) a<<16|b<<8|c
-
-bool CImage::Decode(AlignedMemory *src, const char *fileName)
-{
-	if (src->Size() == 0)
-		return NULL;
-
-	// pointer to decoded texture in ram
-	AlignedMemory *data = NULL;
-
-	// get extension
-	UINT32 ext = 0xffffffff;
-	if (fileName)
-	{
-		for (const char *t = fileName; *t; ++t)
-		{
-			ext = *t == '.' ? 0 : ((ext << 8) + tolower(*t));
-		}
-	}
-
-	// try to decode with decoder selected on extension
-	bool success = false;
-	switch (ext)
-	{
-	case EXT3('p', 'n', 'g'): success = DecodePNG(this, src); break;
-	case EXT3('t', 'g', 'a'): success = DecodeTGA(this, src); break;
-	case EXT3('b', 'm', 'p'): success = DecodeBMP(this, src); break;
-	case EXT4('j', 'p', 'e', 'g'):
-	case EXT3('j', 'p', 'g'): success = DecodeJPG(this, src); break;
-	}
-
-	// if decodnig based on extension don't work, try everything
-	if (!success)
-		success = DecodeBMP(this, src);
-
-	if (!success)
-		success = DecodeTGA(this, src);
-
-	if (!success)
-		success = DecodePNG(this, src);
-
-	if (!success)
-		success = DecodeJPG(this, src);
-
-	return success;
-}
-*/
-
 /// <summary>
 /// Converts sRGB value (U8: 0-255) to linear value (F32: 0.0 - 1.0).
 /// </summary>

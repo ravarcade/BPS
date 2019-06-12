@@ -275,11 +275,11 @@ struct Light {
 	float radius;
 } GlobalLights[6] = {
 	{ {   0,  ld,  0, 0}, { 1, 1, 1 }, 2 * lr },
-	{ {-ld2,  ld,  0, 0}, { 0.3, 0.3, 1 }, 2 * lr  },
-	{ { ld2,  ld,  0, 0}, { 0.3, 1, 0.3 }, 2 * lr  },
-	{ {   0, -ld, ld, 0}, { 1, 0.3, 0.3 }, 2 * lr  },
-	{ {-ld2, -ld, ld, 0}, { 1, 1, 0.3 }, 2 * lr  },
-	{ { ld2, -ld, ld, 0}, { 0.3, 1, 1 }, 2 * lr  },
+	{ {-ld2,  ld,  0, 0}, { 0.3f, 0.3f, 1 }, 2 * lr  },
+	{ { ld2,  ld,  0, 0}, { 0.3f, 1, 0.3f }, 2 * lr  },
+	{ {   0, -ld, ld, 0}, { 1, 0.3f, 0.3f }, 2 * lr  },
+	{ {-ld2, -ld, ld, 0}, { 1, 1, 0.3f }, 2 * lr  },
+	{ { ld2, -ld, ld, 0}, { 0.3f, 1, 1 }, 2 * lr  },
 
 };
 
@@ -419,8 +419,9 @@ void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
 	{
 		meshesChecked[i] = true;
 		CResourceManager rm;
-
-		CResMesh mesh = rm.Get<CResMesh>(meshes[i]);
+		auto res = rm.FindExisting(meshes[i], CResMesh::GetType());
+		assert(res != nullptr);
+		CResMesh mesh(res);
 		auto mp = mesh.GetMeshProperties(true);
 		for (auto ctn : colorTexturePropertyName)
 		{
@@ -717,22 +718,22 @@ int main()
 		rm.LoadSync();
 		ToggleWnd(en, 0); // show first window
 
-		CResImage ri = rm.Find("test", RESID_IMAGE);
+		CResImage ri = rm.FindExisting("test", RESID_IMAGE);
 		auto img = ri.GetImage(true);
 
-		CResMesh m1 = rm.Find("Mesh_1", RESID_MESH);
+		CResMesh m1 = rm.FindExisting("Mesh_1", RESID_MESH);
 		auto vd = m1.GetVertexDescription(true);
-		rm.AddResource(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
+		rm.FindOrCreate(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 
 		// default shader program ... not needed any more
-		auto s = rm.GetShaderByName("deferred");
+		auto s = rm.Get<CResShader>("deferred");
 		s.AddProgram(L"/Shaders/deferred/deferred.vert.glsl");
 		s.AddProgram(L"/Shaders/deferred/deferred.frag.glsl");
 		//			auto s = rm.GetShaderByName("default");
 //			s.AddProgram(L"/Shaders/default.vert.glsl");
 //			s.AddProgram(L"/Shaders/default.frag.glsl");
 
-		auto r = rm.GetRawData("ReadMe");
+		auto r = rm.Get<CResRawData>("ReadMe");
 		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
 		rm.LoadSync();
 		printf("ReadMe is loade? %s\n", r.IsLoaded() ? "yes" : "no");
@@ -742,12 +743,12 @@ int main()
 		auto rdata = r.GetData();
 		auto rsize = r.GetSize();
 
-		CResource res = rm.Find("ReadMe");
+		CResource res = rm.FindOrCreate("ReadMe");
 		auto uid = res.GetUID();
 		auto path = res.GetPath();
 		auto name = res.GetName();
 
-		auto rr = rm.GetRawData(uid);
+		auto rr = rm.Get<CResRawData>(uid);
 		uid = rr.GetUID();
 		path = rr.GetPath();
 		name = rr.GetName();
@@ -757,34 +758,6 @@ int main()
 		testloop(en);
 
 		rm.LoadSync();
-
-		uint32_t resCount = 0;
-		rm.Filter([](IResource *res, void *prm) {
-
-			BAMS::CResourceManager &rm = *static_cast<BAMS::CResourceManager *>(prm);
-			BAMS::CResource r(res);
-			if (!r.IsLoaded())
-				rm.LoadSync();
-			printf("%3d: \"%s\", %#010x, %s", 0, r.GetName(), r.GetType(), UUID2String(r.GetUID()));
-			wprintf(L", \"%s\"\n", r.GetPath());
-			if (r.IsLoadable())
-			{
-				auto rd = rm.GetRawData(r.GetName());
-				auto rdata = rd.GetData();
-				auto rsize = rd.GetSize();
-				if (rsize > 32)
-					rsize = 32;
-				printf("     ");
-				if (!rdata && rsize > 0)
-					printf("[NO LOADING NEEDED]");
-				if (rdata)
-					DumpHex(rdata, rsize);
-			}
-			else {
-				printf("[NO LOADING NEEDED]");
-			}
-			printf("\n");
-		}, &rm);
 	}
 
 	BAMS::Finalize();

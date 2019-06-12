@@ -222,7 +222,7 @@ CShadersReflections::CShadersReflections(const char *shaderName) { LoadProgram(s
 void CShadersReflections::LoadProgram(const char *shaderName)
 {
 	BAMS::CResourceManager rm;
-	m_shaderResource = rm.GetShaderByName(shaderName);
+	m_shaderResource = rm.Get<BAMS::CResShader>(shaderName);
 	if (!m_shaderResource.IsLoaded())
 		rm.LoadSync(m_shaderResource);
 	uint32_t cnt = m_shaderResource.GetBinaryCount();
