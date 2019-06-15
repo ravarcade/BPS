@@ -36,6 +36,10 @@ namespace Allocators {
 	public:
 		inline static void* allocate(size_t bytes) { return alloc->allocate(bytes); }
 		inline static void deallocate(void* ptr) { alloc->deallocate(ptr); }
+
+		template<typename U>
+		inline static U* allocate(size_t num) { return reinterpret_cast<U*>(alloc->allocate(num * sizeof(T))); }
+
 		template <class U>
 		inline static void allocArray(size_t arraySize, U*& result)
 		{

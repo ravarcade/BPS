@@ -281,7 +281,7 @@ if (!ow || !ow->Exist())  return;
 void  ire::AddMesh(const void * params)
 {
 	CASTMSGPARAMS(PADD_MESH);
-	auto oi = ow->AddObject(p->name, p->mesh, p->shader);
+	auto oi = ow->AddObject(p->mesh, p->shader);
 	if (oi)
 	{
 		if (p->pProperties)
@@ -289,6 +289,20 @@ void  ire::AddMesh(const void * params)
 		if (p->pId)
 			*p->pId = oi->oid;
 	}
+}
+
+void  ire::AddModel(const void * params)
+{
+	CASTMSGPARAMS(PADD_MODEL);
+	ow->AddModel(p->modelName);
+	//auto oi = ow->AddObject(p->name, p->mesh, p->shader);
+	//if (oi)
+	//{
+	//	if (p->pProperties)
+	//		*p->pProperties = oi->GetProperties();
+	//	if (p->pId)
+	//		*p->pId = oi->oid;
+	//}
 }
 
 void ire::AddTexture(const void * params)
@@ -339,7 +353,7 @@ void ire::GetShaderParams(const void * params)
 void ire::GetObjectParams(const void * params)
 {
 	CASTMSGPARAMS(PGET_OBJECT_PARAMS);
-	ow->GetObjectParams(p->name, p->objectIdx, p->pProperties);
+	ow->GetObjectParams(p->objectIdx, p->pProperties);
 }
 
 void ire::UpdateDrawCommands(const void *params)

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="BAMS::basic_string_base&lt;*&gt;">
+    <DisplayString>{_buf,[_used]na}</DisplayString>
+    <Expand>
+      <Item Name="[_buf]">_buf,[_used]</Item>
+      <Item Name="[_used]">_used</Item>
+      <Item Name="[_reserved]">_reserved</Item>
+    </Expand>
+  </Type>
+  <Type Name="BAMS::shared_base&lt;*&gt;">
+    <DisplayString>{_pool._buf[_idx].value}</DisplayString>
+    <Expand>
+      <Item Name="[value]">_pool._buf[_idx].value</Item>
+      <Item Name="[idx]">_idx</Item>
+      <Item Name="[refCounter]">_pool._buf[_idx].refCounter</Item>
+    </Expand>
+  </Type>
+  <Type Name="BAMS::array&lt;*&gt;">
+    <DisplayString>{{ [{_used,d}] }}</DisplayString>
+    <Expand>
+      <Item Name="[_used]">_used</Item>
+      <Item Name="[_reserved]">_reserved</Item>
+      <IndexListItems>
+        <Size>_used</Size>
+        <ValueNode>_storage[$i]</ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+  <Type Name="BAMS::MProperties">
+    <DisplayString>{{ [{count,d}] }}</DisplayString>
+    <Expand>
+      <IndexListItems>
+        <Size>count</Size>
+        <ValueNode>properties[$i]</ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+  <Type Name="BAMS::Properties">
+    <DisplayString>{{ [{count,d}] }}</DisplayString>
+    <Expand>
+      <IndexListItems>
+        <Size>count</Size>
+        <ValueNode>properties[$i]</ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+  <Type Name="BAMS::Property">
+    <DisplayString Condition="type == 1">{{{name,na} = {(int32_t*)val,na}}}</DisplayString>
+    <DisplayString Condition="type == 2">{{{name,na} = {(uint32_t*)val}}}</DisplayString>
+    <DisplayString Condition="type == 3">{{{name,na} = {(short*)val}}}</DisplayString>
+    <DisplayString Condition="type == 4">{{{name,na} = {(uint16_t*)val}}}</DisplayString>
+    <DisplayString Condition="type == 5">{{{name,na} = {(char*)val}}}</DisplayString>
+    <DisplayString Condition="type == 6">{{{name,na} = {(uint8_t*)val}}}</DisplayString>
+    <DisplayString Condition="type == 7">{{{name,na} = {(float*)val,na}}}</DisplayString>
+    <DisplayString Condition="type == 8">{{{name,na} = {(const char*)val,na}}}</DisplayString>
+    <DisplayString Condition="type == 9">{{{name,na} = [array]{val}}</DisplayString>
+    <DisplayString Condition="type == 10">{{{name,na} = [texture] {(void *)val}}</DisplayString>
+    <DisplayString Condition="type == 0 || type >10">{{{name,na} = ...}}</DisplayString>
+  </Type>
+</AutoVisualizer>

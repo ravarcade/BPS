@@ -18,12 +18,12 @@ enum {
 	RESID_SHADER,
 	RESID_SHADER_SRC,
 	RESID_SHADER_BIN,
-	RESID_SHADER_PROGRAM,
 
 	RESID_MESH = RESID_RENDERING_ENGINE_RESOURCES + 0x201,
 	RESID_MODEL,
 	RESID_IMPORTMODEL,
 	RESID_IMAGE,
+	RESID_DRAWMODEL,
 
 	RESID_VERTEXDATA,
 };
@@ -120,8 +120,9 @@ extern "C" {
 	BAMS_EXPORT void                 IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx);
 
 	// ResModel
-	BAMS_EXPORT void                 IResModel_AddMesh(IResModel *res, const char *meshResName, const float *m = nullptr);
-
+	BAMS_EXPORT void                 IResModel_AddMesh(IResModel *res, const char *meshResName, const char * shaderProgramName, const float *m = nullptr);
+	BAMS_EXPORT void                 IResModel_GetMesh(IResModel *res, uint32_t idx, const char **mesh, const char ** shader, const float **m, MProperties **properties);
+	BAMS_EXPORT uint32_t             IResModel_GetMeshCount(IResModel *res);
 	// Image
 	BAMS_EXPORT Image *   IResImage_GetImage(IResImage *res, bool loadASAP = false);
 	BAMS_EXPORT void      IResImage_Updated(IResImage *res);
@@ -237,18 +238,20 @@ public:
 
 // ================================================================================== Help macro ===
 
-#define CRESOURCEEXT(x, resTypeId) \
+#define CRESOURCEEXT2(x, y, resTypeId) \
 		C##x() {} \
-		C##x(I##x *r) : CResource(static_cast<IResource *>(r)) {} \
+		C##x(I##y *r) : CResource(static_cast<IResource *>(r)) {} \
 		C##x(const C##x &src) : CResource(src) {} \
 		C##x(C##x &&src) : CResource(std::move(src)) {} \
 		virtual ~C##x() {} \
 		C##x & operator = (const C##x &src) { _res = src._res; return *this; } \
 		C##x & operator = (C##x &&src) { _res = std::move(src._res); return *this; } \
 		static uint32_t GetType() { return resTypeId; } \
-		I##x *Self() { return Get<I##x>(); }
+		I##y *Self() { return Get<I##y>(); }
 
-	// ================================================================================== CResRawData ===
+#define CRESOURCEEXT(x, resTypeId) CRESOURCEEXT2(x, x, resTypeId)
+
+// ================================================================================== CResRawData ===
 
 class CResRawData : public CResource
 {
@@ -303,7 +306,9 @@ class CResModel : public CResource
 public:
 	CRESOURCEEXT(ResModel, RESID_MODEL);
 
-	void AddMesh(const char * meshResName, const float * m = nullptr) { IResModel_AddMesh(Self(), meshResName, m); }
+	void AddMesh(const char * meshResName, const char *shaderProgramName, const float * m = nullptr) { IResModel_AddMesh(Self(), meshResName, shaderProgramName, m); }
+	void GetMesh(uint32_t idx, const char **mesh, const char **shader, const float **m, MProperties **properties) { IResModel_GetMesh(Self(), idx, mesh, shader, m, properties); }
+	uint32_t GetMeshCount() { return IResModel_GetMeshCount(Self()); }
 };
 
 // ================================================================================== CResImage ===
@@ -439,7 +444,6 @@ public:
 	}
 };
 
-
 // ============================================================================
 
 enum { // msgDst
@@ -485,7 +489,6 @@ struct PCLOSE_WINDOW {
 
 struct PADD_MESH {
 	uint32_t wnd;
-	const char *name;    // uniq name
 	const char *mesh;	 // resource name
 	const char *shader;  // resource name
 	Properties **pProperties;
@@ -546,6 +549,61 @@ struct PADD_TEXTURE {
 
 struct PADD_MODEL {
 	uint32_t wnd;
-	const char *repoResourceName;
-	uint32_t modelIdx;
+	const char * modelName;
+};
+
+// ================================================================================== *** CResModelDraw ===
+
+class CResModelDraw : public CResource
+{
+public:
+	CRESOURCEEXT2(ResModelDraw, ResModel, RESID_MODEL);
+
+	// CResModel methods
+	void AddMesh(const char * meshResName, const char *shaderProgramName, const float * m = nullptr) { IResModel_AddMesh(Self(), meshResName, shaderProgramName, m); }
+	void GetMesh(uint32_t idx, const char **mesh, const char **shader, const float **m, MProperties **properties) { IResModel_GetMesh(Self(), idx, mesh, shader, m, properties); }
+	uint32_t GetMeshCount() { return IResModel_GetMeshCount(Self()); }
+
+	// CResModelDraw methods
+	void AddToWindow(uint32_t wnd)
+	{
+		CEngine en;
+		uint32_t count = GetMeshCount();
+		meshes.resize(count);
+		PADD_MESH p = { wnd, nullptr, nullptr, nullptr, nullptr };
+		const float *M;
+		MProperties *srcProp;
+		Properties *prop = nullptr;
+
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			GetMesh(i, &p.mesh, &p.shader, &M, &srcProp);
+			p.pProperties = &prop;
+			en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &p);
+			MeshData &m = meshes[i];
+			memcpy_s(m.M, sizeof(m.M), M, sizeof(m.M));
+			m.prop = *prop;
+			auto pModelProp = m.prop.Find("model");
+			m.outputM = pModelProp ? reinterpret_cast<float *>(pModelProp->val) : nullptr;
+		}
+
+	}
+
+	void SetMatrix(const float *T) 
+	{
+		for (auto &m : meshes)
+		{
+			Tools::Mat4mul(m.outputM, T, m.M);
+		}
+	};
+
+private:
+
+	struct MeshData
+	{
+		float M[16];
+		float *outputM;
+		MProperties prop;
+	};
+	array<MeshData> meshes;
 };

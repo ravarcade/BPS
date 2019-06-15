@@ -134,6 +134,9 @@
     <ClInclude Include="ResImp.h">
       <Filter>ResMan</Filter>
     </ClInclude>
+    <ClInclude Include="ResDrawModel.h">
+      <Filter>ResMan</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -196,8 +199,14 @@
     <ClCompile Include="ResBase.cpp">
       <Filter>ResMan</Filter>
     </ClCompile>
+    <ClCompile Include="ResDrawModel.cpp">
+      <Filter>ResMan</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="basic_string.natvis" />
   </ItemGroup>
 </Project>

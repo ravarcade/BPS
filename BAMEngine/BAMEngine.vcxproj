@@ -183,6 +183,7 @@
     <ClInclude Include="Core_Properties.h" />
     <ClInclude Include="Core_Queue.h" />
     <ClInclude Include="ResBase.h" />
+    <ClInclude Include="ResDrawModel.h" />
     <ClInclude Include="ResImp.h" />
     <ClInclude Include="ResModel.h" />
     <ClInclude Include="ResourceNotifier.h" />
@@ -216,6 +217,7 @@
     <ClCompile Include="RenderingEngine_Image.cpp" />
     <ClCompile Include="RenderingEngine_VertexDescription.cpp" />
     <ClCompile Include="ResBase.cpp" />
+    <ClCompile Include="ResDrawModel.cpp" />
     <ClCompile Include="ResImage.cpp" />
     <ClCompile Include="ResMesh.cpp" />
     <ClCompile Include="ResModel.cpp" />
@@ -248,6 +250,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="basic_string.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

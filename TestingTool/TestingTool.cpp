@@ -163,9 +163,9 @@ void wait_for_esc()
 
 // ================================================================= 
 
-void AddModel(BAMS::CEngine &en, uint32_t wnd, const char *repoResourceName, uint32_t idx = 0)
+void AddModel(BAMS::CEngine &en, uint32_t wnd, const char *repoResourceName)
 {
-	PADD_MODEL p = { wnd, repoResourceName, idx };
+	PADD_MODEL p = { wnd, repoResourceName };
 	en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &p);
 	return;
 }
@@ -378,20 +378,27 @@ void Spin(BAMS::CEngine &en)
 	}
 }
 
-void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, const char *repoResourceName, uint32_t idx = 0)
+void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, const char *repoResourceName)
 {
 	BAMS::CResourceManager rm;
 	
 	// new bob model
-	auto bobModel = rm.Get<CResModel>("bob");
-	bobModel.AddMesh("Mesh_4");
-	bobModel.AddMesh("Mesh_5");
-	bobModel.AddMesh("Mesh_6");
-	bobModel.AddMesh("Mesh_7");
-	bobModel.AddMesh("Mesh_8");
-	bobModel.AddMesh("Mesh_9");
+	auto res = rm.FindExisting("bob", CResModel::GetType());
+	if (!res) {
+		auto bobModel = rm.Get<CResModel>("bob");
+		bobModel.AddMesh("Mesh_4", "basic", nullptr);
+		bobModel.AddMesh("Mesh_5", "basic", nullptr);
+		bobModel.AddMesh("Mesh_6", "basic", nullptr);
+		bobModel.AddMesh("Mesh_7", "basic", nullptr);
+		bobModel.AddMesh("Mesh_8", "basic", nullptr);
+		bobModel.AddMesh("Mesh_9", "basic", nullptr);
+	}
 
-	AddModel(en, wnd, repoResourceName, idx);
+	auto bob = rm.Get<CResModelDraw>("bob");
+	bob.AddToWindow(wnd);
+	glm::mat4 m(1);
+	bob.SetMatrix(&m[0][0]);
+//	AddModel(en, wnd, repoResourceName);
 	// set params:
 
 
@@ -432,19 +439,15 @@ void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
 					[](BAMS::IResource *res, void *local) {
 					CResource r(res);
 					*reinterpret_cast<const char **>(local) = r.GetName();
-//					TRACE(r.GetName());
-//					TRACEW(r.GetPath());
 				});// , &colorTextures[i], p, mesh);
 				break;
 			}
 		}
-
-//		Tools::Dump(mp);
 	}
 
 	uint32_t oid = -1;
 	Properties *pprop = nullptr;
-	PADD_MESH addMeshParams = { wnd, "name is irrelevant", meshes[i], "basic", &pprop, &oid };
+	PADD_MESH addMeshParams = { wnd, meshes[i], "basic", &pprop, &oid };
 
 	en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &addMeshParams);
 
@@ -467,7 +470,7 @@ void ToggleWnd(BAMS::CEngine &en, int wnd)
 	static PCLOSE_WINDOW cw = { 0 };
 	static PCREATE_WINDOW *wn[3] = { &w0, &w1, &w2 };
 	Properties *pprop = nullptr;
-	PADD_MESH deferredResolveShader = { 0, "", "", "deferred", &pprop, nullptr };
+	PADD_MESH deferredResolveShader = { 0, "", "deferred", &pprop, nullptr };
 
 	cw.wnd = wnd;
 	if (wndState[wnd])
@@ -690,13 +693,126 @@ void testloop(BAMS::CEngine &en)
 				case VK_NUMPAD6: AddToWnd(en, 0, 4);	break;
 				case VK_NUMPAD3: AddToWnd(en, 0, 5);	break;
 				case VK_NUMPAD0: ChangeDebugView(en);	break;
-				case VK_ADD: AddModelToWnd(en, 0, "boblampclean2", 0);
+				case VK_ADD: AddModelToWnd(en, 0, "boblampclean2");
 
 //				default:					TRACE("KEY: " << i << "\n");
 				}
 			}
 		}
 	}
+}
+
+template<typename T>
+void PrintInfo(const char *tn)
+{
+	TRACE(tn << ":\n");
+#define III(x)	TRACE("  "<< #x << ": " <<( std::x<T>::value ? "true\n":"false\n"))
+
+	III(is_trivially_move_constructible);
+	
+	III(is_trivially_constructible);
+	III(is_trivially_destructible);
+	III(is_trivially_copy_constructible);
+}
+
+void DoLocalTests()
+{
+	//BAMS::STR s = "ala ma kota";
+
+	//auto x = s.c_str();
+	//TRACE(x);
+	//using BAMS::array;
+	//struct obj {
+	//	int x, y;
+	//	obj(int x, int y) { this->x = x; this->y = y; }
+
+	//};
+	//array<obj> ta;
+	//PrintInfo<obj>("obj");
+	//ta.emplace_back( 1,2 );
+	//ta.emplace_back( 2,3 );
+	//ta.emplace_back( 3,4 );
+
+	//TRACE("ta: " << ta._reserved << ":" << ta._used << ":" << ta._storage << "\n");
+
+	//struct ob2 {
+	//	int x;
+	//	std::string s;
+	//	ob2(int x, const char *s) 
+	//	{ 
+	//		this->x = x; this->s = s; 
+	//	}
+	//};
+
+	//ob2 hmm(5, "sazdfasedf");
+
+	//PrintInfo<std::string>("ob2");
+	//array<ob2> t2;
+	//PrintInfo<ob2>("ob2");
+	//t2.emplace_back(1, "haha");
+	//t2.emplace_back(2, "haha2");
+	//t2.emplace_back(3, "ala ma kota");
+	//TRACE("t2: " << t2._reserved << ":" << t2._used << ":" << t2._storage << "\n");
+
+	//struct ob3 {
+	//	int x;
+	//	const char * s;
+	//	ob3(int x, const char *s)
+	//	{
+	//		auto l = strlen(s)+1;
+	//		auto buf = new char[l];
+	//		memcpy_s(buf, l, s, l);
+	//		this->x = x; 
+	//		this->s = buf;
+	//	}
+
+	//	// copy constructor
+	//	ob3(const ob3 &src)
+	//	{
+	//		x = src.x;
+	//		auto l = strlen(src.s) + 1;
+	//		auto buf = new char[l];
+	//		memcpy_s(buf, l, src.s, l);
+	//		this->x = x;
+	//		this->s = buf;
+	//	}
+
+	//	// move constructor
+	//	ob3(ob3 &&src) noexcept
+	//	{
+	//		x = src.x;
+	//		s = src.s;
+	//		src.s = nullptr;
+	//	}
+
+	//	ob3& operator = (ob3 && src) noexcept
+	//	{
+	//		x = src.x;
+	//		s = src.s;
+	//		src.s = nullptr;
+	//		return *this;
+	//	}
+
+	//	~ob3()
+	//	{
+	//		if (s)
+	//			delete s;
+	//	}
+	//};
+
+	//std::vector<ob3> t4;
+	//t4.emplace_back(1, "haha");
+	//t4.emplace_back(2, "haha2");
+	//t4.emplace_back(3, "ala ma kota");
+
+
+	//array<ob3> t3;
+	//PrintInfo<ob3>("ob3");
+	//t3.emplace_back(1, "haha");
+	//t3.emplace_back(2, "haha2");
+	//t3.emplace_back(3, "ala ma kota");
+	//TRACE("t3: " << t3._reserved << ":" << t3._used << ":" << t3._storage << "\n");
+
 }
 
 int main()
@@ -710,7 +826,7 @@ int main()
 	LoadModules();
 	{
 		BAMS::CEngine en;
-
+//		DoLocalTests();
 
 		BAMS::DoTests();
 		BAMS::CResourceManager rm;

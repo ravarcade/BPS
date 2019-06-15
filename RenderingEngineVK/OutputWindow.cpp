@@ -1402,15 +1402,16 @@ void OutputWindow::GetShaderParams(const char *shader, Properties **props)
 }
 
 
-void OutputWindow::GetObjectParams(const char *objectName, uint32_t objectIdx, Properties **props)
+void OutputWindow::GetObjectParams(uint32_t idx, Properties **props)
 {
 	ObjectInfo *oi;
-	if (objectName)
-		oi = objects.find(objectName);
-	else
-		oi = &objects[objectIdx];
+	if (idx >= static_cast<uint32_t>(objects.size()))
+		return;
 
-	if (!oi) return;
+	oi = &objects[idx];
+	if (!oi) 
+		return;
+
 	*props = oi->GetProperties();
 }
 
@@ -1638,12 +1639,7 @@ CShaderProgram * OutputWindow::_GetShader(const char *shader)
 	return AddShader(shader);
 }
 
-ObjectInfo * OutputWindow::_GetObject(const char * name)
-{
-	return objects.find(name);
-}
-
-ObjectInfo * OutputWindow::AddObject(const char * name, const char * mesh, const char * shader)
+ObjectInfo * OutputWindow::AddObject(const char * mesh, const char * shader)
 {
 	auto sh = _GetShader(shader);
 	if (!sh)
@@ -1652,7 +1648,9 @@ ObjectInfo * OutputWindow::AddObject(const char * name, const char * mesh, const
 	auto oid = sh->AddObject(mesh);
 	if (oid == -1)
 		return nullptr;
-	auto ret = objects.add(name, sh, oid);
+
+	auto ret = objects.add_empty();
+	ret->shader = sh;
 	ret->oid = oid;
 
 	BufferRecreationNeeded();
@@ -1660,6 +1658,34 @@ ObjectInfo * OutputWindow::AddObject(const char * name, const char * mesh, const
 	return ret;
 }
 
+void OutputWindow::AddModel(const char * name)
+{
+	CResourceManager rm;
+	auto res = rm.FindExisting(name, RESID_MODEL);
+	assert(!res);
+	if (res) 
+	{
+		CResModel model(res);
+		uint32_t count = model.GetMeshCount();
+		const char *mesh;
+		const char *shader;
+		const float *m;
+		MProperties *prop;
+
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			model.GetMesh(i, &mesh, &shader, &m, &prop);
+			if (mesh && shader)
+			{
+				auto oid = AddObject(mesh, shader);
+				auto oProp = oid->GetProperties();
+
+				// oProp->Set(porp);
+			
+			}
+		}
+	}
+}
 
 bool OutputWindow::IsBufferFeatureSupported(VkFormat format, VkFormatFeatureFlagBits features)
 {

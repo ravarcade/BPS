@@ -93,3 +93,4 @@ public:
 #include "ResMesh.h"
 #include "ResModel.h"
 #include "ResImage.h"
+#include "ResDrawModel.h"

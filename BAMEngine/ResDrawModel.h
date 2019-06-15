@@ -6,25 +6,27 @@
 *
 */
 
-class ResModel : public ResImp<ResModel, RESID_MODEL, false>
+class ResDrawModel : public ResImp<ResDrawModel, RESID_DRAWMODEL, false>
 {
 public:
-	ResModel(ResBase *res) : rb(res) {
+	ResDrawModel(ResBase *res) : rb(res) {
 		if (rb->XML->FirstChild())
 			_LoadXML(); // XML is readed from manifest, so no need to load any file from disk
 	}
-	~ResModel() {}
+	~ResDrawModel() {}
 	void Update(ResBase *res) {}
 	void Release(ResBase *res) {}
 
-	// ResModel methods
-	void AddMesh(CSTR meshResourceName, CSTR shaderProgramName, const float *m = nullptr);
-	void GetMesh(U32 idx, const char ** mesh, const char **shader, const float **m, MProperties **prop);
-	U32 GetMeshCount() { return static_cast<U32>(meshes.size()); }
+	// ResDrawModel methods
+	void SetModel(CSTR model) {};
+	void GetModel() {};
+	void SetMatrix(const F32 *m) {};
+	MProperties* GetMeshProperties(U32 idx) { return nullptr; }
+	U32 GetMeshCount() { return 0;  }
 
 private:
 	ResBase *rb;
-
+/*
 	struct MeshEntry {
 		ResBase *mesh;
 		ResBase *shader;
@@ -32,8 +34,9 @@ private:
 		MProperties prop;
 	};
 
-	
+
 	basic_array<MeshEntry> meshes;
+*/
 	void _LoadXML();
 	void _SaveXML();
 

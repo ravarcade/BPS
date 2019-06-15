@@ -108,7 +108,9 @@ extern "C" {
 
 	// =========================================================================== ResModel
 	
-	BAMS_EXPORT void IResModel_AddMesh(IResModel * res, const char * meshResName, const float * m) { Impl<ResModel>(res)->AddMesh(meshResName, m); }
+	BAMS_EXPORT void IResModel_AddMesh(IResModel * res, const char * meshResName, const char * shaderProgramName, const float * m) { Impl<ResModel>(res)->AddMesh(meshResName, shaderProgramName, m); }
+	BAMS_EXPORT void IResModel_GetMesh(IResModel *res, uint32_t idx, const char **mesh, const char ** shader, const float **m, MProperties **properties) { Impl<ResModel>(res)->GetMesh(idx, mesh, shader, m, properties); }
+	BAMS_EXPORT uint32_t IResModel_GetMeshCount(IResModel *res) { return Impl<ResModel>(res)->GetMeshCount(); }
 
 	// =========================================================================== ResImage
 
@@ -317,6 +319,14 @@ extern "C" {
 
 	BAMS_EXPORT void DoTests()
 	{
+		return;
+		{
+			WSTR s;
+			s = L"Ala ma kota";
+			auto a = s.ToBasicString();
+
+			printf("str123=%ws\n", s.c_str());
+		}
 		typedef  basic_string_base<char, U32> QQ;
 //		QQ a("hello");
 

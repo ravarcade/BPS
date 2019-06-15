@@ -100,6 +100,8 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 	inline ResBase *NewResBase(CSTR name, tinyxml2::XMLElement * xml = nullptr) 
 	{ 
+		if (!xml)
+			xml = NewXMLElement();
 		return _resources.add(name, name, xml);
 	}
 
@@ -172,6 +174,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		auto res = NewResBase(resName);
 		Tools::CreateUUID(res->UID);
 		res->Type = type;
+		res->_resTimestamp = std::time(nullptr);
 		CreateResourceImplementation(res);
 		return res;
 	}
@@ -181,6 +184,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		auto res = NewResBase(resFilename);
 		Tools::CreateUUID(res->UID);
 		res->Type = type;
+		res->_resTimestamp = std::time(nullptr);
 		CreateResourceImplementation(res);
 		return res;
 	}
@@ -190,6 +194,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		auto res = NewResBase("_noname_");
 		res->UID = resUID;
 		res->Type = type;
+		res->_resTimestamp = std::time(nullptr);
 		CreateResourceImplementation(res);
 		return res;
 	}

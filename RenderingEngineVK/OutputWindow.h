@@ -10,7 +10,7 @@ enum EDrawOrder {
 struct ObjectInfo {
 	CShaderProgram *shader;
 	uint32_t oid;
-	ObjectInfo(CShaderProgram *_shader, uint32_t _oid) : shader(_shader), oid(_oid) {}
+//	ObjectInfo(CShaderProgram *_shader, uint32_t _oid) : shader(_shader), oid(_oid) {}
 	Properties *GetProperties() { return shader->GetProperties(oid); }
 };
 
@@ -167,7 +167,6 @@ private:
 	void _Cleanup();
 
 	CShaderProgram *_GetShader(const char *shader);
-	ObjectInfo *_GetObject(const char *name);
 
 	bool _SimpleAcquireNextImage(uint32_t & imageIndex);
 	void _SimpleQueueSubmit(VkSemaphore & waitSemaphore, VkSemaphore & signalSemaphore, VkCommandBuffer & commandBuffer);
@@ -229,13 +228,16 @@ public:
 
 	std::vector<CShaderProgram*> forwardRenderingShaders;
 	CStringHastable<CShaderProgram> shaders;
-	CStringHastable<ObjectInfo> objects;
+//	CStringHastable<ObjectInfo> objects;
+	basic_array<ObjectInfo> objects;
 
-	ObjectInfo * AddObject(const char * name, const char * mesh, const char * shader);
+	ObjectInfo * AddObject(const char * mesh, const char * shader);
+	void AddModel(const char * name);
+
 	CShaderProgram *AddShader(const char * shader);
 	CShaderProgram *ReloadShader(const char *shader);
 	void GetShaderParams(const char * shader, Properties **params);
-	void GetObjectParams(const char * objectName, uint32_t objectIdx, Properties ** props);
+	void GetObjectParams(uint32_t idx, Properties ** props);
 	void UpdateDrawCommands();
 
 	void AddTexture(void *propVal, const char *textureName);

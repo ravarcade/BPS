@@ -59,6 +59,16 @@ struct Properties
 	U32 count;
 	Property *properties;
 	Properties() : count(0), properties(nullptr) {}
+
+	Property *Find(const char *name)
+	{
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			if (strcmp(properties[i].name, name) == 0)
+				return &properties[i];
+		}
+		return nullptr;
+	}
  };
 
 class MProperties : public Properties

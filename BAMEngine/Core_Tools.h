@@ -38,4 +38,6 @@ public:
 
 	static void XMLWriteValue(tinyxml2::XMLElement * out, F32 *v, U32 count);
 	static U32 XMLReadValue(tinyxml2::XMLElement * src, F32 *out, U32 max = 0);
+	static time_t TimestampNow();
+	static void Mat4mul(F32 *O, const F32 *A, const F32 *B);
 };

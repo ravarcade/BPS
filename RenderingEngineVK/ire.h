@@ -99,6 +99,7 @@ public:
 	void CreateWnd(const void *params);
 	void CloseWnd(const void *params);
 	void AddMesh(const void *params);
+	void AddModel(const void * params);
 	void AddTexture(const void * params);
 	void AddShader(const void *params);
 	void ReloadShader(const void * params);
