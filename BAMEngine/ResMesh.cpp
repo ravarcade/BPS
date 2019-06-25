@@ -9,7 +9,11 @@ using tinyxml2::XMLDocument;
 
 void ResMesh::_LoadXML()
 {
+	if (!rb->XML->FirstChild())
+		return;
 	auto &rm = globalResourceManager;
+	Tools::XMLReadProperties(rb->XML->FirstChildElement("Properties"), meshProperties);
+
 	tinyxml2::XMLElement* r = rb->XML->FirstChildElement("Mesh");
 	if (r == nullptr)
 		return;
@@ -66,6 +70,12 @@ void ResMesh::_SaveXML()
 	auto &rm = globalResourceManager;
 	auto out = rb->XML ? rb->XML : rm->NewXMLElement();
 	out->DeleteChildren();
+	if (meshProperties.count > 0) {
+		auto xmlProp = rm->NewXMLElement("Properties");
+		Tools::XMLWriteProperties(xmlProp, meshProperties);
+		out->InsertEndChild(xmlProp);
+	}
+
 	auto *r = rm->NewXMLElement("Mesh");
 	STR cvt;
 	WSTR msf = meshSrc->Path;
@@ -110,13 +120,14 @@ void ResMesh::_SaveXML()
 	rb->SetTimestamp(); 
 }
 
-void ResMesh::SetVertexDescription(VertexDescription * pvd, U32 _meshHash, ResBase * _meshSrc, U32 _meshIdx)
+void ResMesh::SetVertexDescription(VertexDescription * pvd, U32 _meshHash, ResBase * _meshSrc, U32 _meshIdx, const Properties *_meshProperties)
 { 
 	// set new mesh data
 	vd = *pvd; 
 	meshHash = _meshHash; 
 	meshSrc = _meshSrc; 
 	meshIdx = _meshIdx; 
+	meshProperties = *_meshProperties;
 
 	// mark, that we don't need to load this mesh again.
 	isMeshLoaded = true;  
@@ -125,7 +136,7 @@ void ResMesh::SetVertexDescription(VertexDescription * pvd, U32 _meshHash, ResBa
 	_SaveXML(); 
 }
 
-VertexDescription * ResMesh::GetVertexDescription(bool loadASAP)
+const VertexDescription * ResMesh::GetVertexDescription(bool loadASAP)
 {
 	if (!isMeshLoaded && loadASAP)
 	{
@@ -136,7 +147,7 @@ VertexDescription * ResMesh::GetVertexDescription(bool loadASAP)
 	return &vd;
 }
 
-MProperties *ResMesh::GetMeshProperties(bool loadASAP)
+const Properties *ResMesh::GetMeshProperties(bool loadASAP)
 {
 	if (!isMeshLoaded && loadASAP)
 	{

@@ -55,7 +55,7 @@ public:
 		BAMS::VertexDescription vd;
 		uint32_t hash;
 		bool match;
-		BAMS::MProperties prop;
+		BAMS::sProperties prop;
 	};
 
 	AssImp_Loader();
@@ -126,5 +126,5 @@ private:
 
 	std::vector<ImportedMesh> _meshes;
 	CStringStorage _cstringStorage;
-	void _SafeMProperties(BAMS::MProperties &dst);
+	//void _SafeMProperties(BAMS::MProperties &dst);
 };

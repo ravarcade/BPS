@@ -240,7 +240,7 @@ public:
 	void GetObjectParams(uint32_t idx, Properties ** props);
 	void UpdateDrawCommands();
 
-	void AddTexture(void *propVal, const char *textureName);
+	void AddTexture(void * propVal, const char * textureName, IResource * textureRes = nullptr);
 
 	// ------------------------ camera stuffs -------------------
 

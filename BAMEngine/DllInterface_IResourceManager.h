@@ -38,8 +38,6 @@ extern "C" {
 	typedef void IResourceManager;
 
 	typedef void IModule;
-	typedef void IVertexDescription;
-	typedef void IMProperties;
 
 	// Call Initialize befor do anything with resources, game engine, etc. Only some memory allocations.
 	BAMS_EXPORT void Initialize();
@@ -111,17 +109,19 @@ extern "C" {
 	BAMS_EXPORT IResRawData *   IResShader_GetBinary(IResShader *res, uint32_t idx);
 
 	// ResMesh
-	BAMS_EXPORT void                 IResMesh_SetVertexDescription(IResMesh *res, IVertexDescription *_vd, uint32_t _meshHash, IResource *_meshSrc, U32 _meshIdx);
-	BAMS_EXPORT IVertexDescription * IResMesh_GetVertexDescription(IResMesh * res, bool loadASAP = false);
-	BAMS_EXPORT IMProperties *       IResMesh_GetMeshProperties(IResMesh * res, bool loadASAP = false);
-	BAMS_EXPORT IResource *          IResMesh_GetMeshSrc(IResMesh * res);
-	BAMS_EXPORT uint32_t             IResMesh_GetMeshIdx(IResMesh * res);
-	BAMS_EXPORT uint32_t             IResMesh_GetMeshHash(IResMesh * res);
-	BAMS_EXPORT void                 IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx);
+	BAMS_EXPORT void                      IResMesh_SetVertexDescription(IResMesh *res, VertexDescription *_vd, uint32_t _meshHash, IResource *_meshSrc, U32 _meshIdx, const Properties *_meshProperties);
+	BAMS_EXPORT const VertexDescription * IResMesh_GetVertexDescription(IResMesh * res, bool loadASAP = false);
+	BAMS_EXPORT const Properties *        IResMesh_GetMeshProperties(IResMesh * res, bool loadASAP = false);
+	BAMS_EXPORT IResource *               IResMesh_GetMeshSrc(IResMesh * res);
+	BAMS_EXPORT uint32_t                  IResMesh_GetMeshIdx(IResMesh * res);
+	BAMS_EXPORT uint32_t                  IResMesh_GetMeshHash(IResMesh * res);
+	BAMS_EXPORT void                      IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx);
 
 	// ResModel
 	BAMS_EXPORT void                 IResModel_AddMesh(IResModel *res, const char *meshResName, const char * shaderProgramName, const float *m = nullptr);
-	BAMS_EXPORT void                 IResModel_GetMesh(IResModel *res, uint32_t idx, const char **mesh, const char ** shader, const float **m, MProperties **properties);
+	BAMS_EXPORT void                 IResModel_AddMeshRes(IResModel *res, IResource *mesh, IResource * shader, const float *m = nullptr);
+	BAMS_EXPORT void                 IResModel_GetMesh(IResModel *res, uint32_t idx, const char **pMesh, const char ** pShader, const float **pM, const Properties **pProperties);
+	BAMS_EXPORT void                 IResModel_GetMeshRes(IResModel *res, uint32_t idx, IResource **pMesh, IResource ** pShader, const float **pM, const Properties **pProperties);
 	BAMS_EXPORT uint32_t             IResModel_GetMeshCount(IResModel *res);
 	// Image
 	BAMS_EXPORT Image *   IResImage_GetImage(IResImage *res, bool loadASAP = false);
@@ -289,10 +289,10 @@ class CResMesh : public CResource
 public:
 	CRESOURCEEXT(ResMesh, RESID_MESH);
 
-	void SetVertexDescription(IVertexDescription *vd, uint32_t meshHash, CResource &meshRes, uint32_t meshIdx) { IResMesh_SetVertexDescription(Self(), vd, meshHash, meshRes.Get(), meshIdx); }
-	void SetVertexDescription(IVertexDescription *vd, uint32_t meshHash, IResource *meshRes, uint32_t meshIdx) { IResMesh_SetVertexDescription(Self(), vd, meshHash, meshRes, meshIdx); }
-	IVertexDescription *GetVertexDescription(bool loadASAP = false) { return IResMesh_GetVertexDescription(Self(), loadASAP); }
-	BAMS::MProperties *GetMeshProperties(bool loadASAP = false) { return reinterpret_cast<MProperties *>(IResMesh_GetMeshProperties(Self(), loadASAP)); }
+	void SetVertexDescription(VertexDescription *vd, uint32_t meshHash, CResource &meshRes, uint32_t meshIdx, const Properties *meshProperties) { IResMesh_SetVertexDescription(Self(), vd, meshHash, meshRes.Get(), meshIdx, meshProperties); }
+	void SetVertexDescription(VertexDescription *vd, uint32_t meshHash, IResource *meshRes, uint32_t meshIdx, const Properties *meshProperties) { IResMesh_SetVertexDescription(Self(), vd, meshHash, meshRes, meshIdx, meshProperties); }
+	const VertexDescription *GetVertexDescription(bool loadASAP = false) { return IResMesh_GetVertexDescription(Self(), loadASAP); }
+	const Properties *GetMeshProperties(bool loadASAP = false) { return IResMesh_GetMeshProperties(Self(), loadASAP); }
 	IResource *GetMeshSrc() { return IResMesh_GetMeshSrc(Self()); }
 	uint32_t GetMeshIdx() { return IResMesh_GetMeshIdx(Self()); }
 	uint32_t GetMeshHash() { return IResMesh_GetMeshHash(Self()); }
@@ -307,7 +307,9 @@ public:
 	CRESOURCEEXT(ResModel, RESID_MODEL);
 
 	void AddMesh(const char * meshResName, const char *shaderProgramName, const float * m = nullptr) { IResModel_AddMesh(Self(), meshResName, shaderProgramName, m); }
-	void GetMesh(uint32_t idx, const char **mesh, const char **shader, const float **m, MProperties **properties) { IResModel_GetMesh(Self(), idx, mesh, shader, m, properties); }
+	void AddMesh(IResource * mesh, IResource *shader, const float * m = nullptr) { IResModel_AddMeshRes(Self(), mesh, shader, m); }
+	void GetMesh(uint32_t idx, const char **pMesh, const char **pShader = nullptr, const float **pM = nullptr, const Properties **pProperties = nullptr) { IResModel_GetMesh(Self(), idx, pMesh, pShader, pM, pProperties); }
+	void GetMesh(uint32_t idx, IResource **pMesh, IResource **pShader = nullptr, const float **pM = nullptr, const Properties **pProperties = nullptr) { IResModel_GetMeshRes(Self(), idx, pMesh, pShader, pM, pProperties); }
 	uint32_t GetMeshCount() { return IResModel_GetMeshCount(Self()); }
 };
 
@@ -370,6 +372,11 @@ public:
 
 	void StartDirectoryMonitor() { IResourceManager_StartDirectoryMonitor(_rm); }
 	void StopDirectoryMonitor() { IResourceManager_StopDirectoryMonitor(_rm); }
+
+	// some helper functions
+	const char * GetName(IResource *res) { return IResource_GetName(res); }
+	const wchar_t * GetPath(IResource *res) { return IResource_GetPath(res); }
+	uint32_t GetType(IResource *res) { return IResource_GetType(res); }
 };
 
 // ================================================================================== CEngine ===
@@ -545,6 +552,7 @@ struct PADD_TEXTURE {
 	uint32_t wnd;
 	void *propVal;
 	const char *textureResourceName;
+	IResource *textureResource;
 };
 
 struct PADD_MODEL {
@@ -561,32 +569,84 @@ public:
 
 	// CResModel methods
 	void AddMesh(const char * meshResName, const char *shaderProgramName, const float * m = nullptr) { IResModel_AddMesh(Self(), meshResName, shaderProgramName, m); }
-	void GetMesh(uint32_t idx, const char **mesh, const char **shader, const float **m, MProperties **properties) { IResModel_GetMesh(Self(), idx, mesh, shader, m, properties); }
+	void GetMesh(uint32_t idx, const char **mesh, const char **shader, const float **m, const Properties **properties) { IResModel_GetMesh(Self(), idx, mesh, shader, m, properties); }
 	uint32_t GetMeshCount() { return IResModel_GetMeshCount(Self()); }
 
 	// CResModelDraw methods
-	void AddToWindow(uint32_t wnd)
+	void AddToWindow(uint32_t _wnd, const char *modelMatrixName)
 	{
+		wnd = _wnd;
 		CEngine en;
 		uint32_t count = GetMeshCount();
 		meshes.resize(count);
-		PADD_MESH p = { wnd, nullptr, nullptr, nullptr, nullptr };
 		const float *M;
-		MProperties *srcProp;
+		const Properties *srcProp;
 		Properties *prop = nullptr;
+		PADD_MESH p = { wnd, nullptr, nullptr, &prop, nullptr };
 
 		for (uint32_t i = 0; i < count; ++i)
 		{
 			GetMesh(i, &p.mesh, &p.shader, &M, &srcProp);
-			p.pProperties = &prop;
+
 			en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &p);
 			MeshData &m = meshes[i];
 			memcpy_s(m.M, sizeof(m.M), M, sizeof(m.M));
 			m.prop = *prop;
-			auto pModelProp = m.prop.Find("model");
-			m.outputM = pModelProp ? reinterpret_cast<float *>(pModelProp->val) : nullptr;
-		}
 
+			// set mesh "model" matrix (M)
+			auto pModelProp = m.prop.Find(modelMatrixName);
+			m.outputM = pModelProp ? reinterpret_cast<float *>(pModelProp->val) : nullptr;
+
+			// set textures
+			for (auto &p : *srcProp)
+			{
+				if (p.type == Property::PT_TEXTURE)
+				{
+					auto dst = m.prop.Find(p.name);
+					if (dst)
+					{
+						PADD_TEXTURE addTexParams = { wnd, dst->val, nullptr, reinterpret_cast<IResource *>(const_cast<void *>(p.val)) };
+						en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
+					}
+				}
+			}
+		}
+	}
+
+	void *GetParam(const char *name, uint32_t idx)
+	{
+		if (idx >= meshes.size())
+			return nullptr;
+		auto p = meshes[idx].prop.Find(name);
+		return p ? p->val : nullptr;
+	}
+
+	void SetParam(const char *name, void *value, uint32_t idx = -1)
+	{
+		if (idx == -1)
+		{
+			idx = 0;
+			for (uint32_t max = GetMeshCount(); idx < max; ++idx)
+				SetParam(name, value, idx);
+		}
+		if (idx < meshes.size())
+		{
+			MeshData &mesh = meshes[idx];
+			auto p = mesh.prop.Find(name);
+			if (p) 
+			{
+				if (p->type == Property::PT_TEXTURE)
+				{
+					CEngine en;
+					PADD_TEXTURE addTexParams = { wnd, p->val, nullptr, reinterpret_cast<IResource *>(value) };
+					en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
+				}
+				else
+				{
+					p->SetMem(value);
+				}
+			}
+		}
 	}
 
 	void SetMatrix(const float *T) 
@@ -598,9 +658,9 @@ public:
 	};
 
 private:
-
+	uint32_t wnd;
 	struct MeshData
-	{
+	{		
 		float M[16];
 		float *outputM;
 		MProperties prop;

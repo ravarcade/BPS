@@ -1,4 +1,5 @@
 
+#include <thread>
 
 struct Property
 {
@@ -41,7 +42,7 @@ public:
 
 	void  Set(U32 t, void *v, size_t s)
 	{
-		if (val && t != type)
+		if (val && t == type)
 		{
 			memcpy_s(val, s, v, s);
 		}
@@ -52,6 +53,32 @@ public:
 	void Set(F32 v) { Set(PT_F32, &v, sizeof(v)); }
 	void Set(F32 *v, U32 cnt = 1) { Set(PT_F32, v, sizeof(F32)*cnt); }
 	void Set(CSTR v) { val = const_cast<char *>(v); }
+
+	void SetMem(void *v) { SIZE_T l = MemoryRequired(); if (!l) val = v; else memcpy_s(val, l, v, l); }
+	SIZE_T MemoryRequired() const { return MemoryRequired(type, count); }
+	static SIZE_T MemoryRequired(U32 type, U32 count) 
+	{
+		switch (type)
+		{
+		case Property::PT_I8:
+		case Property::PT_U8:
+			return count;
+		case Property::PT_I16:
+		case Property::PT_U16:
+			return count * sizeof(U16);
+		case Property::PT_I32:
+		case Property::PT_U32:
+		case Property::PT_F32:
+			return count * sizeof(U32);
+		case Property::PT_CSTR:
+			return 0;
+
+		case Property::PT_ARRAY:
+		case Property::PT_TEXTURE:
+			return count * sizeof(void *);
+		}
+		return 0;
+	}
 };
 
 struct Properties
@@ -69,7 +96,22 @@ struct Properties
 		}
 		return nullptr;
 	}
- };
+
+	const Property *ConstFind(const char *name) const
+	{
+		for (uint32_t i = 0; i < count; ++i)
+		{
+			if (strcmp(properties[i].name, name) == 0)
+				return &properties[i];
+		}
+		return nullptr;
+	}
+	
+	Property *begin() { return properties; }
+	Property *end() { return properties + count; }
+	const Property *begin() const { return properties; }
+	const Property *end() const { return properties + count; }
+};
 
 class MProperties : public Properties
 {
@@ -84,14 +126,14 @@ public:
 		}
 	}
 
-	MProperties(const Properties &src)
+	MProperties(const Properties &src) : reserved(0)
 	{
 		_setAlloc();
 		_cpy(src);
 	}
 
 	// c++ rule of 5
-	MProperties(const MProperties &src)
+	MProperties(const MProperties &src) : reserved(0)
 	{
 		_setAlloc();
 		_cpy(src);
@@ -101,33 +143,18 @@ public:
 	{
 		memcpy_s(this, sizeof(MProperties), &src, sizeof(MProperties));
 		src.properties = nullptr;
+		src.alloc = nullptr;
 	}
 
 	~MProperties()
 	{
-		if (properties)
+		if (properties && alloc)
 			alloc->deallocate(properties);
 	}
 
 	MProperties &operator = (const MProperties &src)
 	{
-		if (&src != this)
-		{
-			if (properties && reserved >= src.count)
-			{
-				count = src.count;
-				auto s = sizeof(Property) * count;
-				memcpy_s(properties, s, src.properties, s);
-			}
-			else
-			{
-				if (properties)
-					alloc->deallocate(properties);
-
-				_cpy(src);
-			}
-		}
-
+		_cpy(src);
 		return *this;
 	}
 
@@ -146,9 +173,8 @@ public:
 	{
 		if (reserved <= (count+1))
 		{
-			if (reserved == 0)
-				reserved = 8;
-			_resize(reserved * 2);
+			reserved += reserved / 2 + 8;
+			_resize();
 		}
 
 		auto ret = new (&properties[count]) Property(std::forward<Args>(args)...);
@@ -188,21 +214,25 @@ public:
 
 	Property * begin() { return properties; }
 	Property * end() { return &properties[count]; }
+
+	const Property * begin() const { return properties; }
+	const Property * end() const { return &properties[count]; }
+
 private:
 	IMemoryAllocator *alloc;
 	U32 reserved;
 
-	void _resize(U32 res)
+	void _resize()
 	{
-		reserved = res;
 		Property *old = properties;
+		if (!alloc) 
+			_setAlloc();
 		properties = static_cast<Property*>(alloc->allocate(sizeof(Property)*reserved));
 		if (old && count)
 			memcpy_s(properties, sizeof(Property)*reserved, old, sizeof(Property)*count);
 
 		if (old)
 			alloc->deallocate(old);
-
 	}
 
 	void _setAlloc()
@@ -212,15 +242,203 @@ private:
 
 	void _cpy(const Properties &src)
 	{
-		reserved = count = src.count;
+		if (src.count > reserved)
+		{
+			reserved = src.count;
+			_resize();
+		}
+		count = src.count;
 		if (count)
 		{
 			auto s = sizeof(Property)*reserved;
-			properties = static_cast<Property*>(alloc->allocate(s));
 			memcpy_s(properties, s, src.properties, s);
 		}
-		else {
+	}
+};
+
+class sProperties : public Properties
+{
+public:
+	sProperties() : _alloc(nullptr), _reserved(0) { 
+		count = 0; 
+		properties = nullptr; 
+	}
+
+	sProperties(const Properties &src) : _alloc(nullptr), _reserved(0) { 
+		_assign(src);  
+	}
+
+	sProperties(const sProperties &src) : _alloc(nullptr), _reserved(0) {
+		_assign(src);
+	}
+
+	sProperties(sProperties &&src)
+	{
+		_alloc = src._alloc;
+		_reserved = src._reserved;
+		properties = src.properties;
+		count = src.count;
+		src._alloc = nullptr;
+		src.properties = nullptr;
+		src.count = 0;
+	}
+
+	~sProperties() { clear(); }
+
+	sProperties & operator = (const Properties &src) { _assign(src); return *this; }
+
+	sProperties & operator = (sProperties &&src)
+	{
+		clear();
+		_alloc = src._alloc;
+		properties = src.properties;
+		_reserved = src._reserved;
+		count = src.count;
+		src._alloc = nullptr;
+		src.properties = nullptr;
+		src._reserved = 0;
+		src.count = 0;
+	}
+
+	void _assign(const Properties &src)
+	{
+		clear();
+		for (U32 i = 0; i < src.count; ++i)
+			add(src.properties[i]);
+	}
+
+	void clear()
+	{
+		if (_alloc)
+		{
 			properties = nullptr;
+			count = 0;
+			_reserved = 0;
+			delete _alloc; // releas all memory
+			_alloc = nullptr;
 		}
+	}
+
+	Property *add(const char *name, const char *value)
+	{
+		auto  p = add(name, Property::PT_CSTR, 1);
+		p->val = const_cast<char *>(storeString(value));
+		return p;
+	}
+
+	Property *add(const char *name, F32 *value, U32 count = 1)
+	{
+		auto  p = add(name, Property::PT_F32, count);
+		p->SetMem(value);
+		return p;
+	}
+
+	Property *add(const char *name, U32 *value, U32 count = 1)
+	{
+		auto  p = add(name, Property::PT_U32, count);
+		p->SetMem(value);
+		return p;
+	}
+
+	Property *add(const char *name, I32 *value, U32 count = 1)
+	{
+		auto  p = add(name, Property::PT_I32, count);
+		p->SetMem(value);
+		return p;
+	}
+
+	Property *add(const char *name, U32 type, U32 _count)
+	{
+		if (_reserved == count)
+		{
+			_reserved += _reserved / 2 + 1;
+			_reallocate();
+		}
+		auto p = new (properties + count)Property();
+		++count;
+
+		p->name = storeString(name);
+		p->type = type;
+		p->count = _count;
+		p->val = getMem<U8*>(p->MemoryRequired());
+
+		return p;
+	}
+
+	Property *add(const Property &p)
+	{
+		auto ret = add(p.name, p.type, p.count);
+		_copyValue(*ret, p);
+		return ret;
+	}
+
+	void _reallocate()
+	{
+		auto new_properties = getMem<Property>(_reserved);
+		if (count) 
+		{
+			auto l = count * sizeof(Property);
+			memcpy_s(new_properties, l, properties, l);
+			_alloc->deallocate(properties);
+		}
+		properties = new_properties;
+	}
+
+	void _copyValue(Property &dst, const Property &src)
+	{
+		switch (src.type)
+		{
+		case Property::PT_I8:
+		case Property::PT_U8:
+		case Property::PT_I16:
+		case Property::PT_U16:
+		case Property::PT_I32:
+		case Property::PT_U32:
+		case Property::PT_F32:
+		{
+			auto l = src.MemoryRequired();
+			memcpy_s(dst.val, l, src.val, l);
+		}
+		break;
+		case Property::PT_CSTR: dst.val = const_cast<char *>(storeString(reinterpret_cast<CSTR>(src.val))); break;
+		}
+	}
+
+	const char *storeString(const char *str)
+	{
+		size_t l = strlen(str) + 1;
+		auto ret = getMem<char>(l);
+		memcpy_s(ret, l, str, l);
+		return ret;
+	}
+
+	const char *storeString(const String &str)
+	{
+		auto ret = getMem<char>(str._used+1);
+		memcpy_s(ret, str._used, str._buf, str._used);
+		ret[str._used] = 0;
+		return ret;
+	}
+
+	Property *begin() { return properties; }
+	Property *end() { return properties + count; }
+
+	const Property *begin() const { return properties; }
+	const Property *end() const { return properties + count; }
+
+private:
+	IMemoryAllocator *_alloc;
+	U32 _reserved;
+
+	template<typename T>
+	T *getMem(SIZE_T size)
+	{
+		if (!size)
+			return nullptr;
+
+		if (!_alloc)
+			_alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);
+
+		return reinterpret_cast<T *>(_alloc->allocate(size * sizeof(T)));
 	}
 };

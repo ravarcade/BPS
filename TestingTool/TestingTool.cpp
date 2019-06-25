@@ -199,7 +199,7 @@ Property *FindProp(MProperties &prop, const char *name)
 	return nullptr;
 }
 
-Property *FindProp(Properties &prop, const char *name)
+Property *FindProp(const Properties &prop, const char *name)
 {
 	for (uint32_t i = 0; i < prop.count; ++i)
 	{
@@ -215,7 +215,7 @@ static PCREATE_WINDOW w1 = { 1, 500, 500, 1310, 20 };
 static PCREATE_WINDOW w2 = { 2, 500, 200, 1310, 620 };
 
 bool wndState[3] = { false, false, false };
-vector<MProperties> onWnd[3];			// properties of 1st model on window
+//vector<MProperties> onWnd[3];			// properties of 1st model on window
 vector<MProperties> deferredProp(3);    // properties for deferred resolve shader (ligth positions, debugSwitch)
 
 void SetModel(Property &p, uint32_t num)
@@ -352,118 +352,204 @@ void SetDeferredParams(Properties *pprop)
 	}
 }
 
+// ============================================================================
+//
+//void Spin(BAMS::CEngine &en)
+//{
+//	for (uint32_t i = 0; i < COUNT_OF(onWnd); ++i)
+//	{
+//		if (onWnd[i].size())
+//		{
+//			auto p = FindProp(onWnd[i][0], "model");
+//			if (!p) {
+//				auto newProp = GetObjectParams(en, i, nullptr, 1);
+//				if (newProp)
+//				{
+//					onWnd[i][0] = *newProp;
+//					p = FindProp(onWnd[i][0], "model");
+//				}
+//			}
+//			if (p)
+//			{
+//				SetModel(*p, 0);
+//				PUPDATE_DRAW_COMMANDS cw = { i };
+//				en.SendMsg(UPDATE_DRAW_COMMANDS, RENDERING_ENGINE, 0, &cw);
+//			}
+//		}
+//	}
+//}
+//
+// ============================================================================
 
-void Spin(BAMS::CEngine &en)
-{
-	for (uint32_t i = 0; i < COUNT_OF(onWnd); ++i)
-	{
-		if (onWnd[i].size())
-		{
-			auto p = FindProp(onWnd[i][0], "model");
-			if (!p) {
-				auto newProp = GetObjectParams(en, i, nullptr, 1);
-				if (newProp)
-				{
-					onWnd[i][0] = *newProp;
-					p = FindProp(onWnd[i][0], "model");
-				}
-			}
-			if (p)
-			{
-				SetModel(*p, 0);
-				PUPDATE_DRAW_COMMANDS cw = { i };
-				en.SendMsg(UPDATE_DRAW_COMMANDS, RENDERING_ENGINE, 0, &cw);
-			}
-		}
-	}
-}
+std::vector<IResource *>availableModels;
+std::vector<CResModelDraw *> modelsOnScreen[3];
 
-void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, const char *repoResourceName)
+void CreateModels(BAMS::CEngine &en)
 {
 	BAMS::CResourceManager rm;
-	
-	// new bob model
-	auto res = rm.FindExisting("bob", CResModel::GetType());
-	if (!res) {
-		auto bobModel = rm.Get<CResModel>("bob");
-		bobModel.AddMesh("Mesh_4", "basic", nullptr);
-		bobModel.AddMesh("Mesh_5", "basic", nullptr);
-		bobModel.AddMesh("Mesh_6", "basic", nullptr);
-		bobModel.AddMesh("Mesh_7", "basic", nullptr);
-		bobModel.AddMesh("Mesh_8", "basic", nullptr);
-		bobModel.AddMesh("Mesh_9", "basic", nullptr);
-	}
+	availableModels.clear();
+	std::vector<IResource*> unusedModels;
+	rm.Filter(RESID_IMPORTMODEL, &unusedModels, [](IResource *res, void *local) {
+		auto &unusedModels = *reinterpret_cast<std::vector<IResource*> *>(local);
 
-	auto bob = rm.Get<CResModelDraw>("bob");
-	bob.AddToWindow(wnd);
-	glm::mat4 m(1);
-	bob.SetMatrix(&m[0][0]);
-//	AddModel(en, wnd, repoResourceName);
-	// set params:
+		struct MI {
+			std::vector<IResource*> meshes;
+			std::vector<bool> machting;
+			IResource *res;
+			IResource *model;
 
+		} meshSrc = { {}, {}, res, nullptr };
 
-	//if (pprop)
-	//{
-	//	int num = static_cast<int>(onWnd[wnd].size());
-	//	SetParams(pprop, num);
-	//	onWnd[wnd].push_back(*pprop);
-	//	auto pTex = FindProp(*pprop, "samplerColor");
-	//	if (pTex)
-	//	{
-	//		PADD_TEXTURE addTexParams = { wnd, pTex->val, colorTextures[i] };
-	//		en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
-	//	}
-	//}
-}
-
-void AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
-{
-	static const char *meshes[] = { "Mesh_1", "Mesh_2", "Mesh_4", "Mesh_5", "Mesh_6", "Mesh_7" };
-	static const char *colorTextures[] = {"flipper-t1-white-red",  "test", "guard1_body", "test", "test", "test" };
-	static bool meshesChecked[100] = { false };
-	static const char *colorTexturePropertyName[] = { "file", "albedo" };
-	if (!meshesChecked[i])
-	{
-		meshesChecked[i] = true;
-		CResourceManager rm;
-		auto res = rm.FindExisting(meshes[i], CResMesh::GetType());
-		assert(res != nullptr);
-		CResMesh mesh(res);
-		auto mp = mesh.GetMeshProperties(true);
-		for (auto ctn : colorTexturePropertyName)
-		{
-			auto p = FindProp(*mp, ctn);
-			if (p) 
-			{
-				rm.Filter(mesh, p, &colorTextures[i],
-					[](BAMS::IResource *res, void *local) {
-					CResource r(res);
-					*reinterpret_cast<const char **>(local) = r.GetName();
-				});// , &colorTextures[i], p, mesh);
-				break;
+		BAMS::CResourceManager rm;
+		rm.Filter(RESID_MESH, &meshSrc, [](IResource *resMesh, void *pMeshes) {
+			auto &meshSrc = *reinterpret_cast<MI *>(pMeshes);
+			CResMesh r(resMesh);
+			if (r.GetMeshSrc() == meshSrc.res) {
+				meshSrc.meshes.push_back(resMesh);
+				meshSrc.machting.push_back(false);
 			}
-		}
-	}
+		});
 
-	uint32_t oid = -1;
-	Properties *pprop = nullptr;
-	PADD_MESH addMeshParams = { wnd, meshes[i], "basic", &pprop, &oid };
-
-	en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &addMeshParams);
-
-	if (pprop) 
-	{
-		int num = static_cast<int>(onWnd[wnd].size());
-		SetParams(pprop, num);
-		onWnd[wnd].push_back(*pprop);
-		auto pTex = FindProp(*pprop, "samplerColor");
-		if (pTex)
+		if (meshSrc.meshes.size())
 		{
-			PADD_TEXTURE addTexParams = { wnd, pTex->val, colorTextures[i] };
-			en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
+			// check if we have already model like this:
+			rm.Filter(RESID_MODEL, &meshSrc, [](IResource *resModel, void *pMeshes) {
+				auto &meshSrc = *reinterpret_cast<MI *>(pMeshes);
+				if (!meshSrc.model)
+				{
+					BAMS::CResourceManager rm;
+					CResModel r(resModel);
+					IResource *basicShader = rm.FindExisting("basic", RESID_SHADER);
+					IResource *mesh, *shader;
+					auto cnt = r.GetMeshCount();
+					bool same = cnt == meshSrc.meshes.size();
+					if (same)
+					{
+						for (uint32_t i = 0; i < cnt; ++i)
+							meshSrc.machting[i] = true;
+
+						for (uint32_t i = 0; i < cnt && same; ++i)
+						{
+							r.GetMesh(i, &mesh, &shader);
+							same = false;
+							for (uint32_t j = 0; j < cnt; ++j)
+							{
+								if (meshSrc.machting[j] && meshSrc.meshes[j] == mesh && shader == basicShader)
+								{
+									meshSrc.machting[j] = false;
+									same = true;
+									meshSrc.model = resModel;
+									break;
+								}
+							}
+						}
+					}
+				}
+			});
+
+			if (!meshSrc.model)
+			{
+				unusedModels.push_back(meshSrc.res);
+			}
+			else {
+				availableModels.push_back(meshSrc.model);
+			}
+
+		}
+	});
+
+	// create models
+	IResource *basicShader = rm.FindExisting("basic", RESID_SHADER);
+	for (auto res : unusedModels)
+	{
+		struct MI {
+			std::vector<IResource*> meshes;
+			IResource *res;
+
+		} meshSrc = { {}, res };
+
+		BAMS::CResourceManager rm;
+		rm.Filter(RESID_MESH, &meshSrc, [](IResource *resMesh, void *pMeshes) {
+			auto &meshSrc = *reinterpret_cast<MI *>(pMeshes);
+			CResMesh r(resMesh);
+			if (r.GetMeshSrc() == meshSrc.res)
+				meshSrc.meshes.push_back(resMesh);
+		});
+
+		// create new model					
+		auto resModel = rm.Create(rm.GetName(meshSrc.res), RESID_MODEL);
+		CResModel model(resModel);
+		for (uint32_t i = 0; i < meshSrc.meshes.size(); ++i)
+		{
+			model.AddMesh(meshSrc.meshes[i], basicShader);
+		}
+		availableModels.push_back(resModel);
+	}
+}
+
+
+
+void SetModelMatrix(BAMS::CEngine &en, uint32_t wnd, uint32_t num, CResModelDraw * pMod)
+{
+	static auto startTime = std::chrono::high_resolution_clock::now();
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
+
+	uint32_t i = num;
+	int pos = ((i & 1) ? 1 : -1) * ((i + 1) & 0xfffe);
+
+	static float s = 1.0f;
+	glm::mat4 I(1.0f);
+	auto S = glm::scale(I, glm::vec3(s));
+	auto R = glm::rotate(I, time * glm::radians(90.0f / 4), glm::vec3(0.0f, 0.0f, 1.0f));
+	auto T = glm::translate(I, glm::vec3(pos * 15, 0, 0));
+	auto model = T * R * S;
+	pMod->SetMatrix(&model[0][0]);
+
+	PUPDATE_DRAW_COMMANDS cw = { wnd };
+	en.SendMsg(UPDATE_DRAW_COMMANDS, RENDERING_ENGINE, 0, &cw);
+}
+
+void DeleteModels(uint32_t wnd)
+{
+	for (auto pMod : modelsOnScreen[wnd])
+		delete pMod;
+	modelsOnScreen[wnd].clear();
+}
+
+void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t modelIdx)
+{
+	if (modelIdx >= availableModels.size())
+		return;
+
+	BAMS::CResourceManager rm;
+	CResModelDraw *pMod = new CResModelDraw(availableModels[modelIdx]);
+	pMod->AddToWindow(wnd, "model"); 
+	modelsOnScreen[wnd].push_back(pMod);
+
+
+	// set "baseColor" & "model"
+	static float colors[][4] = {
+	{ 0.8f, 1, 1, 1 },
+	{ 1, 0.8f, 1, 1 },
+	{ 1, 1, 0.8f, 1 }
+	};
+	pMod->SetParam("baseColor", colors[ modelsOnScreen[wnd].size() % 3 ]);
+	SetModelMatrix(en, wnd, static_cast<uint32_t>(modelsOnScreen[wnd].size()), pMod);
+}
+
+void SpinModel(BAMS::CEngine &en)
+{
+	for (uint32_t i = 0; i < COUNT_OF(modelsOnScreen); ++i)
+	{
+		if (modelsOnScreen[i].size())
+		{
+			SetModelMatrix(en, i, 0, modelsOnScreen[i][0]);
 		}
 	}
 }
+
+// ==============================================================================================
 
 void ToggleWnd(BAMS::CEngine &en, int wnd)
 {
@@ -475,8 +561,9 @@ void ToggleWnd(BAMS::CEngine &en, int wnd)
 	cw.wnd = wnd;
 	if (wndState[wnd])
 	{
+		DeleteModels(wnd);
 		en.SendMsg(CLOSE_WINDOW, RENDERING_ENGINE, 0, &cw);
-		onWnd[wnd].clear();
+//		onWnd[wnd].clear();
 	}
 	else
 	{
@@ -498,7 +585,7 @@ void ChangeDebugView(BAMS::CEngine &en)
 		for (uint32_t i = 0; i < prop.count; ++i)
 		{
 			auto &p = prop.properties[i];
-			if (strcmp(p.name, "debugSwitch") == 0 )
+			if (strcmp(p.name, "debugSwitch") == 0)
 			{
 				auto pVal = reinterpret_cast<uint32_t *>(p.val);
 				*pVal = ((*pVal) + 1) % 6;
@@ -507,7 +594,60 @@ void ChangeDebugView(BAMS::CEngine &en)
 	}
 }
 
-// ========================================================================
+// ==============================================================================================
+
+// ==============================================================================================
+
+//void _OLD_AddToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t i)
+//{
+//	static const char *meshes[] = { "Mesh_1", "Mesh_2", "Mesh_4", "Mesh_5", "Mesh_6", "Mesh_7" };
+//	static const char *colorTextures[] = {"flipper-t1-white-red",  "test", "guard1_body", "test", "test", "test" };
+//	static bool meshesChecked[100] = { false };
+//	static const char *colorTexturePropertyName[] = { "file", "albedo" };
+//	if (!meshesChecked[i])
+//	{
+//		meshesChecked[i] = true;
+//		CResourceManager rm;
+//		auto res = rm.FindExisting(meshes[i], CResMesh::GetType());
+//		assert(res != nullptr);
+//		CResMesh mesh(res);
+//		auto mp = mesh.GetMeshProperties(true);
+//		for (auto ctn : colorTexturePropertyName)
+//		{
+//			auto p = FindProp(*mp, ctn);
+//			if (p) 
+//			{
+//				rm.Filter(mesh, p, &colorTextures[i],
+//					[](BAMS::IResource *res, void *local) {
+//					CResource r(res);
+//					*reinterpret_cast<const char **>(local) = r.GetName();
+//				});
+//				break;
+//			}
+//		}
+//	}
+//
+//	uint32_t oid = -1;
+//	Properties *pprop = nullptr;
+//	PADD_MESH addMeshParams = { wnd, meshes[i], "basic", &pprop, &oid };
+//
+//	en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &addMeshParams);
+//
+//	if (pprop) 
+//	{
+//		int num = static_cast<int>(onWnd[wnd].size());
+//		SetParams(pprop, num);
+//		onWnd[wnd].push_back(*pprop);
+//		auto pTex = FindProp(*pprop, "samplerColor");
+//		if (pTex)
+//		{
+//			PADD_TEXTURE addTexParams = { wnd, pTex->val, colorTextures[i] };
+//			en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
+//		}
+//	}
+//}
+//
+
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
 
@@ -596,7 +736,8 @@ const float moveScale = 5.0f;
 
 void ProcessCam(CEngine &en)
 {
-	if (!wndState[0] || !onWnd[0].size())
+//	if (!wndState[0] || (!onWnd[0].size() && !modelsOnScreen[0].size()))
+	if (!wndState[0] || !modelsOnScreen[0].size())
 		return;
 
 	PSET_CAMERA cam = defaultCam;
@@ -662,10 +803,12 @@ void ProcessCam(CEngine &en)
 // ========================================================================
 void testloop(BAMS::CEngine &en)
 {
+	CreateModels(en);
 	for (bool isRunning = true; isRunning;)
 	{
-		//		Sleep(100);
-		Spin(en);
+		// Sleep(100);
+		// Spin(en);
+		SpinModel(en);
 		BAMS::CEngine::Update(25.0f);
 		SleepEx(25, TRUE);
 		ProcessCam(en);
@@ -686,14 +829,14 @@ void testloop(BAMS::CEngine &en)
 					ToggleWnd(en, i - VK_NUMPAD7);
 					break;
 
-				case VK_NUMPAD4: AddToWnd(en, 0, 0);	break;
-				case VK_NUMPAD1: AddToWnd(en, 0, 1);	break;
-				case VK_NUMPAD5: AddToWnd(en, 0, 2);	break;
-				case VK_NUMPAD2: AddToWnd(en, 0, 3);	break;
-				case VK_NUMPAD6: AddToWnd(en, 0, 4);	break;
-				case VK_NUMPAD3: AddToWnd(en, 0, 5);	break;
+				case VK_NUMPAD1: AddModelToWnd(en, 0, 0);	break;
+				case VK_NUMPAD2: AddModelToWnd(en, 0, 1);	break;
+				case VK_NUMPAD3: AddModelToWnd(en, 0, 2);	break;
+				case VK_NUMPAD4: AddModelToWnd(en, 0, 3);	break;
+				case VK_NUMPAD5: AddModelToWnd(en, 0, 4);	break;
+				case VK_NUMPAD6: AddModelToWnd(en, 0, 5);	break;
 				case VK_NUMPAD0: ChangeDebugView(en);	break;
-				case VK_ADD: AddModelToWnd(en, 0, "boblampclean2");
+//				case VK_ADD: AddModelToWnd(en, 0, 0);
 
 //				default:					TRACE("KEY: " << i << "\n");
 				}
@@ -877,8 +1020,10 @@ int main()
 	}
 
 	BAMS::Finalize();
-	for (auto &w : onWnd)
-		w.clear();
+	for (uint32_t wnd : {0, 1, 2})
+		DeleteModels(wnd);
+//	for (auto &w : onWnd)
+//		w.clear();
 	deferredProp.clear();
 
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);

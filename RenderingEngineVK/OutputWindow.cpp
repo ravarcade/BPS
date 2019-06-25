@@ -1420,13 +1420,20 @@ void OutputWindow::UpdateDrawCommands()
 	BufferRecreationNeeded();
 }
 
-void OutputWindow::AddTexture(void *propVal, const char * textureName)
-{	
+void OutputWindow::AddTexture(void *propVal, const char * textureName, IResource *textureRes)
+{
+	if (!textureName && textureRes)
+	{
+		textureName = IResource_GetName(textureRes);
+	}
 	auto pTex = textures.find(textureName);
 	if (!pTex)
 	{
 		pTex = textures.add(textureName, this);
-		pTex->LoadTexture(textureName);		
+		if (textureRes)
+			pTex->LoadTexture(textureRes);
+		else
+			pTex->LoadTexture(textureName);
 	}
 	*reinterpret_cast<VkDescriptorImageInfo **>(propVal) = &pTex->descriptor;
 }
@@ -1670,7 +1677,7 @@ void OutputWindow::AddModel(const char * name)
 		const char *mesh;
 		const char *shader;
 		const float *m;
-		MProperties *prop;
+		const Properties *prop;
 
 		for (uint32_t i = 0; i < count; ++i)
 		{

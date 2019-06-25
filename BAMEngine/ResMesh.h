@@ -10,17 +10,18 @@ class ResMesh : public ResImp<ResMesh, RESID_MESH, false>
 {
 public:
 	ResMesh(ResBase *res) : rb(res), meshSrc(nullptr), meshIdx(-1), meshHash(0), isMeshLoaded(false) {
-		if (res->XML->FirstChild())
-			_LoadXML(); // XML is readed from manifest, so no need to load any file from disk
+		_LoadXML(); 
 	}
-	~ResMesh() {}
+	~ResMesh() {
+	}
+
 	void Update(ResBase *res) {}
 	void Release(ResBase *res) {}
 
 	// ResMesh methods
-	void SetVertexDescription(VertexDescription *pvd, U32 _meshHash, ResBase *_meshSrc, U32 _meshIdx);
-	VertexDescription *GetVertexDescription(bool loadASAP = false);
-	MProperties *GetMeshProperties(bool loadASAP = false);
+	void SetVertexDescription(VertexDescription *pvd, U32 _meshHash, ResBase *_meshSrc, U32 _meshIdx, const Properties *_meshProperties);
+	const VertexDescription *GetVertexDescription(bool loadASAP = false);
+	const Properties *GetMeshProperties(bool loadASAP = false);
 	ResBase *GetMeshSrc() { return meshSrc; }
 	U32 GetMeshIdx() { return meshIdx; }
 	void SetMeshIdx(U32 idx) { meshIdx = idx; }
@@ -29,7 +30,7 @@ public:
 private:
 	ResBase *rb;
 	VertexDescription vd;
-	MProperties meshProperties;
+	sProperties meshProperties;
 	U32 meshIdx;
 	U32 meshHash;
 	ResBase *meshSrc;

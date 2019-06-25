@@ -89,6 +89,9 @@ public:
 	T *begin() { return _buf; }
 	T *end() { return _buf + _used; }
 
+	const T *begin() const { return _buf; }
+	const T *end() const { return _buf + _used; }
+
 	void push_back(const T &v) {
 		if (size() == capacity())
 			_Realocate(_used + minReservedSize);
@@ -300,10 +303,14 @@ public:
 		_reallocate();
 	}
 
+	size_type size() { return _used; }
 	iterator begin() { return _storage; }
 	iterator end() { return _storage + _used; }
 
- private:
+	const_iterator begin() const { return _storage; }
+	const_iterator end() const { return _storage + _used; }
+
+private:
 	value_type * _storage = nullptr;
 	size_type _used = 0;
 	size_type _reserved = 0;
@@ -361,9 +368,9 @@ public:
 
 	template<typename X>
 	typename std::enable_if<std::is_trivially_move_constructible<X>::value == false>::type
-		_moveRange(T* dst, const_iterator f, const_iterator e) { 
+		_moveRange(T* dst, iterator f, iterator e) {
 		for (; f != e; ++f, ++dst) 
-			new(dst)T(*f); 
+			new(dst)T(std::move(*f)); 
 	}
 
 	template<typename X>
@@ -375,146 +382,6 @@ public:
 
 
 	void _deleteAll() { _deleteRange<T>(_storage, _storage + _used); }
-	void _moveAll(T* dst, const_iterator f) { _moveRange<T>(dst, f, f + _used); }
-	void _copyAll(T* dst, const_iterator f) { _copyRange<T>(dst, f, f + _used); }
-
-	
-/*
-
-	// ======================================================================== "not trivial" ===
-	template<typename X>
-	typename std::enable_if<std::is_trivially_destructible<X>::value == false>::type
-		deleteObjects()
-	{
-		foreach([&](T *o) {
-			o->~T();
-		});
-	}
-
-	// ======================================================================== "trivial" ===
-	template<typename X>
-	typename std::enable_if<std::is_trivially_destructible<X>::value == true>::type
-		deleteObjects()
-	{
-		// Trivially destructible objects can be reused without using the destructor.
-	}
-
-
-	void _Realocate(SIZE_T newSize)
-	{
-		T *oldBuf = _buf;
-		SIZE_T oldReserved = _reserved;
-		_reserved = newSize;
-		_Allocate();
-
-		if (oldBuf && _used)
-			_Copy(_buf, oldBuf, _used);
-
-		if (oldBuf)
-			_allocator->deallocate(oldBuf);
-	}
-
-	void _Construct(T *dst, const T *src, SIZE_T len)
-	{
-		while (len)
-		{
-			new (*dst) T(*src);
-			++dst;
-			++src;
-			--len;
-		}
-	}
-
-	void _Copy(T *dst, const T *src, SIZE_T len)
-	{
-		size_t s = len * sizeof(T);
-		memcpy_s(dst, s, src, s);
-	}
-
-	void _Append(SIZE_T len, const T *src)
-	{
-		if (_reserved < _used + len)
-			_Realocate(_used + len + minReservedSize);
-
-		if (len && src)
-		{
-			_Construct(_buf + _used, src, len);
-			_used += len;
-		}
-	}
-
-	void _Allocate() { _buf = static_cast<T *>(_allocator->allocate(_reserved * sizeof(T))); }
-
-public:
-	array() { }
-	array(SIZE_T s) : _B(s, s) { _Allocate(); for (SIZE_T i = 0; i < _used; ++i) new (_buf + i) T(); }
-	array(const _B &src) : _B(src._reserved, src._used) { _Allocate(); _Construct(_buf, src._buf, src._used); }
-	array(std::initializer_list<T> list) : _B(list.size()) { _Allocate(); _Append(list.size(), list.begin()); }
-	array(_T &&src) : _B(src._reserved, src._used, src._buf) { src._reserved = 0; src._used = 0; src._buf = nullptr; }
-
-	~array() { if (_buf) _allocator->deallocate(_buf); }
-
-	T operator[](SIZE_T pos) const { return (pos < _used && pos >= 0) ? _buf[pos] : 0; };
-	T& operator[](SIZE_T pos) { return (pos < _used && pos >= 0) ? _buf[pos] : _buf[0]; };
-
-	SIZE_T size() const { return _used; }
-	SIZE_T capacity() const { return _reserved; }
-
-	T *begin() { return _buf; }
-	T *end() { return _buf + _used; }
-
-	void push_back(const T &v) {
-		if (size() == capacity())
-			_Realocate(_used + minReservedSize);
-
-		// we must call constructor for new object
-		new (_buf + _used) T(v);
-		++_used;
-	}
-
-	void push_back(T && v) {
-		if (size() == capacity())
-			_Realocate(_used + minReservedSize);
-
-		new (_buf + _used) T(std::move(v));
-		++_used;
-	}
-
-	array & operator += (const _T &src) { _Append(src._used, src._buf); return *this; }
-	array & operator = (const _T& src) { clear(); _Append(src._used, src._buf); return *this; }
-	array & operator = (_T&& src) {
-		clear();
-
-		if (_buf)
-			_allocator->deallocate(oldBuf);
-
-		_reserved = src._reserved;
-		_used = src._used;
-		_buf = src._buf;
-
-		src._reserved = 0; src._used = 0; src._buf = nullptr;
-
-		return *this;
-	}
-
-	bool operator == (const _B &src) const {
-		if (src._buf == _buf)
-			return true;
-		if (src._used != _used)
-			return false;
-		for (SIZE_T i = 0; i < _used; ++i)
-			if (src._buf[i] != _buf[i])
-				return false;
-
-		return true;
-	}
-
-	void clear() {
-		// call destructor on every object stored in array
-		for (auto *p : *this)
-			p->~T();
-
-		_used = 0;
-	}
-	*/
+	void _moveAll(T* dst, iterator f) { _moveRange<T>(dst, f, f + _used); }
+	void _copyAll(T* dst, iterator f) { _copyRange<T>(dst, f, f + _used); }
 };

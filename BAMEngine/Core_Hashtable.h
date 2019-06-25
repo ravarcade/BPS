@@ -258,6 +258,10 @@ public:
 
 	T ** begin() { return table.begin(); }
 	T ** end() { return table.end(); }
+
+	const T ** begin() const { return table.begin(); }
+	const T ** end() const { return table.end(); }
+
 	SIZE_T size() { return this->table.size(); }
 
 	T * find(const K *s) { auto pIdx = ht.find(s); return pIdx ? table[*pIdx] : nullptr; }

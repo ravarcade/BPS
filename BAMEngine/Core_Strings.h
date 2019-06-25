@@ -304,6 +304,11 @@ public:
 
 	~basic_string() { if (_buf) { alloc->deallocate(_buf); _buf = 0; _reserved = 0; _used = 0; } }
 
+	void clear()
+	{
+		_used = 0;
+	}
+
 	void resize(U32 s)
 	{
 		if (s >= _reserved)
@@ -593,12 +598,38 @@ public:
 	}
 
 	template<typename V>
-	typename std::enable_if_t<std::is_integral<V>::value, shared_string &>
+	typename std::enable_if_t<std::is_integral<V>::value && std::is_signed<V>::value, shared_string &>
 		operator += (V val) { 
 		NeedUniq(); 
 		auto &v = GetValue();
+		bool minus = val < 0;
+		val = abs(val);
+		U32 s = minus ? 2 : 1;
+		for (V a = val / 10; a >= 1; a = a / 10)
+			++s;
+		resize(static_cast<U32>(size()) + s);
+		auto e = v._buf + v._used;
+		if (minus)
+		{
+			*v._buf = '-';
+			--s;
+		}
+		for (; s > 0; --s)
+		{
+			--e;
+			*e = val % 10 + '0';
+			val = val / 10;
+		}
+		return *this;
+	}
+
+	template<typename V>
+	typename std::enable_if_t<std::is_integral<V>::value && std::is_unsigned<V>::value, shared_string &>
+		operator += (V val) {
+		NeedUniq();
+		auto &v = GetValue();
 		U32 s = 1;
-		for (V a = abs(val) / 10; a >= 1; a = a / 10)
+		for (V a = val / 10; a >= 1; a = a / 10)
 			++s;
 		resize(static_cast<U32>(size()) + s);
 		for (auto e = v._buf + v._used; s > 0; --s)
@@ -617,6 +648,7 @@ public:
 	bool startsWith(const _B &str, bool caseInsesitive = false) const { return GetValue().startsWith(str, caseInsesitive); }
 	bool endsWith(const _B &str, bool caseInsesitive = false) const { return GetValue().endsWith(str, caseInsesitive); }
 
+	void clear() { NeedUniq(); GetValue().clear(); }
 	U size() const { return GetValue().size(); }
 	void resize(U s) { NeedUniq(); GetValue().resize(s); }
 

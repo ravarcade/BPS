@@ -81,3 +81,31 @@ public:
 
 template <typename T, U32 ResTypeId, bool IsLoadable, MemoryAllocator Alloc>
 typename ResImp<T, ResTypeId, IsLoadable, Alloc>::ResFactory ResImp<T, ResTypeId, IsLoadable, Alloc>::_resourceFactory;
+
+// ============================================================================ ResPure ===
+
+/// <summary>
+/// Helper class used to make resource implementation easier.
+/// It will add ResFactory to class.
+/// </summary>
+template <typename T, U32 ResTypeId, MemoryAllocator Alloc = Allocators::default>
+class ResPure : public IResImp, public Allocators::Ext<Alloc>
+{
+public:
+	class ResFactory : public ResourceFactoryChain, public Allocators::Ext<Alloc>
+	{
+	public:
+		IResImp *Create(ResBase *res) { return make_new<T>(res); }
+		void Destroy(void *ptr) { make_delete<T>(ptr); }
+		IMemoryAllocator *GetMemoryAllocator() { return Alloc; }
+		ResFactory() : ResourceFactoryChain() { TypeId = ResTypeId; }
+		bool IsLoadable() { return false; }
+	};
+	IResourceFactory *GetFactory() { return &_resourceFactory; }
+
+	static ResFactory _resourceFactory;
+	static U32 GetTypeId() { return _resourceFactory.TypeId; }
+};
+
+template <typename T, U32 ResTypeId,MemoryAllocator Alloc>
+typename ResPure<T, ResTypeId, Alloc>::ResFactory ResPure<T, ResTypeId, Alloc>::_resourceFactory;

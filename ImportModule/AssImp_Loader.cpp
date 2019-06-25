@@ -631,7 +631,7 @@ void AssImp_Loader::_AddMaterial(ImportedMesh *m, aiMesh *aiMesh)
 		}		
 	}
 	
-	_SafeMProperties(m->prop);
+//	_SafeMProperties(m->prop);
 	BAMS::Tools::Dump(&m->prop);
 }
 
@@ -788,13 +788,13 @@ void AssImp_Loader::_OptimizeMeshStorage()
 	}
 }
 
-void AssImp_Loader::_SafeMProperties(BAMS::MProperties &dst)
-{
-	for (uint32_t i = 0; i < dst.count; ++i)
-	{
-		auto &p = dst.properties[i];
-		p.name = _cstringStorage.add(p.name);
-		if (p.type == Property::PT_CSTR)
-			p.val = const_cast<char *>(_cstringStorage.add(reinterpret_cast<const char *>(p.val)));
-	}
-}
+//void AssImp_Loader::_SafeMProperties(BAMS::MProperties &dst)
+//{
+//	for (uint32_t i = 0; i < dst.count; ++i)
+//	{
+//		auto &p = dst.properties[i];
+//		p.name = _cstringStorage.add(p.name);
+//		if (p.type == Property::PT_CSTR)
+//			p.val = const_cast<char *>(_cstringStorage.add(reinterpret_cast<const char *>(p.val)));
+//	}
+//}

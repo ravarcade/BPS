@@ -37,7 +37,11 @@
     </Expand>
   </Type>
   <Type Name="BAMS::Properties">
-    <DisplayString>{{ [{count,d}] }}</DisplayString>
+    <DisplayString Condition="count == 0">[ empty ]</DisplayString>
+    <DisplayString Condition="count == 1">[{count,d}] = {{ {properties[0]}  }}</DisplayString>
+    <DisplayString Condition="count == 2">[{count,d}] = {{ {properties[0]}, {properties[1]}}}</DisplayString>
+    <DisplayString Condition="count == 3">[{count,d}] = {{ {properties[0].name,na}:... , {properties[1].name,na}:... , {properties[2].name,na}:...}}</DisplayString>
+    <DisplayString>{{ [{count,d}] = ... }}</DisplayString>
     <Expand>
       <IndexListItems>
         <Size>count</Size>
@@ -46,16 +50,35 @@
     </Expand>
   </Type>
   <Type Name="BAMS::Property">
-    <DisplayString Condition="type == 1">{{{name,na} = {(int32_t*)val,na}}}</DisplayString>
-    <DisplayString Condition="type == 2">{{{name,na} = {(uint32_t*)val}}}</DisplayString>
-    <DisplayString Condition="type == 3">{{{name,na} = {(short*)val}}}</DisplayString>
-    <DisplayString Condition="type == 4">{{{name,na} = {(uint16_t*)val}}}</DisplayString>
-    <DisplayString Condition="type == 5">{{{name,na} = {(char*)val}}}</DisplayString>
-    <DisplayString Condition="type == 6">{{{name,na} = {(uint8_t*)val}}}</DisplayString>
-    <DisplayString Condition="type == 7">{{{name,na} = {(float*)val,na}}}</DisplayString>
-    <DisplayString Condition="type == 8">{{{name,na} = {(const char*)val,na}}}</DisplayString>
-    <DisplayString Condition="type == 9">{{{name,na} = [array]{val}}</DisplayString>
-    <DisplayString Condition="type == 10">{{{name,na} = [texture] {(void *)val}}</DisplayString>
-    <DisplayString Condition="type == 0 || type >10">{{{name,na} = ...}}</DisplayString>
+    <DisplayString Condition="type == 1">{{{name,na}: {(int32_t*)val,na}}}</DisplayString>
+    <DisplayString Condition="type == 2">{{{name,na}: {(uint32_t*)val}}}</DisplayString>
+    <DisplayString Condition="type == 3">{{{name,na}: {(short*)val}}}</DisplayString>
+    <DisplayString Condition="type == 4">{{{name,na}: {(uint16_t*)val}}}</DisplayString>
+    <DisplayString Condition="type == 5">{{{name,na}: {(char*)val}}}</DisplayString>
+    <DisplayString Condition="type == 6">{{{name,na}: {(uint8_t*)val}}}</DisplayString>
+    <DisplayString Condition="type == 7 &amp;&amp; count == 1">{{{name,na}: {*(float*)val}}}</DisplayString>
+    <DisplayString Condition="type == 7 &amp;&amp; count == 2">{{{name,na}: {{{*(float*)val}, {*((float*)val+1)}}}}}</DisplayString>
+    <DisplayString Condition="type == 7 &amp;&amp; count == 3">{{{name,na}: {{{*(float*)val}, {*((float*)val+1)}, {*((float*)val+2)}}}}}</DisplayString>
+    <DisplayString Condition="type == 7">{{{name,na}: {(float*)val,na}, ...}} }</DisplayString>
+    <DisplayString Condition="type == 8">{{{name,na}: {(const char*)val,na}}}</DisplayString>
+    <DisplayString Condition="type == 9">{{{name,na}: [array]{val}}</DisplayString>
+    <DisplayString Condition="type == 10">{{{name,na}: [texture] {(void *)val}}</DisplayString>
+    <DisplayString Condition="type == 0 || type >10">{{{name,na}: ...}}</DisplayString>
+    <Expand>
+      <IndexListItems Condition="type == 7 &amp;&amp; count > 1">
+        <Size>count</Size>
+        <ValueNode>((float*)val)[$i]</ValueNode>
+      </IndexListItems>
+    </Expand>
+  </Type>
+  <Type Name="BAMS::CORE::ResBase">
+    <DisplayString> Name={Name}, RefCounter={_refCounter,d}, Path={Path}</DisplayString>
+    <Expand>
+      <Item Name="[Name]">Name</Item>
+      <Item Name="[RefCounter]">_refCounter,d</Item>
+      <Item Name="[Path]">Path</Item>
+      <Item Name="[Type]">Type</Item>
+      <Item Name="[IsLoaded]">_isLoaded</Item>
+    </Expand>
   </Type>
 </AutoVisualizer>

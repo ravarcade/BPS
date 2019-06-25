@@ -560,7 +560,7 @@ void Tools::Dump(BAMS::Properties * prop)
 }
 
 // lame float to string, string to float functions
-void f32toa(char *out, float v) { sprintf_s(out, 15, "%1.8e", v); }
+void f32toa(char *out, float v) { sprintf_s(out, 25, "%1.8e", v); }
 void atof32(const char *in, float &v) { sscanf_s(in, "%f", &v); }
 
 const char *matrixNames[] = {
@@ -584,7 +584,7 @@ void Tools::XMLWriteValue(tinyxml2::XMLElement * out, F32 * v, U32 count)
 	}
 	else 
 	{
-		char *buf = new char[count * 15];
+		char *buf = new char[count * 25];
 		char *p = buf;
 		for (uint32_t i = 0; i < count; ++i)
 		{
@@ -632,6 +632,175 @@ U32 Tools::XMLReadValue(tinyxml2::XMLElement * src, F32 *out, U32 max)
 		}
 	}
 	return cnt;
+}
+
+// ---------------------------------
+
+template<typename T>
+void SetPropertyXMLValue(tinyxml2::XMLElement * out, const Property &p)
+{
+	T *v = reinterpret_cast<T*>(p.val);
+	STR s;
+
+	for (auto cnt = p.count; cnt; --cnt)
+	{
+		s += (*v++);
+		if (cnt > 1) s += ";";
+	}
+	out->SetAttribute("value", s.c_str());
+}
+
+template<>
+void SetPropertyXMLValue<F32>(tinyxml2::XMLElement * out, const Property &p)
+{
+	char buf[25];
+	F32 *v = reinterpret_cast<F32*>(p.val);
+	STR s;
+
+	for (auto cnt = p.count; cnt; --cnt)
+	{
+		f32toa(buf, *v++);
+		s += buf;
+		if (cnt > 1) s += ";";
+	}
+	out->SetAttribute("value", s.c_str());
+}
+
+template<>
+void SetPropertyXMLValue<CSTR>(tinyxml2::XMLElement * out, const Property &p)
+{
+	out->SetAttribute("value", reinterpret_cast<CSTR>(p.val));
+}
+
+using CORE::ResBase;
+
+template<>
+void SetPropertyXMLValue<ResBase *>(tinyxml2::XMLElement * out, const Property &p)
+{
+	out->SetAttribute("value", reinterpret_cast<ResBase *>(p.val)->Name.c_str());
+}
+
+void SetPropertyXMLValue(tinyxml2::XMLElement * out, const Property &p, Tools::TNewXMLElementFunc NewXMLElement)
+{
+	CSTR *v = reinterpret_cast<CSTR*>(p.val);
+	for (auto cnt = p.count; cnt; --cnt)
+	{
+		tinyxml2::XMLElement *entry = NewXMLElement("str");
+		entry->SetText(*v++);
+		out->InsertEndChild(entry);
+	}
+}
+
+void XMLWriteVal(tinyxml2::XMLElement * parent, const Property &p, Tools::TNewXMLElementFunc NewXMLElement)
+{
+	tinyxml2::XMLElement *out = NewXMLElement(p.name);
+
+	//out->SetAttribute("name", p.name);
+	out->SetAttribute("type", p.type);	
+	switch (p.type)
+	{
+	case Property::PT_I8: SetPropertyXMLValue<I8>(out, p); break;
+	case Property::PT_U8: SetPropertyXMLValue<U8>(out, p); break;
+	case Property::PT_I16: SetPropertyXMLValue<I16>(out, p); break;
+	case Property::PT_U16: SetPropertyXMLValue<U16>(out, p); break;
+	case Property::PT_I32: SetPropertyXMLValue<I32>(out, p); break;
+	case Property::PT_U32: SetPropertyXMLValue<U32>(out, p); break;
+	case Property::PT_F32: SetPropertyXMLValue<F32>(out, p); break;
+	case Property::PT_CSTR: SetPropertyXMLValue<CSTR>(out, p); break;
+//	case Property::PT_ARRAY: return false; // not supported
+	case Property::PT_TEXTURE: SetPropertyXMLValue<ResBase *>(out, p); break;
+	default:
+		return;
+	}
+	parent->InsertEndChild(out);
+}
+
+void Tools::XMLWriteProperties(tinyxml2::XMLElement * out, const Properties &prop, TNewXMLElementFunc NewXMLElement)
+{
+	if (!NewXMLElement)
+		NewXMLElement = [](CSTR s) {return BAMS::CORE::globalResourceManager->NewXMLElement(s); };
+
+	for (uint32_t i = 0; i < prop.count; ++i)
+	{
+		XMLWriteVal(out, prop.properties[i], NewXMLElement);
+	}
+}
+
+// --------------------------------------------------------------------------------
+
+void GoToNextValue(const char *&s)
+{
+	while (*s && *s != xmlValueSeparator)
+		++s;
+	if (*s == xmlValueSeparator)
+		++s;
+}
+
+template<typename T>
+void GetXMLValue(Property *p, const char *s)
+{
+	auto o = reinterpret_cast<T *>(p->val);
+	do {
+		*o++ = static_cast<T>(atol(s));
+		GoToNextValue(s);
+	} while (*s);
+}
+
+
+template<>
+void GetXMLValue<F32>(Property *p, const char *s)
+{
+	auto o = reinterpret_cast<F32 *>(p->val);
+	do {
+		atof32(s, *o++);
+		GoToNextValue(s);
+	} while (*s);
+}
+
+U32 xmlEntryGetCount(tinyxml2::XMLElement *xmlEntry)
+{
+	U32 ret = 0;
+	int type = xmlEntry->IntAttribute("type", 0);
+	if (type == Property::PT_CSTR)
+	{
+		for (auto x = xmlEntry->FirstChildElement(); x; x = x->NextSiblingElement())
+			++ret;
+
+	}
+	else {
+		++ret;
+		for (auto v = xmlEntry->Attribute("value"); *v; ++v)
+			if (*v == xmlValueSeparator)
+				++ret;
+	}
+	return ret;
+}
+
+void Tools::XMLReadProperties(tinyxml2::XMLElement * src, sProperties &prop)
+{
+	if (!src)
+		return;
+	prop.clear();
+	for (auto xmlEntry = src->FirstChildElement(); xmlEntry; xmlEntry = xmlEntry->NextSiblingElement())
+	{
+		auto name = xmlEntry->Name();
+		auto type = xmlEntry->IntAttribute("type", 0);
+		auto count = xmlEntryGetCount(xmlEntry);
+		auto p = prop.add(name, type, count);
+		
+		switch (type)
+		{
+		case Property::PT_I8: GetXMLValue<I8>(p, xmlEntry->Attribute("value")); break;
+		case Property::PT_U8: GetXMLValue<U8>(p, xmlEntry->Attribute("value")); break;
+		case Property::PT_I16: GetXMLValue<I16>(p, xmlEntry->Attribute("value")); break;
+		case Property::PT_U16: GetXMLValue<U16>(p, xmlEntry->Attribute("value")); break;
+		case Property::PT_I32: GetXMLValue<I32>(p, xmlEntry->Attribute("value")); break;
+		case Property::PT_U32: GetXMLValue<U32>(p, xmlEntry->Attribute("value")); break;
+		case Property::PT_F32: GetXMLValue<F32>(p, xmlEntry->Attribute("value")); break;
+		case Property::PT_CSTR: p->val = const_cast<char *>(prop.storeString(xmlEntry->Attribute("value")));  break;
+		case Property::PT_TEXTURE: p->val = CORE::globalResourceManager->FindExisting(xmlEntry->Attribute("value"), RESID_IMAGE); break;
+		}	
+	}
 }
 
 time_t Tools::TimestampNow()

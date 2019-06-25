@@ -90,26 +90,31 @@ extern "C" {
 
 	// =========================================================================== ResMesh
 
-	BAMS_EXPORT void IResMesh_SetVertexDescription(IResMesh * res, IVertexDescription * vd, uint32_t meshHash, IResource * meshSrc, U32 meshIdx)
+	BAMS_EXPORT void IResMesh_SetVertexDescription(IResMesh * res, VertexDescription * vd, uint32_t meshHash, IResource * meshSrc, U32 meshIdx, const Properties *meshProperties)
 	{
 		Impl<ResMesh>(res)->SetVertexDescription( 
-			reinterpret_cast<VertexDescription *>(vd), 
+			vd, 
 			meshHash, 
 			reinterpret_cast<ResBase *>(meshSrc), 
-			meshIdx);
+			meshIdx,
+			meshProperties);
 	}
 
-	BAMS_EXPORT IVertexDescription * IResMesh_GetVertexDescription(IResMesh * res, bool loadASAP) { return Impl<ResMesh>(res)->GetVertexDescription(loadASAP); }
-	BAMS_EXPORT IMProperties * IResMesh_GetMeshProperties(IResMesh * res, bool loadASAP)          { return Impl<ResMesh>(res)->GetMeshProperties(loadASAP); }
-	BAMS_EXPORT IResource * IResMesh_GetMeshSrc(IResMesh * res)                                   { return Impl<ResMesh>(res)->GetMeshSrc(); }
-	BAMS_EXPORT uint32_t IResMesh_GetMeshIdx(IResMesh * res)                                      { return Impl<ResMesh>(res)->GetMeshIdx(); }
-	BAMS_EXPORT void IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx)                            { return Impl<ResMesh>(res)->SetMeshIdx(idx); }
-	BAMS_EXPORT uint32_t IResMesh_GetMeshHash(IResMesh * res)                                     { return Impl<ResMesh>(res)->GetMeshHash(); }
+	BAMS_EXPORT const VertexDescription * IResMesh_GetVertexDescription(IResMesh * res, bool loadASAP) { return Impl<ResMesh>(res)->GetVertexDescription(loadASAP); }
+	BAMS_EXPORT const Properties * IResMesh_GetMeshProperties(IResMesh * res, bool loadASAP)           { return Impl<ResMesh>(res)->GetMeshProperties(loadASAP); }
+	BAMS_EXPORT IResource * IResMesh_GetMeshSrc(IResMesh * res)                                        { return Impl<ResMesh>(res)->GetMeshSrc(); }
+	BAMS_EXPORT uint32_t IResMesh_GetMeshIdx(IResMesh * res)                                           { return Impl<ResMesh>(res)->GetMeshIdx(); }
+	BAMS_EXPORT void IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx)                                 { return Impl<ResMesh>(res)->SetMeshIdx(idx); }
+	BAMS_EXPORT uint32_t IResMesh_GetMeshHash(IResMesh * res)                                          { return Impl<ResMesh>(res)->GetMeshHash(); }
 
 	// =========================================================================== ResModel
 	
 	BAMS_EXPORT void IResModel_AddMesh(IResModel * res, const char * meshResName, const char * shaderProgramName, const float * m) { Impl<ResModel>(res)->AddMesh(meshResName, shaderProgramName, m); }
-	BAMS_EXPORT void IResModel_GetMesh(IResModel *res, uint32_t idx, const char **mesh, const char ** shader, const float **m, MProperties **properties) { Impl<ResModel>(res)->GetMesh(idx, mesh, shader, m, properties); }
+	BAMS_EXPORT void IResModel_AddMeshRes(IResModel *res, IResource *mesh, IResource * shader, const float *m) { Impl<ResModel>(res)->AddMesh(reinterpret_cast<ResBase *>(mesh), reinterpret_cast<ResBase *>(shader), m); }
+
+	BAMS_EXPORT void IResModel_GetMesh(IResModel *res, uint32_t idx, const char **pMesh, const char ** pShader, const float **pM, const Properties **pProperties) { Impl<ResModel>(res)->GetMesh(idx, pMesh, pShader, pM, pProperties); }
+	BAMS_EXPORT void IResModel_GetMeshRes(IResModel *res, uint32_t idx, IResource **pMesh, IResource ** pShader, const float **pM, const Properties **pProperties) { Impl<ResModel>(res)->GetMesh(idx, reinterpret_cast<ResBase **>(pMesh), reinterpret_cast<ResBase **>(pShader), pM, pProperties); }
+
 	BAMS_EXPORT uint32_t IResModel_GetMeshCount(IResModel *res) { return Impl<ResModel>(res)->GetMeshCount(); }
 
 	// =========================================================================== ResImage

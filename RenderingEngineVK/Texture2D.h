@@ -7,6 +7,7 @@ public:
 	~CTexture2d();
 
 	void LoadTexture(const char *textureResourceName);
+	void LoadTexture(IResource * textureResource);
 	void Release();
 
 	VkDescriptorImageInfo descriptor;

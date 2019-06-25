@@ -45,7 +45,7 @@ private:
 		IResource *res;
 		AssImp_Loader aiLoader;
 
-		void Preload()
+		void Load()
 		{
 			CResource r(res);
 			aiLoader.Clear();
@@ -88,7 +88,7 @@ private:
 		CResourceManager rm;
 		auto pimr = _GetImportedModelRepo(res);
 
-		pimr->Preload();
+		pimr->Load();
 
 		// we have hash calculated for every mesh... so we want: 
 		// (1) remove broken meshes from RM: hash is wrong or something
@@ -100,7 +100,7 @@ private:
 			if (r.GetMeshSrc() == pimr->res)
 			{
 				auto hash = r.GetMeshHash();
-				auto &vd = *reinterpret_cast<VertexDescription *>(r.GetVertexDescription(false)); // we are parsing file with meshes, we don't want to start loading it.
+				auto &vd = *r.GetVertexDescription(false); // we are parsing file with meshes, we don't want to start loading it.
 
 				// check
 				U32 i = 0;
@@ -164,7 +164,7 @@ private:
 			{ // add new mesh
 				BAMS::STR tmp = resName + (num + 1);
 				CResMesh mesh(rm.Create(tmp.c_str(), RESID_MESH));
-				mesh.SetVertexDescription(&m.vd, m.hash, res, num);
+				mesh.SetVertexDescription(&m.vd, m.hash, res, num, &m.prop);
 			}
 			++num;
 			return false;
@@ -217,6 +217,18 @@ private:
 		}
 	}
 
+	void SetVertexDescription(CResMesh &resMesh, AssImp_Loader::ImportedMesh *importedMesh)
+	{
+		resMesh.SetVertexDescription(
+			&importedMesh->vd,
+			importedMesh->hash,
+			resMesh.GetMeshSrc(),
+			resMesh.GetMeshIdx(),
+			&importedMesh->prop
+		);
+	}
+
+
 public:
 	Importer() : en(nullptr) {}
 
@@ -232,21 +244,13 @@ public:
 		CResMesh m(params);
 		auto res = m.GetMeshSrc();
 		if (res) {
-			auto *pimr = _GetImportedModelRepo(res);
-			if (!pimr->IsLoaded())
-				pimr->Preload();
+			auto *pModelRepo = _GetImportedModelRepo(res);
+			if (!pModelRepo->IsLoaded())
+				pModelRepo->Load();
 
-			if (pimr->IsLoaded()) 
+			if (pModelRepo->IsLoaded()) 
 			{
-				auto pvd = reinterpret_cast<VertexDescription *>(m.GetVertexDescription(false));	// we don't want trigger "loading", because we are doing it now, so pass false to GetVertexDescription
-				auto pmp = reinterpret_cast<MProperties *>(m.GetMeshProperties(false));				// we don't want trigger "loading", because we are doing it now, so pass false to GetVertexDescription
-				auto pim = pimr->aiLoader.Mesh(m.GetMeshIdx());
-				if (pim)
-				{
-					*pvd = pim->vd;
-					*pmp = pim->prop;
-				}
-
+				SetVertexDescription(m, pModelRepo->aiLoader.Mesh(m.GetMeshIdx()));
 			}
 		}
 		else {

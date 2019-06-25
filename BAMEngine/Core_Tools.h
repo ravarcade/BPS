@@ -11,6 +11,7 @@ class BAMS_EXPORT Tools
 {
 public:
 	typedef void TSearchForFilesCallback(WSTR &filename, U64 size, time_t timestamp, void *ctrl);
+	typedef tinyxml2::XMLElement * (*TNewXMLElementFunc)(const char *name);
 
 	enum {
 		directorySeparatorChar = '\\'
@@ -38,6 +39,9 @@ public:
 
 	static void XMLWriteValue(tinyxml2::XMLElement * out, F32 *v, U32 count);
 	static U32 XMLReadValue(tinyxml2::XMLElement * src, F32 *out, U32 max = 0);
+	static void XMLWriteProperties(tinyxml2::XMLElement * out, const Properties &prop, TNewXMLElementFunc NewXMLElement = nullptr);
+	static void XMLReadProperties(tinyxml2::XMLElement * src, sProperties &prop);
+
 	static time_t TimestampNow();
 	static void Mat4mul(F32 *O, const F32 *A, const F32 *B);
 };

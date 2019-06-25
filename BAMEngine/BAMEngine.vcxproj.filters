@@ -207,6 +207,6 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Natvis Include="basic_string.natvis" />
+    <Natvis Include="BAMS.natvis" />
   </ItemGroup>
 </Project>

@@ -21,7 +21,7 @@ public:
 	void SetModel(CSTR model) {};
 	void GetModel() {};
 	void SetMatrix(const F32 *m) {};
-	MProperties* GetMeshProperties(U32 idx) { return nullptr; }
+	Properties* GetMeshProperties(U32 idx) { return nullptr; }
 	U32 GetMeshCount() { return 0;  }
 
 private:

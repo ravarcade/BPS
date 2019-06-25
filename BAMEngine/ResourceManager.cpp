@@ -138,7 +138,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 	void MakeNameUniq(STR &name)
 	{
-		while (!_resources.findIdx(name.c_str()))
+		while (_resources.findIdx(name.c_str()))
 		{
 			// number at end of file name
 			auto e = name.end();
