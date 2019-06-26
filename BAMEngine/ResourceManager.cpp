@@ -124,9 +124,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		if (lastSlash == nullptr)
 			lastSlash = path;
 
-		WString n(lastSlash, lastSlash);
-		STR possibleName;
-		possibleName.UTF8(n);
+		STR possibleName(WString(lastSlash, lastDot));
 		MakeNameUniq(possibleName);
 		auto ret = NewResBase(possibleName.c_str());
 		WSTR p = path;
@@ -175,7 +173,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		Tools::CreateUUID(res->UID);
 		res->Type = type;
 		res->_resTimestamp = std::time(nullptr);
-		CreateResourceImplementation(res);
 		return res;
 	}
 
@@ -185,7 +182,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		Tools::CreateUUID(res->UID);
 		res->Type = type;
 		res->_resTimestamp = std::time(nullptr);
-		CreateResourceImplementation(res);
 		return res;
 	}
 
@@ -195,7 +191,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		res->UID = resUID;
 		res->Type = type;
 		res->_resTimestamp = std::time(nullptr);
-		CreateResourceImplementation(res);
 		return res;
 	}
 
@@ -213,6 +208,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		}
 		Tools::CreateUUID(res->UID);
 		res->Type = type;
+		res->_resTimestamp = std::time(nullptr);
 		return res;
 	}
 
@@ -384,13 +380,13 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 	void RootDir(CWSTR path)
 	{
-		AddDirToMonitor(path, 0);
 		_rootDir = path;
 		Tools::NormalizePath(_rootDir);
 		LoadManifest();
 		ScanRootdir();
 		CEngine::SendMsg(RESOURCE_MANIFEST_PARSED);
 		ProcessUnknownResources();
+		AddDirToMonitor(path, 0);
 	}
 
 	void CreateResourceImplementation(ResBase *res)
@@ -674,7 +670,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			_manifest.Parse(manifest, manifestSize);
 
 			auto root = _manifest.FirstChildElement("ResourcesManifest");
-			auto qty = root->IntAttribute("qty");
 			for (auto r = root->FirstChildElement("Resource"); r; r = r->NextSiblingElement())
 			{				
 				auto res = NewResBase(r->Attribute("Name"), r);
@@ -694,7 +689,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 	{
 		XMLDocument out;
 		auto *rm = out.NewElement("ResourcesManifest");
-		rm->SetAttribute("qty", (int)_resources.size());
 		STR cvt;
 		char uidbuf[40];
 		WSTR rpath = _rootDir + Tools::wDirectorySeparator;

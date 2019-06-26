@@ -365,7 +365,7 @@ void ResShader::Notify(ResBase * res, U64 type)
 
 void ResShader::IdentifyResourceType(ResBase *res)
 {
-	if (res->Type == RESID_UNKNOWN)
+	if (res->Type != RESID_UNKNOWN)
 		return;
 
 	if (res->Path.endsWith(L".glsl"))

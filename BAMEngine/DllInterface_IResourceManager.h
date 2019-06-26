@@ -598,18 +598,25 @@ public:
 			m.outputM = pModelProp ? reinterpret_cast<float *>(pModelProp->val) : nullptr;
 
 			// set textures
-			for (auto &p : *srcProp)
+			for (auto &p : m.prop)
 			{
-				if (p.type == Property::PT_TEXTURE)
+				if (p.type != Property::PT_TEXTURE)
+					continue;
+
+				auto src = srcProp->ConstFind(p.name);
+				void *val = src ? src->val : nullptr;
+				if (!val)
 				{
-					auto dst = m.prop.Find(p.name);
-					if (dst)
-					{
-						PADD_TEXTURE addTexParams = { wnd, dst->val, nullptr, reinterpret_cast<IResource *>(const_cast<void *>(p.val)) };
-						en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
-					}
+					CResourceManager rm;
+					val = rm.FindExisting(p.name, RESID_IMAGE);
+				}
+				if (val)
+				{
+					PADD_TEXTURE addTexParams = { wnd, p.val, nullptr, reinterpret_cast<IResource *>(val) };
+					en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
 				}
 			}
+
 		}
 	}
 
@@ -652,9 +659,7 @@ public:
 	void SetMatrix(const float *T) 
 	{
 		for (auto &m : meshes)
-		{
 			Tools::Mat4mul(m.outputM, T, m.M);
-		}
 	};
 
 private:

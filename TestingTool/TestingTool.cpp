@@ -980,8 +980,12 @@ int main()
 		CResImage ri = rm.FindExisting("test", RESID_IMAGE);
 		auto img = ri.GetImage(true);
 
-		CResMesh m1 = rm.FindExisting("Mesh_1", RESID_MESH);
-		auto vd = m1.GetVertexDescription(true);
+		auto resmesh = rm.FindExisting("Mesh_1", RESID_MESH);
+		if (resmesh) {
+			CResMesh m1(resmesh);
+			auto vd = m1.GetVertexDescription(true);
+		}
+
 		rm.FindOrCreate(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
 
 		// default shader program ... not needed any more

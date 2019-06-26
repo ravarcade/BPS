@@ -19,13 +19,16 @@ struct basic_string_base
 	basic_string_base(T* buf, U used, U reserved) : _buf(buf), _reserved(reserved), _used(used) {}
 	basic_string_base(T *buf, U used) : _buf(buf), _used(used), _reserved(used) {}
 	basic_string_base(T* buf) : _buf(buf) { _used = buf ? static_cast<U>(length(buf)) : 0; _reserved = _used; }
-	basic_string_base(T* buf, T *end) : _buf(buf) { _used = static_cast<U>((end - buf) / sizeof(T)) ; _reserved = _used; }
+	basic_string_base(T* buf, T *end) : _buf(buf) { 
+		_used = static_cast<U>((end - buf)) ; 
+		_reserved = _used; 
+	}
 	basic_string_base(basic_string_base &src) : _buf(src._buf), _used(src._used), _reserved(src._reserved) {} // copy contructor
 
 	basic_string_base(const T *buf, const T *end)
 	{
 		_buf = const_cast<T*>(buf);
-		_used = static_cast<U>((end - buf) / sizeof(T));
+		_used = static_cast<U>((end - buf));
 		_reserved = 0;
 	}
 
@@ -287,14 +290,14 @@ public:
 
 	// 3. From basic_string_base
 	template<typename ST, typename SU>
-	basic_string(const basic_string_base<ST, SU> &src) : _B(nullptr, static_cast<U>(src._used), static_cast<U>(src._reserved))
+	basic_string(const basic_string_base<ST, SU> &src) : _B(nullptr, static_cast<U>(src._used), static_cast<U>(src._used))
 	{
 		_Allocate();
 		_CopyText(_buf, src._buf, _used);
 	}
 
 	// 4. Copy constructor
-	basic_string(const _T &src) : _B(nullptr, static_cast<U>(src._used), static_cast<U>(src._reserved)) { if (_used) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); } else _reserved = 0; }
+	basic_string(const _T &src) : _B(nullptr, static_cast<U>(src._used), static_cast<U>(src._used)) { if (_used) { _Allocate(); _CopyText(_buf, _reserved, src._buf, _used); } else _reserved = 0; }
 
 	// 5. Move constructor
 	basic_string(_T &&src) : _B(static_cast<U>(src._reserved), static_cast<U>(src._used), src._buf) { src._used = 0; src._reserved = 0; src._buf = nullptr; }
@@ -425,7 +428,7 @@ public:
 		else
 		{
 			int size_needed = MultiByteToWideChar(CP_UTF8, 0, s._buf, (int)s.size(), NULL, 0);
-			_used = size_needed; // / sizeof(char) = 1;
+			_used = size_needed;
 			if (_used >= _reserved)
 			{
 				if (_buf)

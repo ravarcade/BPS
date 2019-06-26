@@ -86,7 +86,7 @@ public:
 	}
 
 	void clear() { if (data) memset(data, 0, size * sizeof(data[0])); used = 0; }
-	void reset() { alloc->deallocate(data); data = nullptr; }
+	void reset() { if (data && alloc) alloc->deallocate(data); data = nullptr; }
 
 	TVal & operator[] (const TKey &key)
 	{

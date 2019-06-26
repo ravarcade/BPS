@@ -72,13 +72,25 @@
     </Expand>
   </Type>
   <Type Name="BAMS::CORE::ResBase">
-    <DisplayString> Name={Name}, RefCounter={_refCounter,d}, Path={Path}</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_UNKNOWN"> [UNKNOWN, {_refCounter,d}] : {Name}, Imp={_pResImp!=nullptr}, Path={Path}"</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_RAWDATA"> [RAWDATA, {_refCounter,d}] : {Name}, Imp={_pResImp!=nullptr}, Path={Path}"</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_SHADER"> [SHADER, {_refCounter,d}] : {Name}, Imp={_pResImp!=nullptr}, Path={Path}"</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_SHADER_SRC"> [SHADER_SRC, {_refCounter,d}] : {Name}, Imp={_pResImp!=nullptr}, Path={Path}"</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_SHADER_BIN"> [SHADER_BIN, {_refCounter,d}] : {Name}, Imp={_pResImp!=nullptr}, Path={Path}"</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_MESH"> [_Mesh, {_refCounter,d}] : {Name}, Imp={_pResImp!=nullptr}, Path={Path}"</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_MODEL"> [_Model, {_refCounter,d}] : {Name}, Imp={_pResImp!=nullptr}, Path={Path}"</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_IMPORTMODEL"> [_ImpMod, {_refCounter,d}] : {Name}, Imp={_pResImp!=nullptr}, Path={Path}"</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_IMAGE"> [_Image, {_refCounter,d}] : {Name}, Imp={_pResImp!=nullptr}, Path={Path}"</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_DRAWMODEL"> [_DrawModel, {_refCounter,d}] : {Name}, Imp={_pResImp!=nullptr}, Path={Path}"</DisplayString>
+    <DisplayString>[{Type,xb}, {_refCounter,d}]: {Name}, Imp={_pResImp!=nullptr}, Path={Path,na}</DisplayString>
+    <DisplayString Condition="Type == BAMS::RESID_SHADER"> [SHADER, {_refCounter,d}] : {Name}, Path={Path}"</DisplayString>
     <Expand>
       <Item Name="[Name]">Name</Item>
       <Item Name="[RefCounter]">_refCounter,d</Item>
       <Item Name="[Path]">Path</Item>
       <Item Name="[Type]">Type</Item>
       <Item Name="[IsLoaded]">_isLoaded</Item>
+      <Item Name="[ResImp]">_pResImp</Item>
     </Expand>
   </Type>
 </AutoVisualizer>
