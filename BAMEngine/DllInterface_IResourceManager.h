@@ -123,6 +123,8 @@ extern "C" {
 	BAMS_EXPORT void                 IResModel_GetMesh(IResModel *res, uint32_t idx, const char **pMesh, const char ** pShader, const float **pM, const Properties **pProperties);
 	BAMS_EXPORT void                 IResModel_GetMeshRes(IResModel *res, uint32_t idx, IResource **pMesh, IResource ** pShader, const float **pM, const Properties **pProperties);
 	BAMS_EXPORT uint32_t             IResModel_GetMeshCount(IResModel *res);
+	BAMS_EXPORT void                 IResModel_SetMeshProperties(IResModel *res, uint32_t idx, const Properties *properties);
+
 	// Image
 	BAMS_EXPORT Image *   IResImage_GetImage(IResImage *res, bool loadASAP = false);
 	BAMS_EXPORT void      IResImage_Updated(IResImage *res);
@@ -311,6 +313,51 @@ public:
 	void GetMesh(uint32_t idx, const char **pMesh, const char **pShader = nullptr, const float **pM = nullptr, const Properties **pProperties = nullptr) { IResModel_GetMesh(Self(), idx, pMesh, pShader, pM, pProperties); }
 	void GetMesh(uint32_t idx, IResource **pMesh, IResource **pShader = nullptr, const float **pM = nullptr, const Properties **pProperties = nullptr) { IResModel_GetMeshRes(Self(), idx, pMesh, pShader, pM, pProperties); }
 	uint32_t GetMeshCount() { return IResModel_GetMeshCount(Self()); }
+	void SetMeshProperties(uint32_t idx, const Properties *properties) { IResModel_SetMeshProperties(Self(), idx, properties); }
+	void ModifyMeshProperties(uint32_t idx, const Properties *properties) 
+	{ 
+		const Properties *orgProperties;
+		IResModel_GetMeshRes(Self(), idx, nullptr, nullptr, nullptr, &orgProperties);
+		if (orgProperties)
+		{
+			sProperties newProperties(*orgProperties);
+			for (auto &p : *properties)
+			{
+				newProperties.set(p);
+			}
+			IResModel_SetMeshProperties(Self(), idx, &newProperties);
+		}
+	}
+
+	void SetMeshProperty(uint32_t idx, const char *name, uint32_t type, uint32_t count, void *val)
+	{
+		Property p;
+		p.name = name;
+		p.type = type;
+		p.count = count;
+		p.val = val;
+
+		const Properties *orgProperties;
+		IResModel_GetMeshRes(Self(), idx, nullptr, nullptr, nullptr, &orgProperties);
+		if (orgProperties)
+		{
+			sProperties newProperties(*orgProperties);
+			newProperties.set(p);
+			IResModel_SetMeshProperties(Self(), idx, &newProperties);
+		}
+	}
+
+	void SetMeshProperty(uint32_t idx, const char *name, void *val)
+	{
+		const Properties *orgProperties;
+		IResModel_GetMeshRes(Self(), idx, nullptr, nullptr, nullptr, &orgProperties);
+		if (orgProperties)
+		{
+			sProperties newProperties(*orgProperties);
+			newProperties.set(name, val);
+			IResModel_SetMeshProperties(Self(), idx, &newProperties);
+		}
+	}
 };
 
 // ================================================================================== CResImage ===

@@ -71,10 +71,10 @@ public:
 		case Property::PT_F32:
 			return count * sizeof(U32);
 		case Property::PT_CSTR:
+		case Property::PT_TEXTURE:
 			return 0;
 
 		case Property::PT_ARRAY:
-		case Property::PT_TEXTURE:
 			return count * sizeof(void *);
 		}
 		return 0;
@@ -372,6 +372,44 @@ public:
 		return ret;
 	}
 
+	void set(const Property &p)
+	{
+		Property *dst = Find(p.name);
+		if (!dst)
+		{
+			add(p);
+		}
+		else
+		{
+			if (p.type == dst->type && p.count == dst->count)
+			{
+				dst->SetMem(p.val);
+			}
+			else
+			{
+				SIZE_T oldMemReq = dst->MemoryRequired();
+				SIZE_T newMemReq = p.MemoryRequired();
+				dst->type = p.type;
+				dst->count = p.count;
+				if (oldMemReq < newMemReq || (oldMemReq == 0 && newMemReq != 0))
+				{
+					dst->val = getMem<U8*>(p.MemoryRequired());
+				}
+				dst->SetMem(p.val);
+
+			}
+		}
+	}
+
+	void set(const char *name, void *val)
+	{
+		auto p = Find(name);
+		if (p)
+		{
+			p->SetMem(val);
+		}
+	}
+
 	void _reallocate()
 	{
 		auto new_properties = getMem<Property>(_reserved);
@@ -401,6 +439,7 @@ public:
 		}
 		break;
 		case Property::PT_CSTR: dst.val = const_cast<char *>(storeString(reinterpret_cast<CSTR>(src.val))); break;
+		case Property::PT_TEXTURE: dst.val = src.val; break;
 		}
 	}
 

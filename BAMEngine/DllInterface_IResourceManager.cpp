@@ -109,13 +109,12 @@ extern "C" {
 
 	// =========================================================================== ResModel
 	
-	BAMS_EXPORT void IResModel_AddMesh(IResModel * res, const char * meshResName, const char * shaderProgramName, const float * m) { Impl<ResModel>(res)->AddMesh(meshResName, shaderProgramName, m); }
-	BAMS_EXPORT void IResModel_AddMeshRes(IResModel *res, IResource *mesh, IResource * shader, const float *m) { Impl<ResModel>(res)->AddMesh(reinterpret_cast<ResBase *>(mesh), reinterpret_cast<ResBase *>(shader), m); }
-
-	BAMS_EXPORT void IResModel_GetMesh(IResModel *res, uint32_t idx, const char **pMesh, const char ** pShader, const float **pM, const Properties **pProperties) { Impl<ResModel>(res)->GetMesh(idx, pMesh, pShader, pM, pProperties); }
-	BAMS_EXPORT void IResModel_GetMeshRes(IResModel *res, uint32_t idx, IResource **pMesh, IResource ** pShader, const float **pM, const Properties **pProperties) { Impl<ResModel>(res)->GetMesh(idx, reinterpret_cast<ResBase **>(pMesh), reinterpret_cast<ResBase **>(pShader), pM, pProperties); }
-
-	BAMS_EXPORT uint32_t IResModel_GetMeshCount(IResModel *res) { return Impl<ResModel>(res)->GetMeshCount(); }
+	BAMS_EXPORT void IResModel_AddMesh(IResModel * res, const char * meshResName, const char * shaderProgramName, const float * m)                                 {        Impl<ResModel>(res)->AddMesh(meshResName, shaderProgramName, m); }
+	BAMS_EXPORT void IResModel_AddMeshRes(IResModel *res, IResource *mesh, IResource * shader, const float *m)                                                     {        Impl<ResModel>(res)->AddMesh(reinterpret_cast<ResBase *>(mesh), reinterpret_cast<ResBase *>(shader), m); }
+	BAMS_EXPORT void IResModel_GetMesh(IResModel *res, uint32_t idx, const char **pMesh, const char ** pShader, const float **pM, const Properties **pProperties)  {        Impl<ResModel>(res)->GetMesh(idx, pMesh, pShader, pM, pProperties); }
+	BAMS_EXPORT void IResModel_GetMeshRes(IResModel *res, uint32_t idx, IResource **pMesh, IResource ** pShader, const float **pM, const Properties **pProperties) {        Impl<ResModel>(res)->GetMesh(idx, reinterpret_cast<ResBase **>(pMesh), reinterpret_cast<ResBase **>(pShader), pM, pProperties); }
+	BAMS_EXPORT uint32_t IResModel_GetMeshCount(IResModel *res)                                                                                                    { return Impl<ResModel>(res)->GetMeshCount(); }
+	BAMS_EXPORT void IResModel_SetMeshProperties(IResModel *res, uint32_t idx, const Properties *properties)                                                       {        Impl<ResModel>(res)->SetMeshProperties(idx, properties); }
 
 	// =========================================================================== ResImage
 

@@ -669,7 +669,8 @@ void SetPropertyXMLValue<F32>(tinyxml2::XMLElement * out, const Property &p)
 template<>
 void SetPropertyXMLValue<CSTR>(tinyxml2::XMLElement * out, const Property &p)
 {
-	out->SetAttribute("value", reinterpret_cast<CSTR>(p.val));
+	if (p.val)
+		out->SetAttribute("value", reinterpret_cast<CSTR>(p.val));
 }
 
 using CORE::ResBase;
@@ -677,7 +678,8 @@ using CORE::ResBase;
 template<>
 void SetPropertyXMLValue<ResBase *>(tinyxml2::XMLElement * out, const Property &p)
 {
-	out->SetAttribute("value", reinterpret_cast<ResBase *>(p.val)->Name.c_str());
+	if (p.val)
+		out->SetAttribute("value", reinterpret_cast<ResBase *>(p.val)->Name.c_str());
 }
 
 void SetPropertyXMLValue(tinyxml2::XMLElement * out, const Property &p, Tools::TNewXMLElementFunc NewXMLElement)

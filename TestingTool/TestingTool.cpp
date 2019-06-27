@@ -973,9 +973,18 @@ int main()
 
 		BAMS::DoTests();
 		BAMS::CResourceManager rm;
+
+
 		rm.RootDir(L"C:\\Work\\test");
 		rm.LoadSync();
+
+		// slug textures fix:
+		CResModel slugModel = rm.Get<CResModel>("slug2");
+		slugModel.SetMeshProperty(0, "samplerColor", Property::PT_TEXTURE, 1, rm.FindExisting("SLUG_diffuse", RESID_IMAGE));		
+		slugModel.SetMeshProperty(0, "samplerNormal", Property::PT_TEXTURE, 1, rm.FindExisting("SLUG_normal", RESID_IMAGE));
+
 		ToggleWnd(en, 0); // show first window
+
 
 		CResImage ri = rm.FindExisting("test", RESID_IMAGE);
 		auto img = ri.GetImage(true);
@@ -986,7 +995,7 @@ int main()
 			auto vd = m1.GetVertexDescription(true);
 		}
 
-		rm.FindOrCreate(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt");
+		auto tt = rm.FindOrCreate(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt", RESID_RAWDATA);
 
 		// default shader program ... not needed any more
 		auto s = rm.Get<CResShader>("deferred");

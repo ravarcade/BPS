@@ -78,6 +78,16 @@ void ResModel::GetMesh(U32 idx, ResBase ** pMesh, ResBase ** pShader, const floa
 	}
 }
 
+void ResModel::SetMeshProperties(U32 idx, const Properties *prop)
+{
+	if (idx < meshes.size())
+	{
+		auto &entry = meshes[idx];
+		entry.prop = *prop;
+		_SaveXML();
+	}
+}
+
 // ---------------------------------------------------------------------------- private ---
 
 void ResModel::_LoadXML()
@@ -107,7 +117,9 @@ void ResModel::_SaveXML()
 	rb->XML->DeleteChildren();
 	for (auto &entry : meshes)
 	{
+
 		auto xmlEntry = rm->NewXMLElement(entry.mesh->Name.c_str());
+		xmlEntry->SetAttribute("shader", entry.shader->Name.c_str());
 		Tools::XMLWriteValue(xmlEntry, entry.M, static_cast<uint32_t>(COUNT_OF(entry.M)));
 		Tools::XMLWriteProperties(xmlEntry, entry.prop);
 		rb->XML->InsertEndChild(xmlEntry);

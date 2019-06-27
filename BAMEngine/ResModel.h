@@ -23,6 +23,8 @@ public:
 	void GetMesh(U32 idx, const char ** mesh, const char **shader, const float **m, const Properties **prop);
 	void GetMesh(U32 idx, ResBase **mesh, ResBase **shader, const float **m, const Properties **prop);
 
+	void SetMeshProperties(U32 idx, const Properties *prop);
+
 	U32 GetMeshCount() { return static_cast<U32>(meshes.size()); }
 
 private:
