@@ -534,7 +534,12 @@ void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t modelIdx)
 	{ 1, 0.8f, 1, 1 },
 	{ 1, 1, 0.8f, 1 }
 	};
+	
+	static float tweaks[4] = { 0, 0, 0, 0 };
+	tweaks[0] = 0.05f * modelsOnScreen[wnd].size();
+
 	pMod->SetParam("baseColor", colors[ modelsOnScreen[wnd].size() % 3 ]);
+	pMod->SetParam("tweaks", tweaks);
 	SetModelMatrix(en, wnd, static_cast<uint32_t>(modelsOnScreen[wnd].size()), pMod);
 }
 

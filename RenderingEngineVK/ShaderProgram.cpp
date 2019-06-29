@@ -227,6 +227,8 @@ uint32_t CShaderProgram::_AddMesh(const char *name)
 
 	set->usedVertices += vd->m_numVertices;
 	set->usedIndices += vd->m_numIndices;
+	set->freeVertices -= vd->m_numVertices;
+	set->freeIndices -= vd->m_numIndices;
 
 	uint32_t meshId = static_cast<uint32_t>(m_meshes.size());
 	m_meshes.push_back(m);
