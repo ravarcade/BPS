@@ -854,10 +854,6 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool force)
 		for (uint32_t i = numOfExistingDescriptorSets; i < cnt; ++i)
 		{
 			m_miniDescriptorSets[i].descriptorSet = vk->GetDescriptorSetsManager()->CreateDescriptorSets(m_descriptorSetLayout, m_descriptorsRequirments);
-//			TRACE("[cr:" << m_miniDescriptorSets[i].descriptorSet << ", l=(");
-//			for (auto &x : m_descriptorSetLayout)
-//				TRACE(", " << x);
-//			TRACE(")]\n");
 			m_miniDescriptorSets[i].rebuildMe = true;
 		}
 	}

@@ -49,4 +49,5 @@ using namespace BAMS;
 #include "iglfw.h"
 #include "OutputWindow.h"
 #include "ire.h"
+#include "vkImGui.h"
 

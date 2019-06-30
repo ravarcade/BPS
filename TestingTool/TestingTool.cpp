@@ -983,6 +983,10 @@ int main()
 		rm.RootDir(L"C:\\Work\\test");
 		rm.LoadSync();
 
+		// create ui shader
+		CResShader gs = rm.Get<CResShader>("__imgui__");
+		gs.AddProgram(L"/Shaders/imgui/imgui.vert.glsl");
+		gs.AddProgram(L"/Shaders/imgui/imgui.frag.glsl");
 		// slug textures fix:
 		CResModel slugModel = rm.Get<CResModel>("slug2");
 		slugModel.SetMeshProperty(0, "samplerColor", Property::PT_TEXTURE, 1, rm.FindExisting("SLUG_diffuse", RESID_IMAGE));		

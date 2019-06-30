@@ -162,6 +162,9 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 		_LoadShaderPrograms();
 		_CreateCommandBuffers();
 	}
+
+	// ------------------------------------------------------------------------ gui
+	imGui = new VkImGui(this);
 }
 
 void OutputWindow::Close(GLFWwindow* wnd)

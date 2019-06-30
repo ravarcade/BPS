@@ -77,6 +77,22 @@ void ResShader::_SaveXML()
 	using tinyxml2::XMLDocument;
 
 	auto &rm = globalResourceManager;
+
+	if (rb->Path.size() == 0)
+	{
+		// build new file name
+		int fidx = 1;
+		WSTR fn = rb->Name;
+		rm->AbsolutePath(fn);
+		WSTR fnWithExt = fn + L".shader";
+		while (Tools::Exist(fnWithExt))
+		{
+			++fidx;
+			fnWithExt = fn + fidx + L".shader";
+		}
+		rb->Path = fnWithExt;
+	}
+
 	XMLDocument out;
 	WSTR currPath(rm->GetDirPath(rb->Path));
 	auto *root = out.NewElement("Shader");
@@ -109,21 +125,6 @@ void ResShader::_SaveXML()
 	out.InsertFirstChild(root);
 	XMLPrinter prn;
 	out.Print(&prn);
-
-	if (rb->Path.size() == 0)
-	{
-		// build new file name
-		int fidx = 1;
-		WSTR fn = rb->Name;
-		rm->AbsolutePath(fn);
-		WSTR fnWithExt = fn + L".shader";
-		while (Tools::Exist(fnWithExt))
-		{
-			++fidx;
-			fnWithExt = fn + fidx + L".shader";
-		}
-		rb->Path = fnWithExt;
-	}
 
 	if (Size < prn.CStrSize()-1)
 	{

@@ -1,5 +1,6 @@
 
 class OutputWindow;
+class VkImGui;
 
 enum EDrawOrder {
 	DEFERRED = 0,
@@ -206,6 +207,7 @@ public:
 #endif
 #define Define_vkDestroy(t) template<> void vkDestroy(Vk##t &v) { if (v) { vkDestroy##t(device, v, allocator); v = VK_NULL_HANDLE; } }
 	Define_vkDestroy(Pipeline);
+	Define_vkDestroy(PipelineCache);
 	Define_vkDestroy(PipelineLayout);
 	Define_vkDestroy(ImageView);
 	Define_vkDestroy(Image);
@@ -290,7 +292,23 @@ public:
 	}
 	CStringHastable<CTexture2d> textures;
 
+	// ------------------------- for gui ----------------
+	VkImGui *imGui;
+
+
+	VkWriteDescriptorSet _writeDescriptorSet(VkDescriptorSet dstSet, uint32_t binding, CTexture2d *tex2d)
+	{
+		VkWriteDescriptorSet writeDescriptorSet{};
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.dstSet = dstSet;
+		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		writeDescriptorSet.dstBinding = binding;
+		writeDescriptorSet.pImageInfo = &tex2d->descriptor;
+		writeDescriptorSet.descriptorCount = 1;
+		return std::move(writeDescriptorSet);
+	}
 	friend CDescriptorSetsMananger;
 	friend CShaderProgram;
 	friend CTexture2d;
+	friend VkImGui;
 };

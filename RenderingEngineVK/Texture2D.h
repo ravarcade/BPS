@@ -6,6 +6,7 @@ public:
 	CTexture2d(OutputWindow *outputWindow);
 	~CTexture2d();
 
+	void LoadTexture(Image *img);
 	void LoadTexture(const char *textureResourceName);
 	void LoadTexture(IResource * textureResource);
 	void Release();

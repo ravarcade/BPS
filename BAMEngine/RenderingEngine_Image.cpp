@@ -38,7 +38,12 @@ Image::Image() :
 Image::Image(U8 *rawImage, U32 width, U32 height, U32 format, U32 pitch)
 {
 	this->rawImage = rawImage;
-	CreateEmpty(width, height, format, pitch);
+	this->width = width;
+	this->height = height;
+	this->format = format;
+	this->pitch = pitch;
+	this->buffer = nullptr;
+	this->alloc = nullptr;
 }
 
 Image::~Image()

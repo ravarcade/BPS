@@ -160,9 +160,16 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <Text Include="..\3rdParty\ImGui\LICENSE.txt" />
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\3rdParty\ImGui\imconfig.h" />
+    <ClInclude Include="..\3rdParty\ImGui\imgui.h" />
+    <ClInclude Include="..\3rdParty\ImGui\imgui_internal.h" />
+    <ClInclude Include="..\3rdParty\ImGui\imstb_rectpack.h" />
+    <ClInclude Include="..\3rdParty\ImGui\imstb_textedit.h" />
+    <ClInclude Include="..\3rdParty\ImGui\imstb_truetype.h" />
     <ClInclude Include="..\3rdParty\SPRIV-Cross\GLSL.std.450.h" />
     <ClInclude Include="..\3rdParty\SPRIV-Cross\spirv.hpp" />
     <ClInclude Include="..\3rdParty\SPRIV-Cross\spirv_cfg.hpp" />
@@ -185,8 +192,21 @@
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Texture2d.h" />
     <ClInclude Include="Utils.h" />
+    <ClInclude Include="vkImGui.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\3rdParty\ImGui\imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\3rdParty\ImGui\imgui_demo.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\3rdParty\ImGui\imgui_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\3rdParty\ImGui\imgui_widgets.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\3rdParty\SPRIV-Cross\spirv_cfg.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -239,6 +259,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Texture2d.cpp" />
+    <ClCompile Include="vkImGui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
