@@ -51,12 +51,32 @@ struct cmp<const MiniDescriptorSet *> {
 class CShaderProgram
 {
 public:
-	CShaderProgram(OutputWindow *outputWindow) : vk(outputWindow) {}
+	typedef void(*DrawCallback)(VkCommandBuffer cb, void *);
+
+	CShaderProgram(OutputWindow *outputWindow) : vk(outputWindow), m_drawCallback(nullptr) {}
 
 	void LoadProgram(const char *program);
 	void Release();
 	uint32_t AddObject(const char *meshName);
 	Properties *GetProperties(uint32_t drawObjectId = -1);
+
+	Properties *SetDrawCallback(DrawCallback f, void *data)
+	{ 
+		m_drawCallback = f; 
+		m_drawCallbackData = data;
+		if (f != nullptr)
+		{
+			DrawObjectData dod;
+			dod.meshIdx = -1;
+			dod.paramsSetId = static_cast<uint32_t>(m_drawObjectData.size());
+			m_drawObjectData.push_back(dod);
+			return GetProperties(dod.paramsSetId);
+		}
+
+		return nullptr;
+	}
+
+	VkDescriptorSet CreateDescriptorSet();
 
 protected:
 	// called from OutputWindow
@@ -67,7 +87,7 @@ protected:
 	void SetDrawOrder(uint32_t order) { m_drawOrder = order; }
 	uint32_t GetDrawOrder() { return m_drawOrder; }
 
-	void DrawObjects(VkCommandBuffer &cb);
+	void DrawObjects(VkCommandBuffer cb);
 	uint32_t GetObjectCount() { return static_cast<uint32_t>(m_drawObjectData.size()); }
 
 	void RebuildAllMiniDescriptorSets(bool force = false);
@@ -169,9 +189,18 @@ private:
 		{}
 	};
 
+	enum {
+		NORMAL = 0,
+		GUI
+	};
+
+	uint32_t m_mode;
+
 	std::vector<MeshBufferSet> m_meshBufferSets;
 	std::vector<Mesh> m_meshes;
 	std::vector<DrawObjectData> m_drawObjectData;
 	hashtable<const char *, uint32_t> m_meshNames;
 	uint32_t m_drawOrder;
+	DrawCallback m_drawCallback;
+	void *m_drawCallbackData;
 };

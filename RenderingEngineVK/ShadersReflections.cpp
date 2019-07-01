@@ -223,6 +223,7 @@ void CShadersReflections::LoadProgram(const char *shaderName)
 {
 	BAMS::CResourceManager rm;
 	m_shaderResource = rm.Get<BAMS::CResShader>(shaderName);
+	m_shaderName = m_shaderResource.GetName();
 	if (!m_shaderResource.IsLoaded())
 		rm.LoadSync(m_shaderResource);
 	uint32_t cnt = m_shaderResource.GetBinaryCount();
@@ -420,6 +421,8 @@ void CShadersReflections::_ParsePrograms()
 				m_vertexAttribs.attribs.push_back(vad);
 			}
 		}
+
+		std::sort(m_vertexAttribs.attribs.begin(), m_vertexAttribs.attribs.end(), [](const VertexAttribDetails &a, const VertexAttribDetails &b) { return (a.type != b.type) ? a.type < b.type : a.location < b.location; });
 
 		// for fragment stage get target (outputNames)
 		if (prg.stage == VK_SHADER_STAGE_FRAGMENT_BIT) 

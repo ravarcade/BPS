@@ -184,4 +184,7 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="RenderingVK.natvis" />
+  </ItemGroup>
 </Project>

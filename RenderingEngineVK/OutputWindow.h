@@ -4,6 +4,7 @@ class VkImGui;
 
 enum EDrawOrder {
 	DEFERRED = 0,
+	DEFERRED_RESOLVE,
 	FORWARD,
 	MAX_DRAWORDER
 };
@@ -15,7 +16,7 @@ struct ObjectInfo {
 	Properties *GetProperties() { return shader->GetProperties(oid); }
 };
 
-class OutputWindow
+class OutputWindow : public iInputCallback
 {
 private:
 	struct UpdateInfo {
@@ -177,7 +178,6 @@ private:
 	void _RecreateSwapChain();
 	void _CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBufferImageCopy & region, VkImageSubresourceRange & subresourceRange);
 
-	static void _OnWindowSize(GLFWwindow *wnd, int width, int height);
 public:
 	OutputWindow();
 	~OutputWindow() { _Cleanup(); }
@@ -199,6 +199,16 @@ public:
 
 	void CopyBuffer(VkBuffer dstBuf, VkDeviceSize offset, VkDeviceSize size, void *srcData);
 	void CopyImage(VkImage dstImage, Image * srcImage);
+
+
+	void _iglfw_cursorPosition(double x, double y);
+	void _iglfw_cursorEnter(bool v);
+	void _iglfw_mouseButton(int button, int action, int mods);
+	void _iglfw_scroll(double x, double y);
+	void _iglfw_key(int key, int scancode, int action, int mods);
+	void _iglfw_character(unsigned int codepoint);
+	void _iglfw_resize(int width, int height);
+	void _iglfw_close();
 
 	template<typename T> void vkDestroy(T &v) { if (v) { vkDestroyDevice(v, allocator); v = VK_NULL_HANDLE; } }
 

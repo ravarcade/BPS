@@ -38,9 +38,7 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 	instance = _instance;
 	window = _window;
 	allocator = _allocator;
-
-	glfw.SetWindowUserPointer(window, this);
-	glfw.SetWindowSizeCallback(window, &OutputWindow::_OnWindowSize);
+	glfw.SetWindowUserInput(window, this);
 
 	// ------------------------------------------------------------------------ create surface in output window
 	if (glfwCreateWindowSurface(instance, window, allocator, &surface) != VK_SUCCESS)
@@ -164,7 +162,7 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 	}
 
 	// ------------------------------------------------------------------------ gui
-	imGui = new VkImGui(this);
+	imGui = new VkImGui(this, viewport.width, viewport.height);
 }
 
 void OutputWindow::Close(GLFWwindow* wnd)
@@ -184,12 +182,6 @@ void OutputWindow::Close(GLFWwindow* wnd)
 	else {
 		TRACE("HM");
 	}
-}
-
-void OutputWindow::_OnWindowSize(GLFWwindow *wnd, int width, int height)
-{
-	auto *ow = reinterpret_cast<OutputWindow*>(glfw.GetWindowUserPointer(wnd));
-	ow->resizeWindow = true;
 }
 
 bool OutputWindow::_IsDeviceSuitable(VkPhysicalDevice device)
@@ -704,6 +696,12 @@ void OutputWindow::_Cleanup()
 {
 	if (device != VK_NULL_HANDLE)
 	{
+		if (imGui) 
+		{
+			delete imGui;
+			imGui = nullptr;
+		}
+
 		_CleanupTextures();
 		_CleanupShaderPrograms();
 		// do nothing for: graphicsQueue, presentQueue, transferQueue;
@@ -1330,27 +1328,24 @@ void OutputWindow::DrawFrame()
 	_SimplePresent(renderFinishedSemaphore, imageIndex);
 
 	vkQueueWaitIdle(presentQueue);
+	if (imGui)
+		imGui->newFrame();
 }
 
 void OutputWindow::PrepareShader(CShaderProgram *sh)
 {
-	//std::vector<CShaderProgram*> *pass = nullptr;
-	//switch (sh->PrepareShader())
-	//{
-	//case FORWARD: pass = &forwardRenderingShaders; break;
-	//case DEFERRED: pass = &deferredFrameBuf.shaders; break;
-	//}
-	//if (pass)
-	//{
-	//	pass->push_back(sh);
-	//	sh->CreateGraphicsPipeline();
-	//	sh->RebuildAllMiniDescriptorSets();
-	//}
-
 	auto outputNames = sh->GetOutputNames();			// select renderPass base on names of output attachments in fragment shader
 	if (outputNames.size() == 1 && Utils::icasecmp(outputNames[0], "outColor"))
 	{
-		forwardRenderingShaders.push_back(sh);
+		auto &attribs = sh->m_reflection.GetVertexAttribs();
+		if (attribs.size == 0) // this is "resolve shadeder" for previous step
+		{
+			forwardRenderingShaders.insert(forwardRenderingShaders.begin(), sh);
+			sh->SetDrawOrder(DEFERRED_RESOLVE);
+		}
+		else {
+			forwardRenderingShaders.push_back(sh);
+		}
 		sh->SetRenderPassAndMsaaSamples(forwardFrameBuf.renderPass, msaaSamples);
 		sh->SetDrawOrder(FORWARD);
 	}
@@ -1513,7 +1508,7 @@ void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)
 	// in vulkan left/top have coords (-1, -1), right/bottom (1,1)
 	glm::vec4 rays[3] = {
 		{ static_cast<float>(-hFar), static_cast<float>(+vFar), -1, 0 },
-		{ static_cast<float>(-hFar), static_cast<float>(-3*vFar), -1, 0 },
+		{ static_cast<float>(-hFar), static_cast<float>(-3 * vFar), -1, 0 },
 		{ static_cast<float>(+3 * hFar), static_cast<float>(+vFar), -1, 0 },
 	};
 
@@ -1550,76 +1545,9 @@ void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)
 		for (uint32_t i = 0; i < 3; ++i)
 		{
 			view2world[i * 4] = view[0][i];
-			view2world[i * 4+1] = view[1][i];
-			view2world[i * 4+2] = view[2][i];
+			view2world[i * 4 + 1] = view[1][i];
+			view2world[i * 4 + 2] = view[2][i];
 		}
-	}
-
-	// verify
-	if (false)
-	{
-		// We do math in double. That are few simple steps and we want to minimize errors.
-		double vFar = tan(glm::radians(double(cam->fov*0.5)));
-		double aspect = static_cast<double>(swapChainExtent.width) / static_cast<double>(swapChainExtent.height);
-		double hFar = vFar * aspect;
-
-		glm::mat4 iv = glm::inverse(ubo.view);
-		glm::vec4 vrs(static_cast<float>(-hFar), static_cast<float>(+vFar), -1, 0);
-		glm::vec4 vrdh(static_cast<float>(+2 * hFar), 0, 0, 0);
-		glm::vec4 vrdv(0, static_cast<float>(-2 * vFar), 0, 0);
-
-		vrs = vrs * ubo.view;
-		vrdh = vrdh * ubo.view;
-		vrdv = vrdv * ubo.view;
-		auto vrs2 = vrs + vrdh * glm::vec4(2);
-		auto vrs3 = vrs + vrdv * glm::vec4(2);
-
-		auto a1 = viewRays;
-		auto a2 = reinterpret_cast<float *>(reinterpret_cast<uint8_t*>(viewRays) + 1 * stride);
-		auto a3 = reinterpret_cast<float *>(reinterpret_cast<uint8_t*>(viewRays) + 2 * stride);
-		auto b1 = &(vrs.x);
-		auto b2 = &(vrs2.x);
-		auto b3 = &(vrs3.x);
-
-		float c1 = 0, c2 = 0, c3 = 0;
-		for (uint32_t i = 0; i < 3; ++i)
-		{
-			c1 += fabsf(a1[i] - b1[i]);
-			c2 += fabsf(a3[i] - b2[i]);
-			c3 += fabsf(a2[i] - b3[i]);
-		}
-		TRACE("comp: " <<  c1 * 1000 << ", " << c2 * 1000 << ", " << c3 * 1000 << "\n");
-
-		if (false)
-		for (uint32_t i = 0; i < 3; ++i)
-		{
-			a1[i] = b1[i];
-			a2[i] = b3[i];
-			a3[i] = b2[i];
-		}
-
-		//if (viewRayStart)
-		//{
-		//	viewRayStart[0] = vrs.x;
-		//	viewRayStart[1] = vrs.y;
-		//	viewRayStart[2] = vrs.z;
-		//}
-
-		//if (viewRayDelta)
-		//{
-		//	viewRayDelta[0] = vrdh.x;
-		//	viewRayDelta[1] = vrdh.y;
-		//	viewRayDelta[2] = vrdh.z;
-		//}
-
-		//if (viewRayDelta2)
-		//{
-		//	viewRayDelta2[0] = vrdv.x;
-		//	viewRayDelta2[1] = vrdv.y;
-		//	viewRayDelta2[2] = vrdv.z;
-		//}
-
-		
 	}
 }
 
@@ -1859,3 +1787,12 @@ void OutputWindow::CopyImage(VkImage dstImage, Image *srcImage)
 	vkDestroy(stagingBuffer);
 	vkFree(stagingBufferMemory);
 }
+
+void OutputWindow::_iglfw_cursorPosition(double x, double y) { if (imGui) imGui->_iglfw_cursorPosition(x, y); }
+void OutputWindow::_iglfw_cursorEnter(bool v) { if (imGui) imGui->_iglfw_cursorEnter(v); }
+void OutputWindow::_iglfw_mouseButton(int button, int action, int mods) { if (imGui) imGui->_iglfw_mouseButton(button, action, mods); }
+void OutputWindow::_iglfw_scroll(double x, double y) { if (imGui) imGui->_iglfw_scroll(x, y); }
+void OutputWindow::_iglfw_key(int key, int scancode, int action, int mods) { if (imGui) imGui->_iglfw_key(key, scancode, action, mods); }
+void OutputWindow::_iglfw_character(unsigned int codepoint) { if (imGui) imGui->_iglfw_character(codepoint); }
+void OutputWindow::_iglfw_resize(int width, int height) { resizeWindow = true; if (imGui) imGui->_iglfw_resize(width, height); }
+void OutputWindow::_iglfw_close() { if (imGui) imGui->_iglfw_close(); }

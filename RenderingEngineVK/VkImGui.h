@@ -3,7 +3,8 @@
 // based on Sascha Willems Vulkan Example - imGui
 
 
-class VkImGui {
+class VkImGui : public iInputCallback
+{
 private:
 	// Vulkan resources for rendering the UI
 	VkBuffer vertexBuf;
@@ -18,6 +19,8 @@ private:
 	int32_t vertexCount = 0;
 	int32_t indexCount = 0;
 
+	float *pScale;
+	float *pTranslate;
 	CTexture2d *fontTexture; // all below things are inside fontTexture object
 	//VkSampler sampler;
 	//VkDeviceMemory fontMemory = VK_NULL_HANDLE;
@@ -40,22 +43,33 @@ public:
 		glm::vec2 translate;
 	} pushConstBlock;
 
-	VkImGui(OutputWindow *_vk);
+	VkImGui(OutputWindow *_vk, float width, float height);
 	~VkImGui();
 
 	// Initialize styles, keys, etc.
 	void init(float width, float height);
 
 	// Initialize all Vulkan resources used by the ui
-	void initResources(VkRenderPass renderPass, VkQueue copyQueue);
+	void initResources();
 
 	// Starts a new imGui frame and sets up windows and ui elements
-	void newFrame(bool updateFrameGraph);
+	void newFrame();
 
 	// Update vertex and index buffer containing the imGui elements when required
 	void updateBuffers();
 
 	// Draw current imGui frame into a command buffer
 	void drawFrame(VkCommandBuffer commandBuffer);
+
+	void _iglfw_cursorPosition(double x, double y);
+	void _iglfw_cursorEnter(bool Enter) {};
+	void _iglfw_mouseButton(int button, int action, int mods);;
+	void _iglfw_scroll(double x, double y);
+
+	void _iglfw_key(int key, int scancode, int action, int mods);
+	void _iglfw_character(unsigned int codepoint);
+
+	void _iglfw_resize(int width, int height) { };
+	void _iglfw_close() {};
 
 };

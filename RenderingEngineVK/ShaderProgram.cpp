@@ -14,6 +14,11 @@ void CShaderProgram::LoadProgram(const char *program)
 {
 	// to do: add support for loading program description from manifest
 	m_reflection.LoadProgram(program);
+	m_mode = NORMAL;
+	if (_strcmpi(program, "__imgui__") == 0)
+	{
+		m_mode = GUI;
+	}
 }
 
 /// <summary>
@@ -80,6 +85,7 @@ Properties * CShaderProgram::GetProperties(uint32_t drawObjectId)
 			}
 		}
 	}
+
 	return properties;
 }
 
@@ -354,6 +360,10 @@ VkPipelineRasterizationStateCreateInfo CShaderProgram::_GetRasterizationState()
 	rasterizer.depthBiasClamp = 0.0f; // Optional
 	rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
 
+	if (m_mode == GUI)
+	{
+		rasterizer.cullMode = VK_CULL_MODE_NONE;
+	}
 	return rasterizer;
 }
 
@@ -383,6 +393,12 @@ VkPipelineDepthStencilStateCreateInfo CShaderProgram::_GetDepthStencilState()
 	depthStencil.front = {}; // Optional
 	depthStencil.back = {}; // Optional
 
+	if (m_mode == GUI)
+	{
+		depthStencil.depthTestEnable = VK_FALSE;
+		depthStencil.depthWriteEnable = VK_FALSE;
+	}
+
 	return depthStencil;
 }
 
@@ -393,22 +409,42 @@ VkPipelineColorBlendStateCreateInfo CShaderProgram::_GetColorBlendState()
 
 	/* TODO: Add support for multiple attachment. Right now all works only with one. */
 
-	static VkPipelineColorBlendAttachmentState noBlending;
-	noBlending.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-	noBlending.blendEnable = VK_FALSE;
+	static VkPipelineColorBlendAttachmentState noBlending =
+	{
+		VK_FALSE,
+		VK_BLEND_FACTOR_ONE,
+		VK_BLEND_FACTOR_ZERO,
+		VK_BLEND_OP_ADD,
+		VK_BLEND_FACTOR_ONE,
+		VK_BLEND_FACTOR_ZERO,
+		VK_BLEND_OP_ADD,
+		VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+	};
 
-	noBlending.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	noBlending.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	noBlending.colorBlendOp = VK_BLEND_OP_ADD; // Optional
+	static VkPipelineColorBlendAttachmentState blending =
+	{
+		VK_TRUE,
+		VK_BLEND_FACTOR_SRC_ALPHA,
+		VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		VK_BLEND_OP_ADD,
+		VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		VK_BLEND_FACTOR_ZERO,
+		VK_BLEND_OP_ADD,
+		VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+	};
 
-	noBlending.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE; // Optional
-	noBlending.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO; // Optional
-	noBlending.alphaBlendOp = VK_BLEND_OP_ADD; // Optional
 
 	auto &outputNames = m_reflection.GetOutputNames();
 	for (auto &name : outputNames)
 	{
-		colorBlendAttachments.push_back(noBlending);
+		if (m_mode == GUI)
+		{
+			colorBlendAttachments.push_back(blending);
+		}
+		else
+		{
+			colorBlendAttachments.push_back(noBlending);
+		}
 	}
 
 	/* alpha blending
@@ -724,6 +760,11 @@ void CShaderProgram::_ImportMeshData(const VertexDescription *srcVD, void *dstBu
 	vd.Dump();
 }
 
+VkDescriptorSet CShaderProgram::CreateDescriptorSet()
+{
+	return vk->GetDescriptorSetsManager()->CreateDescriptorSets(m_descriptorSetLayout, m_descriptorsRequirments);
+}
+
 void CShaderProgram::RebuildAllMiniDescriptorSets(bool force)
 {
 	if (m_paramsBuffers.rbegin()->type != TEXTURES && !force)
@@ -822,7 +863,7 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool force)
 						freeDescriptorSets.resize(freeDescriptorSets.size() - 1);
 					}
 					else { // create new descriptor set
-						m_miniDescriptorSets[lastUsedIdx].descriptorSet = vk->GetDescriptorSetsManager()->CreateDescriptorSets(m_descriptorSetLayout, m_descriptorsRequirments);
+						m_miniDescriptorSets[lastUsedIdx].descriptorSet = CreateDescriptorSet();
 					}
 					m_miniDescriptorSets[lastUsedIdx].rebuildMe = true;
 				}
@@ -853,7 +894,7 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool force)
 		uint32_t cnt = static_cast<uint32_t>(m_miniDescriptorSets.size());
 		for (uint32_t i = numOfExistingDescriptorSets; i < cnt; ++i)
 		{
-			m_miniDescriptorSets[i].descriptorSet = vk->GetDescriptorSetsManager()->CreateDescriptorSets(m_descriptorSetLayout, m_descriptorsRequirments);
+			m_miniDescriptorSets[i].descriptorSet = CreateDescriptorSet();
 			m_miniDescriptorSets[i].rebuildMe = true;
 		}
 	}
@@ -871,7 +912,7 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool force)
 void CShaderProgram::UpdateDescriptorSet(MiniDescriptorSet &mds)
 {
 	auto &sampledImages = m_reflection.GetSampledImages();
-//	TRACE("[up:" << mds.descriptorSet << ": ");
+
 	std::vector<VkWriteDescriptorSet> descriptorWrites;
 	VkWriteDescriptorSet wds = {};
 	wds.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -888,7 +929,6 @@ void CShaderProgram::UpdateDescriptorSet(MiniDescriptorSet &mds)
 			wds.descriptorCount = 1;
 			wds.pImageInfo = mds.textures[i];
 			descriptorWrites.push_back(wds);
-//			TRACE("(" << i << ":" << sampledImages[i].binding << ":" << mds.textures[i] << ")");
 		}
 	}
 
@@ -908,20 +948,15 @@ void CShaderProgram::UpdateDescriptorSet(MiniDescriptorSet &mds)
 		descriptorWrites.push_back(wds);
 	}
 
-//	TRACE(" " << descriptorWrites.size() <<"]\n");
 	vkUpdateDescriptorSets(vk->device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
 }
 
 
-void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
+void CShaderProgram::DrawObjects(VkCommandBuffer cb)
 {
 	vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
 	uint32_t lastBufferSetIdx = -1;
-
-
-//	TRACE("[" << m_drawObjectData.size() << "]");
-
 	uint8_t *pcBuffer = nullptr;
 	uint32_t pcStride = 0;
 	uint32_t pcStage = 0;
@@ -931,11 +966,9 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 		pcStride = m_paramsBuffers[0].size;
 		pcStage = m_pushConstantsStage;
 	}
-//	TRACE("[");
+
 	for (auto &dod : m_drawObjectData)
 	{
-		auto &m = m_meshes[dod.meshIdx];
-
 		if (!dod.descriptorSet)
 		{
 			dod.descriptorSet = m_miniDescriptorSets[dod.miniDescriptorSetIndex].descriptorSet;
@@ -945,9 +978,21 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 		{
 			vk->currentDescriptorSet = dod.descriptorSet;
 			vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &vk->currentDescriptorSet, 0, nullptr);
-//			TRACE(":" << vk->currentDescriptorSet);
 		}
 
+		if (m_pushConstantsStage)
+		{
+			vkCmdPushConstants(cb, m_pipelineLayout, pcStage, 0, pcStride, pcBuffer);
+			pcBuffer += pcStride;
+		}
+
+		if (dod.meshIdx == -1 && m_drawCallback)
+		{
+			m_drawCallback(cb, m_drawCallbackData);
+			continue;
+		}
+		
+		Mesh &m = m_meshes[dod.meshIdx];
 		if (m.numVertex > 0 && m.bufferSetIdx != lastBufferSetIdx)
 		{
 			lastBufferSetIdx = m.bufferSetIdx;
@@ -956,12 +1001,6 @@ void CShaderProgram::DrawObjects(VkCommandBuffer & cb)
 			VkDeviceSize offsets[] = { 0 };
 			vkCmdBindVertexBuffers(cb, 0, 1, vertexBuffers, offsets);
 			vkCmdBindIndexBuffer(cb, bs.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-		}
-
-		if (m_pushConstantsStage)
-		{
-			vkCmdPushConstants(cb, m_pipelineLayout, pcStage, 0, pcStride, pcBuffer);
-			pcBuffer += pcStride;
 		}
 
 		if (m.numVertex == 0)

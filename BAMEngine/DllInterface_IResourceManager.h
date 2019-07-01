@@ -28,16 +28,126 @@ enum {
 	RESID_VERTEXDATA,
 };
 
-extern "C" {
-	typedef void IResource;
-	typedef void IResRawData;
-	typedef void IResShader;
-	typedef void IResMesh;
-	typedef void IResModel;
-	typedef void IResImage;
-	typedef void IResourceManager;
+// ============================================================================
 
-	typedef void IModule;
+typedef void IResource;
+typedef void IResRawData;
+typedef void IResShader;
+typedef void IResMesh;
+typedef void IResModel;
+typedef void IResImage;
+typedef void IResourceManager;
+
+typedef void IModule;
+
+enum { // msgDst
+	RENDERING_ENGINE = 0x201, // VK
+	IMPORT_MODULE = 0x401 // 
+};
+
+enum { // msgId
+	// to everyone (general notifications)
+	RESOURCE_ADD_FILE = 0x10001,
+	RESOURCE_MANIFEST_PARSED = 0x10003,
+
+	// to RENDERING_ENGINE
+	CREATE_WINDOW = 0x20001,
+	CLOSE_WINDOW = 0x20002,
+	ADD_MESH = 0x20003, // mesh_name_in_shader + mesh_name_as_resource + shader_program
+	ADD_SHADER = 0x20004,
+	RELOAD_SHADER = 0x20005,
+	GET_SHADER_PARAMS = 0x20006,
+	GET_OBJECT_PARAMS = 0x20007,
+	UPDATE_DRAW_COMMANDS = 0x20008,
+	SET_CAMERA = 0x20009,
+	ADD_TEXTURE = 0x2000a,
+	ADD_MODEL = 0x2000b,
+
+	// to IMPORT_MODULE (or everyone?)
+	IDENTIFY_RESOURCE = 0x40001,
+	IMPORTMODULE_UPDATE = 0x40002,
+	IMPORTMODULE_LOADMESH = 0x40003,
+	IMPORTMODULE_LOADIMAGE = 0X40004,
+	IMPORTMODULE_UPDATEIMAGE = 0X40005,
+};
+
+struct PCREATE_WINDOW {
+	uint32_t wnd;
+	uint32_t w, h;
+	uint32_t x, y;
+};
+
+struct PCLOSE_WINDOW {
+	uint32_t wnd;
+};
+
+struct PADD_MESH {
+	uint32_t wnd;
+	const char *mesh;	 // resource name
+	const char *shader;  // resource name
+	Properties **pProperties;
+	uint32_t *pId;
+};
+
+struct PADD_SHADER {
+	uint32_t wnd;
+	const char *shader;
+};
+
+struct SHADER_PARAM_ENTRY {
+	uint32_t parent;
+	uint32_t type;
+	uint32_t count;
+	const char *name;
+};
+
+struct PGET_SHADER_PARAMS {
+	uint32_t wnd;
+	const char *name;
+	Properties **pProperties;
+};
+
+typedef struct PADD_SHADER PRELOAD_SHADER;
+struct PGET_OBJECT_PARAMS {
+	uint32_t wnd;
+	const char *name;
+	uint32_t objectIdx;
+	Properties **pProperties;
+};
+
+struct PIDETIFY_RESOURCE {
+	const wchar_t *filename;
+	uint32_t *pType;
+	void *res;
+};
+
+struct PUPDATE_DRAW_COMMANDS {
+	uint32_t wnd;
+};
+
+struct PSET_CAMERA {
+	uint32_t wnd;
+	float eye[3];
+	float lookAt[3];
+	float up[3];
+	float fov;
+	float zNear;
+	float zFar;
+};
+
+struct PADD_TEXTURE {
+	uint32_t wnd;
+	void *propVal;
+	const char *textureResourceName;
+	IResource *textureResource;
+};
+
+struct PADD_MODEL {
+	uint32_t wnd;
+	const char * modelName;
+};
+
+extern "C" {
 
 	// Call Initialize befor do anything with resources, game engine, etc. Only some memory allocations.
 	BAMS_EXPORT void Initialize();
@@ -475,6 +585,16 @@ public:
 	{
 		IEngine_Update(dt);
 	}
+
+	// =========================== messages ============
+	static Properties *AddMesh(uint32_t wnd, const char *mesh, const char *shader, uint32_t *pId = nullptr)
+	{
+		Properties *pprop = nullptr;
+		PADD_MESH params = { wnd, mesh, shader, &pprop, pId };
+		BAMS::CEngine::SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &params);
+
+		return pprop;
+	}
 };
 
 // ================================================================================== IExternalModule ===
@@ -498,114 +618,6 @@ public:
 	}
 };
 
-// ============================================================================
-
-enum { // msgDst
-	RENDERING_ENGINE = 0x201, // VK
-	IMPORT_MODULE    = 0x401 // 
-};
-
-enum { // msgId
-	// to everyone (general notifications)
-	RESOURCE_ADD_FILE        = 0x10001,
-	RESOURCE_MANIFEST_PARSED = 0x10003,
-
-	// to RENDERING_ENGINE
-	CREATE_WINDOW         = 0x20001,
-	CLOSE_WINDOW          = 0x20002,
-	ADD_MESH              = 0x20003, // mesh_name_in_shader + mesh_name_as_resource + shader_program
-	ADD_SHADER            = 0x20004,
-	RELOAD_SHADER         = 0x20005,
-	GET_SHADER_PARAMS     = 0x20006,
-	GET_OBJECT_PARAMS     = 0x20007,
-	UPDATE_DRAW_COMMANDS  = 0x20008,
-	SET_CAMERA            = 0x20009,
-	ADD_TEXTURE           = 0x2000a,
-	ADD_MODEL             = 0x2000b,
-
-	// to IMPORT_MODULE (or everyone?)
-	IDENTIFY_RESOURCE        = 0x40001,
-	IMPORTMODULE_UPDATE      = 0x40002,
-	IMPORTMODULE_LOADMESH    = 0x40003,
-	IMPORTMODULE_LOADIMAGE   = 0X40004,
-	IMPORTMODULE_UPDATEIMAGE = 0X40005,
-};
-
-struct PCREATE_WINDOW {
-	uint32_t wnd;
-	uint32_t w, h;
-	uint32_t x, y;
-};
-
-struct PCLOSE_WINDOW {
-	uint32_t wnd;
-};
-
-struct PADD_MESH {
-	uint32_t wnd;
-	const char *mesh;	 // resource name
-	const char *shader;  // resource name
-	Properties **pProperties;
-	uint32_t *pId;
-};
-
-struct PADD_SHADER {
-	uint32_t wnd;
-	const char *shader;
-};
-
-struct SHADER_PARAM_ENTRY {
-	uint32_t parent;
-	uint32_t type;
-	uint32_t count;
-	const char *name;
-};
-
-struct PGET_SHADER_PARAMS {
-	uint32_t wnd;
-	const char *name;
-	Properties **pProperties;
-};
-
-typedef struct PADD_SHADER PRELOAD_SHADER;
-struct PGET_OBJECT_PARAMS {
-	uint32_t wnd;
-	const char *name;
-	uint32_t objectIdx;
-	Properties **pProperties;
-};
-
-struct PIDETIFY_RESOURCE {
-	const wchar_t *filename;
-	uint32_t *pType;
-	void *res;
-};
-
-struct PUPDATE_DRAW_COMMANDS {
-	uint32_t wnd;
-};
-
-struct PSET_CAMERA {
-	uint32_t wnd;
-	float eye[3];
-	float lookAt[3];
-	float up[3];
-	float fov;
-	float zNear;
-	float zFar;
-};
-
-struct PADD_TEXTURE {
-	uint32_t wnd;
-	void *propVal;
-	const char *textureResourceName;
-	IResource *textureResource;
-};
-
-struct PADD_MODEL {
-	uint32_t wnd;
-	const char * modelName;
-};
 
 // ================================================================================== *** CResModelDraw ===
 

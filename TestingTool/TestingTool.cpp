@@ -560,23 +560,18 @@ void ToggleWnd(BAMS::CEngine &en, int wnd)
 {
 	static PCLOSE_WINDOW cw = { 0 };
 	static PCREATE_WINDOW *wn[3] = { &w0, &w1, &w2 };
-	Properties *pprop = nullptr;
-	PADD_MESH deferredResolveShader = { 0, "", "deferred", &pprop, nullptr };
 
 	cw.wnd = wnd;
 	if (wndState[wnd])
 	{
 		DeleteModels(wnd);
 		en.SendMsg(CLOSE_WINDOW, RENDERING_ENGINE, 0, &cw);
-//		onWnd[wnd].clear();
 	}
 	else
 	{
 		en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, wn[wnd]);
-		deferredResolveShader.wnd = wnd;
-		en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &deferredResolveShader);
-		deferredProp[wnd] = *pprop;
-		SetDeferredParams(pprop);
+		deferredProp[wnd] = *en.AddMesh(wnd, "", "deferred");
+		SetDeferredParams(&deferredProp[wnd]);
 		defaultCam.wnd = wnd;
 		en.SendMsg(SET_CAMERA, RENDERING_ENGINE, 0, &defaultCam);
 	}

@@ -93,6 +93,8 @@ public:
 	MProperties &GetProperties() { return m_properties; }
 	
 private:
+	const char *m_shaderName;
+
 	VertexDescription m_vertexDescription;
 
 	VertexAttribs m_vertexAttribs;
