@@ -48,6 +48,7 @@ public:
 		case GET_OBJECT_PARAMS: re.GetObjectParams(msg->data); break;
 		case UPDATE_DRAW_COMMANDS: re.UpdateDrawCommands(msg->data); break;
 		case SET_CAMERA:        re.SetCamera(msg->data); break;
+		case SHOW_PROPERTIES:   re.ShowProperties(msg->data); break;
 		}
 	}
 

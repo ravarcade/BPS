@@ -337,6 +337,7 @@ void CShadersReflections::_ParsePrograms()
 		assert(bin != nullptr);
 		auto blen = (code.GetSize() + sizeof(uint32_t) - 1) / sizeof(uint32_t);
 		CompilerGLSL compiler((uint32_t*)code.GetData(), (code.GetSize() + sizeof(uint32_t) - 1) / sizeof(uint32_t));
+		auto constants = compiler.get_specialization_constants();
 		auto resources = compiler.get_shader_resources();
 		auto entry_points = compiler.get_entry_points_and_stages();
 		auto &entry_point = entry_points[0];
@@ -389,7 +390,25 @@ void CShadersReflections::_ParsePrograms()
 			ValDetails vd;
 			GetDetails(compiler, pushConst, vd);
 			vd.stage = prg.stage;
-			m_params_in_push_constants.push_back(vd);
+			
+			// check for mege before adding push constant
+			bool isMerged = false;
+			for (auto &pc : m_params_in_push_constants)
+			{
+				if (vd.set == pc.set &&
+					vd.binding == pc.binding &&
+					vd.entry.offset >= pc.entry.offset &&
+					(vd.entry.offset + vd.entry.size) <= (pc.entry.offset + pc.entry.size))
+				{
+					isMerged = true;
+					pc.stage |= vd.stage;
+				}
+			}
+
+			if (!isMerged)
+			{
+				m_params_in_push_constants.push_back(vd);
+			}
 		}
 
 		// sampled_images
@@ -462,14 +481,17 @@ void CShadersReflections::_ParsePrograms()
 	}
 
 	// push constants
+	// merge push constants if diferrent stages use same space
 	m_layout.pushConstants.clear();
 	for (auto &pc : m_params_in_push_constants)
 	{
 		m_layout.pushConstants.push_back({
 			pc.stage,
-			0,
+			pc.entry.offset,
 			pc.entry.size });
+
 	}
+	
 	m_vertexDescription = GetOptimize()->OptimizeVertexDescription(m_vertexDescription);
 	m_properties = _BuildProperties();
 }

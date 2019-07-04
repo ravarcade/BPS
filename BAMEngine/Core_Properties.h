@@ -31,12 +31,17 @@ public:
 	U32 buffer_idx;
 	U32 buffer_offset;
 	U32 buffer_object_stride;
+	U32 guiType;
+	bool pUpdateFlag;
+	F32 guiMin;
+	F32 guiMax;
+	F32 guiStep;
 
-	Property()                                 : type(PT_EMPTY), parent(-1), count(0),   name(nullptr), val(nullptr), array_stride(0) {}
-	Property(CSTR n, I32 *v, U32 cnt = 1)      : type(PT_I32),   parent(-1), count(cnt), name(n), val(v), array_stride(0) {}
-	Property(CSTR n, F32 *v, U32 cnt = 1)      : type(PT_F32),   parent(-1), count(cnt), name(n), val(v), array_stride(0) {}
-	Property(CSTR n, CSTR v)                   : type(PT_CSTR),  parent(-1), count(1),   name(n), val(const_cast<char *>(v)), array_stride(0) {}
-	Property(CSTR n)                           : type(PT_EMPTY), parent(-1), count(0),   name(n), val(nullptr), array_stride(0) {}
+	Property()                                 : type(PT_EMPTY), parent(-1), count(0),   name(nullptr), val(nullptr), array_stride(0), guiType(0), pUpdateFlag(nullptr){}
+	Property(CSTR n, I32 *v, U32 cnt = 1)      : type(PT_I32),   parent(-1), count(cnt), name(n), val(v), array_stride(0), guiType(0), pUpdateFlag(nullptr) {}
+	Property(CSTR n, F32 *v, U32 cnt = 1)      : type(PT_F32),   parent(-1), count(cnt), name(n), val(v), array_stride(0), guiType(0), pUpdateFlag(nullptr) {}
+	Property(CSTR n, CSTR v)                   : type(PT_CSTR),  parent(-1), count(1),   name(n), val(const_cast<char *>(v)), array_stride(0), guiType(0), pUpdateFlag(nullptr) {}
+	Property(CSTR n)                           : type(PT_EMPTY), parent(-1), count(0),   name(n), val(nullptr), array_stride(0), guiType(0), pUpdateFlag(nullptr) {}
 
 	bool IsEmpty() const { return count == 0 || type == PT_EMPTY; };
 

@@ -389,101 +389,86 @@ void CreateModels(BAMS::CEngine &en)
 	BAMS::CResourceManager rm;
 	availableModels.clear();
 	std::vector<IResource*> unusedModels;
-	rm.Filter(RESID_IMPORTMODEL, &unusedModels, [](IResource *res, void *local) {
-		auto &unusedModels = *reinterpret_cast<std::vector<IResource*> *>(local);
+	std::vector<IResource*> checkMeshes;
+	std::vector<bool> isTested;
+	IResource *basicShader = rm.FindExisting("basic", RESID_SHADER);
 
-		struct MI {
-			std::vector<IResource*> meshes;
-			std::vector<bool> machting;
-			IResource *res;
-			IResource *model;
+	rm.Filter(RESID_IMPORTMODEL, [&](IResource *res) {
+		checkMeshes.clear();
+		IResource *model = nullptr;
 
-		} meshSrc = { {}, {}, res, nullptr };
-
-		BAMS::CResourceManager rm;
-		rm.Filter(RESID_MESH, &meshSrc, [](IResource *resMesh, void *pMeshes) {
-			auto &meshSrc = *reinterpret_cast<MI *>(pMeshes);
+		rm.Filter(RESID_MESH, [&](IResource *resMesh) {
 			CResMesh r(resMesh);
-			if (r.GetMeshSrc() == meshSrc.res) {
-				meshSrc.meshes.push_back(resMesh);
-				meshSrc.machting.push_back(false);
+			if (r.GetMeshSrc() == res) 
+			{
+				checkMeshes.push_back(resMesh);
 			}
 		});
 
-		if (meshSrc.meshes.size())
+		isTested.resize(checkMeshes.size());
+
+		if (checkMeshes.size())
 		{
 			// check if we have already model like this:
-			rm.Filter(RESID_MODEL, &meshSrc, [](IResource *resModel, void *pMeshes) {
-				auto &meshSrc = *reinterpret_cast<MI *>(pMeshes);
-				if (!meshSrc.model)
-				{
-					BAMS::CResourceManager rm;
-					CResModel r(resModel);
-					IResource *basicShader = rm.FindExisting("basic", RESID_SHADER);
-					IResource *mesh, *shader;
-					auto cnt = r.GetMeshCount();
-					bool same = cnt == meshSrc.meshes.size();
-					if (same)
-					{
-						for (uint32_t i = 0; i < cnt; ++i)
-							meshSrc.machting[i] = true;
+			rm.Filter(RESID_MODEL, [&](IResource *resModel) {
+				if (model)
+					return;
 
-						for (uint32_t i = 0; i < cnt && same; ++i)
+				CResModel r(resModel);
+				IResource *mesh, *shader;
+				auto cnt = r.GetMeshCount();
+				bool same = cnt == checkMeshes.size();
+				if (!same)
+					return;
+
+				for (uint32_t i = 0; i < cnt; ++i)
+					isTested[i] = false;
+
+				for (uint32_t i = 0; i < cnt && same; ++i)
+				{
+					r.GetMesh(i, &mesh, &shader);
+					same = false;
+					for (uint32_t j = 0; j < cnt; ++j)
+					{
+						if (!isTested[j] && checkMeshes[j] == mesh && shader == basicShader)
 						{
-							r.GetMesh(i, &mesh, &shader);
-							same = false;
-							for (uint32_t j = 0; j < cnt; ++j)
-							{
-								if (meshSrc.machting[j] && meshSrc.meshes[j] == mesh && shader == basicShader)
-								{
-									meshSrc.machting[j] = false;
-									same = true;
-									meshSrc.model = resModel;
-									break;
-								}
-							}
+							isTested[j] = true;
+							same = true;
+							break;
 						}
 					}
 				}
+				if (same)
+					model = resModel;
 			});
 
-			if (!meshSrc.model)
+			if (!model)
 			{
-				unusedModels.push_back(meshSrc.res);
+				// we cant creat here new model, we are inside loop iterating resource and we can't create new one inside.
+				unusedModels.push_back(res);
 			}
-			else {
-				availableModels.push_back(meshSrc.model);
+			else 
+			{
+				availableModels.push_back(model);
 			}
 
 		}
 	});
 
-	// create models
-	IResource *basicShader = rm.FindExisting("basic", RESID_SHADER);
+	// create new models
 	for (auto res : unusedModels)
 	{
-		struct MI {
-			std::vector<IResource*> meshes;
-			IResource *res;
+		auto newModelResource = rm.Create(rm.GetName(res), RESID_MODEL);
+		CResModel newModel(newModelResource);
 
-		} meshSrc = { {}, res };
-
-		BAMS::CResourceManager rm;
-		rm.Filter(RESID_MESH, &meshSrc, [](IResource *resMesh, void *pMeshes) {
-			auto &meshSrc = *reinterpret_cast<MI *>(pMeshes);
+		// add meshes from this model
+		rm.Filter(RESID_MESH, [&](IResource *resMesh) {
 			CResMesh r(resMesh);
-			if (r.GetMeshSrc() == meshSrc.res)
-				meshSrc.meshes.push_back(resMesh);
+			if (r.GetMeshSrc() == res)
+				newModel.AddMesh(resMesh, basicShader);
 		});
 
-		// create new model					
-		auto resModel = rm.Create(rm.GetName(meshSrc.res), RESID_MODEL);
-		CResModel model(resModel);
-		for (uint32_t i = 0; i < meshSrc.meshes.size(); ++i)
-		{
-			model.AddMesh(meshSrc.meshes[i], basicShader);
-		}
-		availableModels.push_back(resModel);
+		availableModels.push_back(newModelResource);
 	}
 }
 
@@ -517,6 +502,48 @@ void DeleteModels(uint32_t wnd)
 	modelsOnScreen[wnd].clear();
 }
 
+bool strcmpext(const char *val, const char **patt, size_t count, bool caseInsesitive = true)
+{
+	decltype(_stricmp) *cmp = caseInsesitive ? _stricmp : strcmp;
+	for (size_t i = 0; i < count; ++i)
+	{
+		if (cmp(val, patt[i]) == 0)
+			return true;
+	}
+	return false;
+}
+
+Properties * PropertiesForGui(Properties *prop)
+{
+	static const char *colors[] = {
+		"baseColor", "color"
+	};
+	static const char *drag01[] = {
+		"normalMapScale"
+	};
+
+	for (auto &p : *prop)
+	{
+		switch (p.type)
+		{
+		case Property::PT_F32:
+			if ((p.count == 3 || p.count == 4) && strcmpext(p.name, colors, COUNT_OF(colors)))
+			{
+				p.guiType = PTGUI_COLOR;
+			}
+			if (p.count <= 4 && strcmpext(p.name, drag01, COUNT_OF(drag01)))
+			{
+				p.guiType = PTGUI_DRAG;
+				p.guiMin = 0.0f;
+				p.guiMax = 1.0f;
+				p.guiStep = 0.005f;
+			}
+			break;
+		}
+	}
+	return prop;
+}
+
 void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t modelIdx)
 {
 	if (modelIdx >= availableModels.size())
@@ -539,12 +566,17 @@ void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t modelIdx)
 	tweaks[0] = 0.05f * modelsOnScreen[wnd].size();
 
 	pMod->SetParam("baseColor", colors[ modelsOnScreen[wnd].size() % 3 ]);
-	pMod->SetParam("tweaks", tweaks);
+	pMod->SetParam("normalMapScale", tweaks);
 	SetModelMatrix(en, wnd, static_cast<uint32_t>(modelsOnScreen[wnd].size()), pMod);
+	if (wnd == 0 && modelsOnScreen[wnd].size() == 1)
+	{
+		SndMsg::ShorProperties(PropertiesForGui(pMod->GetProperties(0)), "tada!");
+	}
 }
 
 void SpinModel(BAMS::CEngine &en)
 {
+	return;
 	for (uint32_t i = 0; i < COUNT_OF(modelsOnScreen); ++i)
 	{
 		if (modelsOnScreen[i].size())
@@ -1036,12 +1068,13 @@ int main()
 		rm.LoadSync();
 	}
 
-	BAMS::Finalize();
+	// remove models before call to Finalize 
 	for (uint32_t wnd : {0, 1, 2})
 		DeleteModels(wnd);
-//	for (auto &w : onWnd)
-//		w.clear();
+
 	deferredProp.clear();
+
+	BAMS::Finalize();
 
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);
 

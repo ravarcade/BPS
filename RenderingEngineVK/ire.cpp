@@ -368,6 +368,14 @@ void ire::SetCamera(const void *params)
 	ow->SetCamera(p);
 }
 
+void ire::ShowProperties(const void *params)
+{
+	auto ow = outputWindows[MAINWND];
+	auto p = static_cast<const PSHOW_PROPERTIES *>(params);
+	if (!p || !ow || !ow->Exist() || !ow->imGui) 
+		return;
+	ow->imGui->ShowProperties(p->prop, p->name);
+}
 
 // ============================================================================ ire : Rendering Engine - protected methods ===
 

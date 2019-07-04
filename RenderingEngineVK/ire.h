@@ -107,8 +107,10 @@ public:
 	void GetObjectParams(const void * params);
 	void UpdateDrawCommands(const void *params);
 	void SetCamera(const void * params);
+	void ShowProperties(const void * params);
 
 	void CloseWnd(GLFWwindow* window);
+	VkImGui * GetImGui() { return outputWindows[MAINWND] ? outputWindows[MAINWND]->imGui : nullptr; }
 
 	friend OutputWindow;
 };

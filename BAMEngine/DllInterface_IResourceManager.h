@@ -26,6 +26,11 @@ enum {
 	RESID_DRAWMODEL,
 
 	RESID_VERTEXDATA,
+
+
+	// Property GUI types
+	PTGUI_COLOR = 1,
+	PTGUI_DRAG = 2,
 };
 
 // ============================================================================
@@ -62,6 +67,9 @@ enum { // msgId
 	SET_CAMERA = 0x20009,
 	ADD_TEXTURE = 0x2000a,
 	ADD_MODEL = 0x2000b,
+
+	// to GUI
+	SHOW_PROPERTIES = 0x30001,
 
 	// to IMPORT_MODULE (or everyone?)
 	IDENTIFY_RESOURCE = 0x40001,
@@ -145,6 +153,11 @@ struct PADD_TEXTURE {
 struct PADD_MODEL {
 	uint32_t wnd;
 	const char * modelName;
+};
+
+struct PSHOW_PROPERTIES {
+	Properties *prop;
+	const char *name;
 };
 
 extern "C" {
@@ -517,6 +530,15 @@ public:
 	// version used to find textures for mesh property
 	void Filter(CResMesh &mesh, BAMS::Property *prop, void *localData, void(*callback)(IResource *, void *)) { IResourceManager_Filter(_rm, callback, localData, nullptr, nullptr, reinterpret_cast<CSTR>(prop->val), IResource_GetPath(mesh.GetMeshSrc()), RESID_UNKNOWN, true); }
 	
+	template <typename F>
+	void Filter(uint32_t typeId, F f)
+	{
+		Filter(typeId, &f, [](IResource *res, void *data) {
+			auto &f = *reinterpret_cast<F*>(data);
+			f(res);
+		});
+	}
+
 	template<typename T>
 	T Get(const char *name) { T res(FindOrCreate(name, T::GetType())); return std::move(res); }
 
@@ -595,7 +617,15 @@ public:
 
 		return pprop;
 	}
+
+	static void ShorProperties(Properties *prop, const char *name = nullptr)
+	{
+		PSHOW_PROPERTIES params = { prop, name };
+		BAMS::CEngine::SendMsg(SHOW_PROPERTIES, RENDERING_ENGINE, 0, &params);
+	}
 };
+
+typedef CEngine SndMsg;
 
 // ================================================================================== IExternalModule ===
 
@@ -720,7 +750,7 @@ public:
 		for (auto &m : meshes)
 			Tools::Mat4mul(m.outputM, T, m.M);
 	};
-
+	MProperties *GetProperties(uint32_t idx) { return idx < meshes.size() ? &meshes[idx].prop : nullptr; }
 private:
 	uint32_t wnd;
 	struct MeshData

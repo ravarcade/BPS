@@ -110,4 +110,7 @@ namespace Utils {
 			return v.f;
 		}
 	};
+
+	void decomposeM(const float *m, float *r, float *s, float *t);
+	void composeM(float *m, float *r, float *s, float *t);
 };

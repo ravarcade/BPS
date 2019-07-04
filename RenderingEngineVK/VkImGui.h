@@ -35,8 +35,8 @@ private:
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSet descriptorSet;
 //	VkDevice *logicalDevice;
-	OutputWindow *vk;
 public:
+	OutputWindow *vk;
 	// UI params are set via push constants
 	struct PushConstBlock {
 		glm::vec2 scale;
@@ -62,7 +62,7 @@ public:
 	void drawFrame(VkCommandBuffer commandBuffer);
 
 	void _iglfw_cursorPosition(double x, double y);
-	void _iglfw_cursorEnter(bool Enter) {};
+	void _iglfw_cursorEnter(bool Enter);
 	void _iglfw_mouseButton(int button, int action, int mods);;
 	void _iglfw_scroll(double x, double y);
 
@@ -72,4 +72,23 @@ public:
 	void _iglfw_resize(int width, int height) { };
 	void _iglfw_close() {};
 
+
+	// ==================================================================== GUI ===
+	void initGui();
+	void drawGui();
+
+	void ShowProperties(Properties *prop, const char *name);
+
+	bool m_showImGuiDemoWindow;
+	std::string m_propName;
+	Properties *m_prop;
+	std::vector<IResource *> m_textureResources;
+	std::vector<VkDescriptorImageInfo *> m_textureDescriptors;
+	// ==================================================================== Helpers ===
+	void _buildTextureData();
+};
+
+namespace ImGui {
+	bool inputProperties(Properties *prop);
+	bool selectTexture(const char *label, VkDescriptorImageInfo **pPropVal, IResource **res);
 };

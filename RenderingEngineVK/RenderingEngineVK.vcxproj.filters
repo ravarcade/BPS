@@ -180,6 +180,9 @@
     <ClCompile Include="vkImGui.cpp">
       <Filter>Src</Filter>
     </ClCompile>
+    <ClCompile Include="Utils.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

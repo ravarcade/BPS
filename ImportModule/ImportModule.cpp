@@ -92,10 +92,7 @@ private:
 
 		// we have hash calculated for every mesh... so we want: 
 		// (1) remove broken meshes from RM: hash is wrong or something
-		rm.Filter(RESID_MESH, pimr,
-			[](IResource *res, void *param) {
-			auto *pimr = reinterpret_cast<ImportedModelRepo*>(param);
-
+		rm.Filter(RESID_MESH, [&](IResource *res) {
 			CResMesh r(res);
 			if (r.GetMeshSrc() == pimr->res)
 			{
@@ -135,10 +132,7 @@ private:
 		});
 
 		// (2) second pass... assign all meshes in RM even if "hash" is not matching, but only if it is not used. So, update of one mesh should works fine.
-		rm.Filter(RESID_MESH, pimr,
-			[](IResource *res, void *param) {
-			auto *pimr = reinterpret_cast<ImportedModelRepo*>(param);
-
+		rm.Filter(RESID_MESH, [&](IResource *res) {
 			CResMesh r(res);
 			auto &al = pimr->aiLoader;
 			if (r.GetMeshSrc() == pimr->res)
@@ -285,18 +279,13 @@ public:
 		CResourceManager rm;
 
 		// add all modelRepos
-		rm.Filter(RESID_IMPORTMODEL, this,
-			[](IResource *res, void *param) {
-			auto *pim = reinterpret_cast<Importer*>(param);
-			pim->m_modelRepoName2modelRepo.add(IResource_GetPath(res), res);
+		rm.Filter(RESID_IMPORTMODEL, [&](IResource *res) {
+			m_modelRepoName2modelRepo.add(IResource_GetPath(res), res);
 		});
 
 		// add all meshes
 		if (false) // right now, we don't need to do anything with meshes... maybe in "vaidation"
-		rm.Filter(RESID_MESH, this,
-			[](IResource *res, void *param) {
-			auto *pim = reinterpret_cast<Importer*>(param);
-			
+		rm.Filter(RESID_MESH, [&](IResource *res) {
 			CResource r(res);
 		});
 	}

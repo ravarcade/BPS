@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="CShadersReflections">
+    <DisplayString>shader = {m_shaderName,na}</DisplayString>
+    <Expand>
+      <Item Name="[properties]">m_properties</Item>
+      <Item Name="[out:forward]" Condition="m_outputNames.capacity() == 1">m_outputNames[0]</Item>
+      <Item Name="[out:deferred]" Condition="m_outputNames.capacity() == 4">m_outputNames[0]</Item>
+    </Expand>
+  </Type>
+  <Type Name="CShaderProgram">
+    <DisplayString>{m_reflection,na}, meshes = {m_meshes.capacity(),d}</DisplayString>
+  </Type>
+</AutoVisualizer>

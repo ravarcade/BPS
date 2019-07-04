@@ -31,19 +31,10 @@ protected:
 	static U32 _used;
 
 protected:
-#ifdef _DEBUG
-	mutable T *_raw;
-	inline void _rawSet() const
-	{
-		_raw = _idx ? &_pool[_idx].value : nullptr;
-	}
-#else
-	inline void _rawSet() {}
-#endif
 	U32 _idx;
 
-	shared_base() : _idx(0) { _rawSet(); }
-	shared_base(U32 idx) : _idx(idx) { _rawSet(); }
+	shared_base() : _idx(0) {}
+	shared_base(U32 idx) : _idx(idx) {}
 
 	inline void CheckIfInitialized()
 	{
@@ -79,7 +70,6 @@ protected:
 		new (&pEntry->value) T(std::forward<Args>(args)...);
 
 		_idx = idx;
-		_rawSet();
 	}
 
 	void Clone()
@@ -102,7 +92,6 @@ protected:
 		new (&pEntry->value) T(_pool[_idx].value);
 
 		_idx = idx;
-		_rawSet();
 	}
 
 	inline void NeedUniq()
@@ -168,7 +157,7 @@ public:
 		}
 	}
 
-	inline T & GetValue() const { _rawSet();  return _pool[_idx].value; }
+	inline T & GetValue() const { return _pool[_idx].value; }
 };
 
 
