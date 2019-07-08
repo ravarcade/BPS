@@ -73,8 +73,8 @@ void iglfw::SetWindowUserInput(GLFWwindow *window, iInputCallback *inputCallback
 	glfwSetWindowSizeCallback(window, window_resize_callback);
 	glfwSetInputMode(window, GLFW_STICKY_MOUSE_BUTTONS, GLFW_TRUE);
 	glfwSetInputMode(window, GLFW_STICKY_KEYS, GLFW_TRUE);
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-	glfwSetWindowUserPointer(window, inputCallbacks);
+//	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+	glfwSetWindowUserPointer(window, inputCallbacks);	
 }
 
 GLFWwindow* iglfw::CreateWnd(int wnd, int width, int height)

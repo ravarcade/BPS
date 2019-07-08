@@ -3,15 +3,20 @@
 
 #include <chrono>
 #include <glm/gtc/matrix_transform.hpp>
+#include "..\3rdParty\ImGui\imgui.h"
 
+#define GET_PIPELINE_STATISTIC true
 
 // ----------------------------------------------------------------------------
 
-OutputWindow::OutputWindow() :
+OutputWindow::OutputWindow(uint32_t _wnd) :
 	instance(VK_NULL_HANDLE),
 	window(nullptr),
 	allocator(VK_NULL_HANDLE),
-	device(VK_NULL_HANDLE)
+	device(VK_NULL_HANDLE),
+	windowIdx(_wnd),
+	imGui(nullptr),
+	m_pipelineStatisticsQueryPool(VK_NULL_HANDLE)
 {
 }
 
@@ -27,6 +32,8 @@ void OutputWindow::Init()
 	graphicsQueue = VK_NULL_HANDLE;
 	presentQueue = VK_NULL_HANDLE;
 	transferQueue = VK_NULL_HANDLE;
+
+	m_minimizeLag = false;
 }
 
 // ----------------------------------------------------------------------------
@@ -87,6 +94,10 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 	// features
 	VkPhysicalDeviceFeatures deviceFeatures = {};
 	deviceFeatures.samplerAnisotropy = VK_TRUE;
+	if (m_enablePiplineStatistic) {
+		deviceFeatures.pipelineStatisticsQuery = VK_TRUE;
+		deviceFeatures.occlusionQueryPrecise = VK_TRUE;
+	}
 
 	// createInfo structure to create logical device
 	VkDeviceCreateInfo createInfo = {};
@@ -161,8 +172,14 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 		_CreateCommandBuffers();
 	}
 
-	// ------------------------------------------------------------------------ gui
-	imGui = new VkImGui(this, viewport.width, viewport.height);
+
+	// ------------------------------------------------------------------------ gui & other stuffs
+
+	if (windowIdx == MAINWND)
+		imGui = new VkImGui(this, viewport.width, viewport.height);
+
+	camera.init(window);
+	_SetupPipelineStatistic();
 }
 
 void OutputWindow::Close(GLFWwindow* wnd)
@@ -191,6 +208,11 @@ bool OutputWindow::_IsDeviceSuitable(VkPhysicalDevice device)
 
 	vkGetPhysicalDeviceProperties(device, &deviceProperties);
 	vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+#ifdef GET_PIPELINE_STATISTIC
+	m_enablePiplineStatistic = deviceFeatures.pipelineStatisticsQuery == VK_TRUE && deviceFeatures.occlusionQueryPrecise == VK_TRUE;
+#else 
+	m_enablePiplineStatistic = false;
+#endif
 
 	QueueFamilyIndices indices(device, surface);
 
@@ -242,6 +264,13 @@ bool OutputWindow::_CreateSwapChain()
 	{
 		imageCount = swapChainSupport.capabilities.maxImageCount;
 	}
+	if (m_minimizeLag) {
+		imageCount = swapChainSupport.capabilities.minImageCount;		
+	}
+	else {
+		presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+	}
+
 
 	VkSwapchainCreateInfoKHR createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -701,6 +730,8 @@ void OutputWindow::_Cleanup()
 			delete imGui;
 			imGui = nullptr;
 		}
+		if (m_pipelineStatisticsQueryPool)
+			vkDestroy(m_pipelineStatisticsQueryPool);
 
 		_CleanupTextures();
 		_CleanupShaderPrograms();
@@ -809,16 +840,24 @@ void OutputWindow::_CreateDeferredCommandBuffer(VkCommandBuffer &cb)
 	renderPassInfo.renderArea.extent = { deferredFrameBuf.width, deferredFrameBuf.height };
 	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
 	renderPassInfo.pClearValues = clearValues.data();
+	
+	if (m_pipelineStatisticsQueryPool)
+		vkCmdResetQueryPool(cb, m_pipelineStatisticsQueryPool, 0, static_cast<uint32_t>(m_pipelineStats.size()));
 
 	vkCmdBeginRenderPass(cb, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 	vkCmdSetViewport(cb, 0, 1, &viewport);
 	vkCmdSetScissor(cb, 0, 1, &scissor);
 
+	if (m_pipelineStatisticsQueryPool)
+		vkCmdBeginQuery(cb, m_pipelineStatisticsQueryPool, 0, 0);
+	//vkCmdBeginQuery(cb, m_pipelineStatisticsQueryPool, 0, VK_QUERY_CONTROL_PRECISE_BIT);
+
 	for (auto &shader : deferredFrameBuf.shaders) 
 	{
 		shader->DrawObjects(cb);
 	}
-
+	if (m_pipelineStatisticsQueryPool)
+		vkCmdEndQuery(cb, m_pipelineStatisticsQueryPool, 0);
 	vkCmdEndRenderPass(cb);
 }
 
@@ -1187,15 +1226,12 @@ void OutputWindow::_CleanupShaderPrograms()
 
 }
 
-void OutputWindow::UpdateUniformBuffer()
+void OutputWindow::_UpdateUniformBuffer()
 {
 	if (!sharedUboData)
 		return;
 
-	shaders.foreach([&](CShaderProgram *&s) {
-		s->RebuildAllMiniDescriptorSets(false);
-	});
-	SetCamera(&cameraSettings);	
+	// right now there is nothing in UBO to update.
 }
 
 void OutputWindow::_RecreateSwapChain()
@@ -1292,12 +1328,22 @@ void OutputWindow::_SimplePresent(VkSemaphore &waitSemaphore, uint32_t imageInde
 	}
 }
 
-bool OutputWindow::_UpdateBeforeDrawFrame()
+bool OutputWindow::_UpdateBeforeDraw(float dt)
 {
 	if (!swapChain || resizeWindow) {
 		_RecreateSwapChain();
 		return false;
 	}
+
+	_UpdateUniformBuffer();
+
+	// update descriptor sets
+	shaders.foreach([&](CShaderProgram *&s) {
+		s->RebuildAllMiniDescriptorSets(false);
+	});
+
+	camera.update(dt);
+	_UpdateCamera();
 
 	if (updateFlags.commandBuffers[FORWARD] || 
 		updateFlags.commandBuffers[DEFERRED])
@@ -1313,23 +1359,26 @@ bool OutputWindow::_UpdateBeforeDrawFrame()
 	return true;
 }
 
-void OutputWindow::DrawFrame()
+void OutputWindow::Update(float dt)
 {
 	uint32_t imageIndex;
 
-	if (!_UpdateBeforeDrawFrame())
+	if (imGui)
+		imGui->newFrame();
+
+	if (!_UpdateBeforeDraw(dt))
 		return;
 
 	if (!_SimpleAcquireNextImage(imageIndex))
 		return;
 
 	_SimpleQueueSubmit(imageAvailableSemaphore, deferredFrameBuf.deferredSemaphore, *commandBuffers.rbegin());
+	_GetPipelineStatistic();
 	_SimpleQueueSubmit(deferredFrameBuf.deferredSemaphore, renderFinishedSemaphore, commandBuffers[imageIndex]);
 	_SimplePresent(renderFinishedSemaphore, imageIndex);
 
+
 	vkQueueWaitIdle(presentQueue);
-	if (imGui)
-		imGui->newFrame();
 }
 
 void OutputWindow::PrepareShader(CShaderProgram *sh)
@@ -1438,9 +1487,15 @@ void OutputWindow::AddTexture(void *propVal, const char * textureName, IResource
 
 void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)
 {
-	cameraSettings = *cam;
+	camera.set(cam);
+}
+
+void OutputWindow::_UpdateCamera()
+{
 	if (!sharedUboData)
 		return;
+
+	auto cam = camera.get();
 
 	auto &ubo = *sharedUboData;
 	ubo.view = glm::lookAt(
@@ -1492,6 +1547,11 @@ void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)
 			viewRayDelta = reinterpret_cast<float *>(p.val);
 		else if (strcmp(p.name, "view2world") == 0)
 			view2world = reinterpret_cast<float *>(p.val);
+		else if (strcmp(p.name, "mouselagtest") == 0) {
+			ImGuiIO &io = ImGui::GetIO();
+			float *o = reinterpret_cast<float *>(p.val);
+			o[0] = float(io.DisplaySize.x) / float(io.MouseDelta.x);
+		}
 	}
 
 	// write params base on what we know
@@ -1734,6 +1794,55 @@ void OutputWindow::_CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBu
 	vkQueueWaitIdle(transferQueue);
 
 	vkFreeCommandBuffers(device, allocInfo.commandPool, 1, &commandBuffer);
+}
+
+void OutputWindow::_SetupPipelineStatistic()
+{
+	m_pipelineStatisticsQueryPool = VK_NULL_HANDLE;
+	if (!m_enablePiplineStatistic)
+		return;
+
+	VkQueryPoolCreateInfo queryPoolInfo = {};
+	queryPoolInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+	// This query pool will store pipeline statistics
+	queryPoolInfo.queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS;
+	// Pipeline counters to be returned for this pool
+	queryPoolInfo.pipelineStatistics =
+		VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_VERTICES_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_INPUT_ASSEMBLY_PRIMITIVES_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_VERTEX_SHADER_INVOCATIONS_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_CLIPPING_INVOCATIONS_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_CLIPPING_PRIMITIVES_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_FRAGMENT_SHADER_INVOCATIONS_BIT;
+
+	if (false)
+		queryPoolInfo.pipelineStatistics |=
+		VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_CONTROL_SHADER_PATCHES_BIT |
+		VK_QUERY_PIPELINE_STATISTIC_TESSELLATION_EVALUATION_SHADER_INVOCATIONS_BIT;
+
+	queryPoolInfo.queryCount = Utils::count_bits(queryPoolInfo.pipelineStatistics);
+	if (VK_SUCCESS != vkCreateQueryPool(device, &queryPoolInfo, NULL, &m_pipelineStatisticsQueryPool))
+	{
+		// no big deal... just no statisitic avaliable
+		TRACE("Warrning: No pipeline statistics.\n");
+	}
+	m_pipelineStats.resize(queryPoolInfo.queryCount);
+}
+
+void OutputWindow::_GetPipelineStatistic()
+{
+	if (!m_enablePiplineStatistic)
+		return;
+	uint32_t count = static_cast<uint32_t>(m_pipelineStats.size());
+	vkGetQueryPoolResults(
+		device,
+		m_pipelineStatisticsQueryPool,
+		0,
+		1,
+		count * sizeof(uint64_t),
+		m_pipelineStats.data(),
+		sizeof(uint64_t),
+		VK_QUERY_RESULT_64_BIT);
 }
 
 void OutputWindow::CopyImage(VkImage dstImage, Image *srcImage)

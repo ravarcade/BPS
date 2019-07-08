@@ -216,7 +216,7 @@ static PCREATE_WINDOW w2 = { 2, 500, 200, 1310, 620 };
 
 bool wndState[3] = { false, false, false };
 //vector<MProperties> onWnd[3];			// properties of 1st model on window
-vector<MProperties> deferredProp(3);    // properties for deferred resolve shader (ligth positions, debugSwitch)
+vector<vProperties> deferredProp(3);    // properties for deferred resolve shader (ligth positions, debugSwitch)
 
 void SetModel(Property &p, uint32_t num)
 {
@@ -612,7 +612,7 @@ void ToggleWnd(BAMS::CEngine &en, int wnd)
 
 void ChangeDebugView(BAMS::CEngine &en)
 {
-	for (MProperties &prop : deferredProp)
+	for (auto &prop : deferredProp)
 	{
 		for (uint32_t i = 0; i < prop.count; ++i)
 		{
@@ -680,76 +680,76 @@ void ChangeDebugView(BAMS::CEngine &en)
 //}
 //
 
-#define DIRECTINPUT_VERSION 0x0800
-#include <dinput.h>
-
-#pragma comment(lib, "dinput8.lib")
-#pragma comment(lib, "dxguid.lib")
-
-bool InitMouse();
-bool ReadMouse(int &xPosRelative, int &yPosRelative);
-
-int mouseX, mouseY;
-LPDIRECTINPUT8 pDI;
-LPDIRECTINPUTDEVICE8 pMouse;
-bool isInitialized = false;
-bool bImmediate = false;
-HDC last_HDC = NULL;
-
-
-bool InitMouse()
-{
-	isInitialized = false;
-	DWORD hr = DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION,
-		IID_IDirectInput8, (VOID**)&pDI, NULL);
-	if (FAILED(hr)) return false;
-
-	hr = pDI->CreateDevice(GUID_SysMouse, &pMouse, NULL);
-	if (FAILED(hr)) return false;
-
-	hr = pMouse->SetDataFormat(&c_dfDIMouse2);
-	if (FAILED(hr)) return false;
-
-	if (!bImmediate)
-	{
-		DIPROPDWORD dipdw;
-		dipdw.diph.dwSize = sizeof(DIPROPDWORD);
-		dipdw.diph.dwHeaderSize = sizeof(DIPROPHEADER);
-		dipdw.diph.dwObj = 0;
-		dipdw.diph.dwHow = DIPH_DEVICE;
-		dipdw.dwData = 16; // Arbitrary buffer size
-
-		if (FAILED(hr = pMouse->SetProperty(DIPROP_BUFFERSIZE, &dipdw.diph)))
-			return false;
-	}
-
-	pMouse->Acquire();
-	isInitialized = true;
-	return true;
-}
-
-bool ReadMouse(int &xPosRelative, int &yPosRelative)
-{
-	DIMOUSESTATE2 dims2;
-	ZeroMemory(&dims2, sizeof(dims2));
-
-	DWORD hr = pMouse->GetDeviceState(sizeof(DIMOUSESTATE2),
-		&dims2);
-	if (FAILED(hr))
-	{
-		hr = pMouse->Acquire();
-		while (hr == DIERR_INPUTLOST)
-			hr = pMouse->Acquire();
-
-		// no mouse data
-		return false;
-	}
-
-	xPosRelative = dims2.lX;
-	yPosRelative = dims2.lY;
-
-	return true;
-}
+//#define DIRECTINPUT_VERSION 0x0800
+//#include <dinput.h>
+//
+//#pragma comment(lib, "dinput8.lib")
+//#pragma comment(lib, "dxguid.lib")
+//
+//bool InitMouse();
+//bool ReadMouse(int &xPosRelative, int &yPosRelative);
+//
+//int mouseX, mouseY;
+//LPDIRECTINPUT8 pDI;
+//LPDIRECTINPUTDEVICE8 pMouse;
+//bool isInitialized = false;
+//bool bImmediate = false;
+//HDC last_HDC = NULL;
+//
+//
+//bool InitMouse()
+//{
+//	isInitialized = false;
+//	DWORD hr = DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION,
+//		IID_IDirectInput8, (VOID**)&pDI, NULL);
+//	if (FAILED(hr)) return false;
+//
+//	hr = pDI->CreateDevice(GUID_SysMouse, &pMouse, NULL);
+//	if (FAILED(hr)) return false;
+//
+//	hr = pMouse->SetDataFormat(&c_dfDIMouse2);
+//	if (FAILED(hr)) return false;
+//
+//	if (!bImmediate)
+//	{
+//		DIPROPDWORD dipdw;
+//		dipdw.diph.dwSize = sizeof(DIPROPDWORD);
+//		dipdw.diph.dwHeaderSize = sizeof(DIPROPHEADER);
+//		dipdw.diph.dwObj = 0;
+//		dipdw.diph.dwHow = DIPH_DEVICE;
+//		dipdw.dwData = 16; // Arbitrary buffer size
+//
+//		if (FAILED(hr = pMouse->SetProperty(DIPROP_BUFFERSIZE, &dipdw.diph)))
+//			return false;
+//	}
+//
+//	pMouse->Acquire();
+//	isInitialized = true;
+//	return true;
+//}
+//
+//bool ReadMouse(int &xPosRelative, int &yPosRelative)
+//{
+//	DIMOUSESTATE2 dims2;
+//	ZeroMemory(&dims2, sizeof(dims2));
+//
+//	DWORD hr = pMouse->GetDeviceState(sizeof(DIMOUSESTATE2),
+//		&dims2);
+//	if (FAILED(hr))
+//	{
+//		hr = pMouse->Acquire();
+//		while (hr == DIERR_INPUTLOST)
+//			hr = pMouse->Acquire();
+//
+//		// no mouse data
+//		return false;
+//	}
+//
+//	xPosRelative = dims2.lX;
+//	yPosRelative = dims2.lY;
+//
+//	return true;
+//}
 
 // ========================================================================
 // Camera
@@ -771,12 +771,13 @@ void ProcessCam(CEngine &en)
 //	if (!wndState[0] || (!onWnd[0].size() && !modelsOnScreen[0].size()))
 	if (!wndState[0] || !modelsOnScreen[0].size())
 		return;
-
+	return;
 	PSET_CAMERA cam = defaultCam;
 	cam.wnd = 0;
 
 	int mx = 0, my = 0;
-	ReadMouse(mx, my);
+	Tools::ReadMouse(&mx, &my);
+//	ReadMouse(mx, my);
 
 	static glm::vec3 static_target(
 		defaultCam.lookAt[0] - defaultCam.eye[0],
@@ -842,8 +843,8 @@ void testloop(BAMS::CEngine &en)
 		// Spin(en);
 		SpinModel(en);
 		BAMS::CEngine::Update(25.0f);
-		SleepEx(25, TRUE);
-		ProcessCam(en);
+//		SleepEx(5, TRUE);
+		//ProcessCam(en);
 
 		updateAllKeysScan();
 		for (uint16_t i = 0; i < sizeof(currentKeyState); ++i)
@@ -852,7 +853,7 @@ void testloop(BAMS::CEngine &en)
 			{
 				switch (i) {
 				case VK_ESCAPE:
-					isRunning = false;
+//					isRunning = false;
 						break;
 
 				case VK_NUMPAD7:
@@ -872,6 +873,15 @@ void testloop(BAMS::CEngine &en)
 
 //				default:					TRACE("KEY: " << i << "\n");
 				}
+			}
+		}
+		isRunning = false;
+		for (auto w : wndState)
+		{
+			if (w) 
+			{
+				isRunning = true;
+				break;
 			}
 		}
 	}
@@ -992,7 +1002,6 @@ void DoLocalTests()
 
 int main()
 {
-	InitMouse();
 	uint64_t Max, Current, Counter;
 
 	BAMS::GetMemoryAllocationStats(&Max, &Current, &Counter);

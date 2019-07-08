@@ -44,4 +44,6 @@ public:
 
 	static time_t TimestampNow();
 	static void Mat4mul(F32 *O, const F32 *A, const F32 *B);
+
+	static bool ReadMouse(int *xPosRelative, int *yPosRelative, uint32_t *buttons = nullptr, int *zPosRelative = nullptr);
 };

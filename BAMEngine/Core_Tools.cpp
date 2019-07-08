@@ -834,6 +834,93 @@ void Tools::Mat4mul(F32 * O, const F32 * A, const F32 * B)
 	O[15] = A[12] * B[3] + A[13] * B[7] + A[14] * B[11] + A[15] * B[15];
 }
 
+// ============================================================================================= mouse
+#define DIRECTINPUT_VERSION 0x0800
+#include <dinput.h>
+
+#pragma comment(lib, "dinput8.lib")
+#pragma comment(lib, "dxguid.lib")
+
+LPDIRECTINPUT8 pDI;
+LPDIRECTINPUTDEVICE8 pMouse = nullptr;
+bool isInitialized = false;
+bool bImmediate = false;
+
+
+bool InitMouse()
+{
+	isInitialized = false;
+	DWORD hr = DirectInput8Create(GetModuleHandle(NULL), DIRECTINPUT_VERSION,
+		IID_IDirectInput8, (VOID**)&pDI, NULL);
+	if (FAILED(hr)) return false;
+
+	hr = pDI->CreateDevice(GUID_SysMouse, &pMouse, NULL);
+	if (FAILED(hr)) return false;
+
+	hr = pMouse->SetDataFormat(&c_dfDIMouse2);
+	if (FAILED(hr)) return false;
+
+	if (!bImmediate)
+	{
+		DIPROPDWORD dipdw;
+		dipdw.diph.dwSize = sizeof(DIPROPDWORD);
+		dipdw.diph.dwHeaderSize = sizeof(DIPROPHEADER);
+		dipdw.diph.dwObj = 0;
+		dipdw.diph.dwHow = DIPH_DEVICE;
+		dipdw.dwData = 16; // Arbitrary buffer size
+
+		if (FAILED(hr = pMouse->SetProperty(DIPROP_BUFFERSIZE, &dipdw.diph)))
+			return false;
+	}
+
+	pMouse->Acquire();
+	isInitialized = true;
+	return true;
+}
+
+bool Tools::ReadMouse(int *xPosRelative, int *yPosRelative, uint32_t *buttons, int *zPosRelative)
+{
+	DIMOUSESTATE2 dims2;
+	ZeroMemory(&dims2, sizeof(dims2));
+
+	if (!pMouse)
+		InitMouse();
+
+	DWORD hr = pMouse->GetDeviceState(sizeof(DIMOUSESTATE2), &dims2);
+
+	if (FAILED(hr))
+	{
+		hr = pMouse->Acquire();
+		while (hr == DIERR_INPUTLOST)
+			hr = pMouse->Acquire();
+
+		// no mouse data
+		return false;
+	}
+
+	*xPosRelative = dims2.lX;
+	*yPosRelative = dims2.lY;
+	if (zPosRelative)
+		*zPosRelative = dims2.lZ;
+	if (buttons)
+	{
+		uint32_t bit = 1;
+		uint32_t result = 0;
+		for (uint32_t i = 0; i < 5; ++i)
+		{
+			if (dims2.rgbButtons[i] & 0x80)
+			{
+				result |= bit;
+			}
+			bit += bit;
+		}
+		*buttons = result;
+	}
+	
+
+	return true;
+}
+
 UUID Tools::NOUID = { 0 };
 
 }; // BAMS namespace

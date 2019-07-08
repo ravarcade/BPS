@@ -115,8 +115,8 @@ void ire::Init()
 {
 	CreateInstance();
 	SetupDebugCallback();
-	for (auto &ow : outputWindows)
-		ow = new OutputWindow();
+	for (uint32_t i = 0; i < MAX_WINDOWS; ++i)
+		outputWindows[i] = new OutputWindow(i);
 }
 
 /// <summary>
@@ -229,9 +229,8 @@ void ire::Update(float dt)
 	for (auto &ow : outputWindows)
 	{
 		if (ow && ow->IsValid()) 
-		{
-			ow->UpdateUniformBuffer();
-			ow->DrawFrame();
+		{			
+			ow->Update(dt);
 		}
 	}
 }

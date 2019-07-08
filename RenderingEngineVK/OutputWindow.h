@@ -79,6 +79,8 @@ private:
 		std::vector<VkDescriptorImageInfo>descriptionImageInfo;
 	};
 
+	bool m_minimizeLag;
+	uint32_t windowIdx;
 	VkInstance instance;				// required to: (1) create and destroy VkSurfaceKHR, (2) select physical device matching surface
 	VkPhysicalDevice physicalDevice;
 	GLFWwindow* window;
@@ -117,6 +119,11 @@ private:
 
 	std::vector<VkCommandBuffer> commandBuffers;
 	bool resizeWindow = false;
+
+
+	CCamera camera;
+
+	// ----------------------------------------
 
 	bool _IsDeviceSuitable(VkPhysicalDevice device);
 	VkFormat _FindDepthFormat();
@@ -174,12 +181,19 @@ private:
 	void _SimpleQueueSubmit(VkSemaphore & waitSemaphore, VkSemaphore & signalSemaphore, VkCommandBuffer & commandBuffer);
 	void _SimplePresent(VkSemaphore & waitSemaphore, uint32_t imageIndex);
 
-	bool _UpdateBeforeDrawFrame();
+	bool _UpdateBeforeDraw(float dt);
+
 	void _RecreateSwapChain();
 	void _CopyBufferToImage(VkImage dstImage, VkBuffer srcBuffer, VkBufferImageCopy & region, VkImageSubresourceRange & subresourceRange);
 
+	bool m_enablePiplineStatistic;
+	void _SetupPipelineStatistic();
+	void _GetPipelineStatistic();
+	VkQueryPool m_pipelineStatisticsQueryPool;
+	std::vector<uint64_t>m_pipelineStats;
+
 public:
-	OutputWindow();
+	OutputWindow(uint32_t wnd);
 	~OutputWindow() { _Cleanup(); }
 	void Init();
 	void Prepare(VkInstance _instance, GLFWwindow* _window, const VkAllocationCallbacks* _allocator);
@@ -188,9 +202,9 @@ public:
 
 	void Close(GLFWwindow *wnd = nullptr);
 
-	void UpdateUniformBuffer();
+	void _UpdateUniformBuffer();
 
-	void DrawFrame();
+	void Update(float dt);
 	void PrepareShader(CShaderProgram * sh);
 	bool Exist() { return device != VK_NULL_HANDLE; }
 	void BufferRecreationNeeded() { updateFlags.commandBuffers[FORWARD] = true; updateFlags.commandBuffers[DEFERRED] = true; }
@@ -231,6 +245,7 @@ public:
 	Define_vkDestroy(CommandPool);
 	Define_vkDestroy(ShaderModule);
 	Define_vkDestroy(Sampler);
+	Define_vkDestroy(QueryPool);
 	template<> void vkDestroy(VkSurfaceKHR &v) { if (v) { vkDestroySurfaceKHR(instance, v, allocator); v = VK_NULL_HANDLE; } }
 	template<> void vkDestroy(FrameBufferAttachment &v) { vkDestroy(v.image); vkDestroy(v.view); vkFree(v.memory); }
 
@@ -257,7 +272,7 @@ public:
 	// ------------------------ camera stuffs -------------------
 
 	void SetCamera(const BAMS::PSET_CAMERA * cam);
-	BAMS::PSET_CAMERA cameraSettings;
+	void _UpdateCamera();
 
 	VkDescriptorImageInfo *GetDescriptionImageInfo(const char *attachmentName);
 

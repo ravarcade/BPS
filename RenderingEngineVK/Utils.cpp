@@ -48,8 +48,8 @@ void decomposeM(const float *m, float *r, float *s, float *t)
 	glm::vec3 e = glm::eulerAngles(q);
 	
 	r[0] = e.x * rad2deg;
-	r[2] = e.y * rad2deg;
-	r[1] = e.z * rad2deg;
+	r[1] = e.y * rad2deg;
+	r[2] = e.z * rad2deg;
 
 	if ((abs(abs(r[0]) - 180.0f) < epsilon && abs(abs(r[1]) - 180.0f) < epsilon) ||
 		(abs(abs(r[0]) - 180.0f) < epsilon && abs(abs(r[2]) - 180.0f) < epsilon) ||

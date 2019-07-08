@@ -221,6 +221,7 @@ CShadersReflections::CShadersReflections(const char *shaderName) { LoadProgram(s
 /// <param name="shaderName">The shader program name from resource.</param>
 void CShadersReflections::LoadProgram(const char *shaderName)
 {
+	TRACE("reflection: " << shaderName << "\n");
 	BAMS::CResourceManager rm;
 	m_shaderResource = rm.Get<BAMS::CResShader>(shaderName);
 	m_shaderName = m_shaderResource.GetName();

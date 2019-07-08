@@ -317,28 +317,55 @@ void VkImGui::drawGui()
 {
 	ImGuiIO& io = ImGui::GetIO();
 	// property window
+		// left panel
+	ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+	ImGui::SetNextWindowSize(ImVec2(350, io.DisplaySize.y));
+	ImGuiWindowFlags flags =
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_AlwaysAutoResize |
+//		ImGuiWindowFlags_NoResize |
+		// ImGuiWindowFlags_NoCollapse |
+		ImGuiWindowFlags_NoSavedSettings |
+		// ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_AlwaysAutoResize;
+	if (!ImGui::Begin(m_propName.size() ? m_propName.c_str() : "Properties", NULL, flags))
+	{
+		ImGui::End();
+		return;
+	}
+	ImGui::PushItemWidth(ImGui::GetFontSize() * -12);           // Use fixed width for labels (by passing a negative value), the rest goes to widgets. We choose a width proportional to our font size.
+
+	if (ImGui::CollapsingHeader("Stats"))
+	{
+		if (vk->m_enablePiplineStatistic)
+		{
+
+			static const char *pipelineStats[] = {
+			"Input assembly vertex count        ",
+			"Input assembly primitives count    ",
+			"Vertex shader invocations          ",
+			"Clipping stage primitives processed",
+			"Clipping stage primtives output    ",
+			"Fragment shader invocations        " };
+			for (int i = 0; i < COUNT_OF(pipelineStats); ++i)
+			{
+				ImGui::Text("%s : %d", pipelineStats[i], vk->m_pipelineStats[i]);
+			}
+		}
+	}
 	if (m_prop)
 	{
-//		ImGui::SetNextWindowSize(ImVec2(200, 200), ImGuiCond_FirstUseEver);
-
-		// left panel
-		ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-		ImGui::SetNextWindowSize(ImVec2(250, io.DisplaySize.y));
-		ImGuiWindowFlags flags =
-			ImGuiWindowFlags_NoMove |
-			ImGuiWindowFlags_NoResize |
-//			ImGuiWindowFlags_NoCollapse |
-			ImGuiWindowFlags_NoSavedSettings |
-//			ImGuiWindowFlags_NoTitleBar |
-			ImGuiWindowFlags_AlwaysAutoResize;
-		ImGui::Begin(m_propName.size() ? m_propName.c_str() : "Properties", NULL, flags);
-		ImGui::inputProperties(m_prop);
-		ImGui::TextUnformatted("ALA MA KOTA");
-		ImGui::TextUnformatted("TADA");
-		ImGui::Checkbox("Show ImGui Demo Window", &m_showImGuiDemoWindow);
-		ImGui::End();
-
+		if (ImGui::CollapsingHeader("Properties"))
+			inputProperties(m_prop);
 	}
+
+	if (ImGui::CollapsingHeader("Tests"))
+	{
+
+		ImGui::Checkbox("Show ImGui Demo Window", &m_showImGuiDemoWindow);
+	}
+	ImGui::End();
+
 }
 
 void VkImGui::ShowProperties(Properties * prop, const char * name)
@@ -347,7 +374,7 @@ void VkImGui::ShowProperties(Properties * prop, const char * name)
 	m_propName = name ? name : ""; 
 }
 
-void VkImGui::_buildTextureData()
+void VkImGui::_updateTextureData()
 {
 	static int lastFrame = -2;
 	if (lastFrame != ImGui::GetFrameCount())
@@ -358,114 +385,42 @@ void VkImGui::_buildTextureData()
 
 		// build list of textures
 		m_textureResources.clear();
-		m_textureDescriptors.clear();
 		rm.Filter(RESID_IMAGE, [&](IResource *res) {
 			m_textureResources.emplace_back(res);
-			auto pIdx = vk->textures.findIdx(rm.GetName(res));
-			m_textureDescriptors.emplace_back(pIdx ? &vk->textures[*pIdx].descriptor : nullptr);
 		});
 
 		// sort
-		auto f = &m_textureResources[0];
-		auto e = f + m_textureResources.size();
-		std::sort(f, e, [&](IResource *a, IResource *b) {
+		std::sort(m_textureResources.begin(), m_textureResources.end(), [&](IResource *a, IResource *b) {
 			auto na = rm.GetName(a);
 			auto nb = rm.GetName(b);
 			return _stricmp(na, nb) <= 0;
 		});
+
+		m_textureDescriptors.clear();
+		for (auto res : m_textureResources)
+		{
+			auto pIdx = vk->textures.findIdx(rm.GetName(res));
+			m_textureDescriptors.emplace_back(pIdx ? &vk->textures[*pIdx].descriptor : nullptr);
+		}
 	}
 }
 
-// ============================================================================ helper methods
-
-
-// ============================================================================ ImGui namespace extensions
-
-namespace ImGui {
-
-	namespace help {
-		void _decomposeM(const float *f, float **r, float **s, float **t)
-		{
-			struct data
-			{
-				data() : frame(-2) {}
-				const float *f;
-				float r[3];
-				float s[3];
-				float t[3];
-				int frame;
-			};
-
-			static std::vector<data> decomposed(8);
-
-			data *slot = nullptr;
-			int prevFrame = ImGui::GetFrameCount() - 1;
-			data *empty = nullptr;
-			for (auto &prev : decomposed)
-			{
-				if (!empty && prev.frame != prevFrame)
-					empty = &prev;
-
-				if (prevFrame == prev.frame && f == prev.f)
-				{
-					slot = &prev;
-					break;
-				}
-			}
-			if (!slot)
-			{
-				if (!empty)
-				{
-					size_t s = decomposed.size();
-					decomposed.resize(s + 4);
-					empty = &decomposed[s];
-				}
-				slot = empty;
-				slot->f = f;
-				Utils::decomposeM(f, slot->r, slot->s, slot->t);
-			}
-			slot->frame = ImGui::GetFrameCount();
-			*r = slot->r;
-			*s = slot->s;
-			*t = slot->t;
-		}
-
-		int _getTexture(VkDescriptorImageInfo *val)
-		{
-			VkImGui *imGui = re.GetImGui();
-			imGui->_buildTextureData();
-			auto &td = imGui->m_textureDescriptors;
-			for (size_t i = 0; i < td.size(); ++i)
-			{
-				if (td[i] == val)
-				{
-					return static_cast<int>(i);
-				}
-			}
-			return -1;
-		}
-
-	}
-
-	bool inputProperties(Properties *prop);
-	bool selectTexture(const char *label, void **propVal);
-
-bool inputProperties(Properties *prop)
+bool VkImGui::inputProperties(Properties *prop)
 {
 	bool change = false;
 	for (auto &p : *prop)
 	{
 		switch (p.guiType)
 		{
-		case PTGUI_COLOR: 			
+		case PTGUI_COLOR:
 			if (p.count == 3)
-				change = ImGui::ColorEdit3(p.name, reinterpret_cast<float *>(p.val)); 
+				change = ImGui::ColorEdit3(p.name, reinterpret_cast<float *>(p.val));
 			else
-				change = ImGui::ColorEdit4(p.name, reinterpret_cast<float *>(p.val)); 
+				change = ImGui::ColorEdit4(p.name, reinterpret_cast<float *>(p.val));
 			break;
 
 		case PTGUI_DRAG:
-			switch (p.count) 
+			switch (p.count)
 			{
 			case 1:
 				change = ImGui::DragFloat(p.name, reinterpret_cast<float *>(p.val), p.guiStep, p.guiMin, p.guiMax); break;
@@ -495,9 +450,9 @@ bool inputProperties(Properties *prop)
 				{
 					bool Mchange = false;
 					float *r, *s, *t;
-					help::_decomposeM(reinterpret_cast<float *>(p.val), &r, &s, &t);
-					
-					Mchange = ImGui::DragFloat3("Positon", t,1.0);
+					_decomposeM(reinterpret_cast<float *>(p.val), &r, &s, &t);
+
+					Mchange = ImGui::DragFloat3("Positon", t, 1.0);
 					Mchange |= ImGui::DragFloat3("Rotation", r, 1.0);
 					Mchange |= ImGui::DragFloat3("Scale", s, 0.005f);
 
@@ -506,7 +461,7 @@ bool inputProperties(Properties *prop)
 						Utils::composeM(reinterpret_cast<float *>(p.val), r, s, t);
 					}
 				}
-					break;
+				break;
 
 				default:
 					ImGui::Text(".f32x%d?. %s", p.count, p.name);
@@ -517,13 +472,13 @@ bool inputProperties(Properties *prop)
 			{
 				IResource *res = nullptr;
 				auto pPropVal = reinterpret_cast<VkDescriptorImageInfo **>(p.val);
-				change = ImGui::selectTexture(p.name, pPropVal, &res);
+				change = selectTexture(p.name, pPropVal, &res);
 				if (change && res && !*pPropVal)
 				{
 					re.GetImGui()->vk->AddTexture(p.val, nullptr, res);
 				}
 			}
-				break;
+			break;
 			default:
 				ImGui::Text(".?. %s", p.name);
 			}
@@ -532,33 +487,82 @@ bool inputProperties(Properties *prop)
 	return change;
 }
 
-bool selectTexture(const char *label, VkDescriptorImageInfo **pPropVal, IResource **outRes)
+bool VkImGui::selectTexture(const char *label, VkDescriptorImageInfo **pPropVal, IResource **outRes)
 {
-	
-	int idx = help::_getTexture(*pPropVal);
-	VkImGui *imGui = re.GetImGui();
+	_updateTextureData();
+
+	int idx = _getTexture(*pPropVal);
+
 	bool change = ImGui::Combo(label, &idx, [](void *data, int idx, const char **out_text) {
 		auto &textureResources = *reinterpret_cast<std::vector<IResource*>*>(data);
 		if (idx >= 0 && idx < textureResources.size())
 		{
 			CResourceManager rm;
 			*out_text = rm.GetName(textureResources[idx]);
-		} 
+		}
 		else {
 			*out_text = "[ NOT SET ]";
 		}
 		return true;
-	}, &imGui->m_textureResources, static_cast<int>(imGui->m_textureResources.size()));
+	}, &m_textureResources, static_cast<int>(m_textureResources.size()));
 
 	if (change)
 	{
 		if (outRes)
-			*outRes = imGui->m_textureResources[idx];
-		
-		*pPropVal = imGui->m_textureDescriptors[idx];
+			*outRes = m_textureResources[idx];
+
+		*pPropVal = m_textureDescriptors[idx];
 	}
 
 	return change;
 }
 
-}; // ImGui
+// ============================================================================ helper methods
+
+void VkImGui::_decomposeM(const float *f, float **r, float **s, float **t)
+{
+	decomposedMatricesCacheEntry *slot = nullptr;
+	int prevFrame = ImGui::GetFrameCount() - 1;
+	decomposedMatricesCacheEntry *empty = nullptr;
+	for (auto &prev : m_decomposedMatricesCache)
+	{
+		if (!empty && prev.frame != prevFrame)
+			empty = &prev;
+
+		if (prevFrame == prev.frame && f == prev.f)
+		{
+			slot = &prev;
+			break;
+		}
+	}
+	if (!slot)
+	{
+		if (!empty)
+		{
+			size_t s = m_decomposedMatricesCache.size();
+			m_decomposedMatricesCache.resize(s + 4);
+			empty = &m_decomposedMatricesCache[s];
+		}
+		slot = empty;
+		slot->f = f;
+		Utils::decomposeM(f, slot->r, slot->s, slot->t);
+	}
+	slot->frame = ImGui::GetFrameCount();
+	*r = slot->r;
+	*s = slot->s;
+	*t = slot->t;
+}
+
+int VkImGui::_getTexture(VkDescriptorImageInfo *val)
+{
+	for (size_t i = 0; i < m_textureDescriptors.size(); ++i)
+	{
+		if (m_textureDescriptors[i] == val)
+		{
+			return static_cast<int>(i);
+		}
+	}
+	return -1;
+}
+
+

@@ -13,28 +13,21 @@ private:
 	VkDeviceMemory indexMem;
 	void *vertexData;
 	void *indexData;
-
-//	vks::Buffer vertexBuffer;
-//	vks::Buffer indexBuffer;
 	int32_t vertexCount = 0;
 	int32_t indexCount = 0;
-
 	float *pScale;
 	float *pTranslate;
 	CTexture2d *fontTexture; // all below things are inside fontTexture object
-	//VkSampler sampler;
-	//VkDeviceMemory fontMemory = VK_NULL_HANDLE;
-	//VkImage fontImage = VK_NULL_HANDLE;
-	//VkImageView fontView = VK_NULL_HANDLE;
 
 
-	VkPipelineCache pipelineCache;
-	VkPipelineLayout pipelineLayout;
-	VkPipeline pipeline;
-	VkDescriptorPool descriptorPool;
-	VkDescriptorSetLayout descriptorSetLayout;
-	VkDescriptorSet descriptorSet;
-//	VkDevice *logicalDevice;
+	//VkPipelineCache pipelineCache;
+	//VkPipelineLayout pipelineLayout;
+	//VkPipeline pipeline;
+	//VkDescriptorPool descriptorPool;
+	//VkDescriptorSetLayout descriptorSetLayout;
+	//VkDescriptorSet descriptorSet;
+
+
 public:
 	OutputWindow *vk;
 	// UI params are set via push constants
@@ -84,11 +77,25 @@ public:
 	Properties *m_prop;
 	std::vector<IResource *> m_textureResources;
 	std::vector<VkDescriptorImageInfo *> m_textureDescriptors;
-	// ==================================================================== Helpers ===
-	void _buildTextureData();
+
+	bool inputProperties(Properties *prop);
+	bool selectTexture(const char *label, VkDescriptorImageInfo **pPropVal, IResource **outRes);
+		// ==================================================================== Helpers ===
+private:
+	void _updateTextureData();
+	int _getTexture(VkDescriptorImageInfo *val);
+
+	// matrix decomposition
+	struct decomposedMatricesCacheEntry
+	{
+		decomposedMatricesCacheEntry() : frame(-2) {}
+		const float *f;
+		float r[3];
+		float s[3];
+		float t[3];
+		int frame;
+	};
+	std::vector<decomposedMatricesCacheEntry> m_decomposedMatricesCache;
+	void _decomposeM(const float *f, float **r, float **s, float **t);
 };
 
-namespace ImGui {
-	bool inputProperties(Properties *prop);
-	bool selectTexture(const char *label, VkDescriptorImageInfo **pPropVal, IResource **res);
-};

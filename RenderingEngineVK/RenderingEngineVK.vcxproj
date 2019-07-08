@@ -181,6 +181,7 @@
     <ClInclude Include="..\3rdParty\SPRIV-Cross\spirv_hlsl.hpp" />
     <ClInclude Include="..\3rdParty\SPRIV-Cross\spirv_msl.hpp" />
     <ClInclude Include="..\3rdParty\SPRIV-Cross\spirv_reflect.hpp" />
+    <ClInclude Include="camera.h" />
     <ClInclude Include="DescriptorSetsManager.h" />
     <ClInclude Include="iglfw.h" />
     <ClInclude Include="ire.h" />
@@ -231,6 +232,7 @@
     <ClCompile Include="..\3rdParty\SPRIV-Cross\spirv_reflect.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="camera.cpp" />
     <ClCompile Include="DescriptorSetsManager.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>

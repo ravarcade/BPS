@@ -486,3 +486,157 @@ private:
 		return reinterpret_cast<T *>(_alloc->allocate(size * sizeof(T)));
 	}
 };
+
+
+// ------------------------------------------------------------------------------------
+
+class vProperties : public Properties
+{
+public:
+	vProperties(U32 cnt = 0) : reserved(cnt), _alloc(nullptr)
+	{
+		if (cnt)
+		{
+			properties = _getMem<Property>(reserved);
+			memset(properties, 0, sizeof(Property) * reserved);
+		}
+	}
+
+	vProperties(const Properties &src) : reserved(0) { _cpy(src); }
+	vProperties(const vProperties &src) : reserved(0) { _cpy(src); }
+
+	vProperties(vProperties &&src) noexcept
+	{
+		memcpy_s(this, sizeof(vProperties), &src, sizeof(vProperties));
+		src.properties = nullptr;
+		src._alloc = nullptr;
+	}
+
+	~vProperties() 
+	{ 
+		if (_alloc)
+			delete _alloc; 
+	}
+
+	vProperties &operator = (const Properties &src) { return _cpy(src); }
+	vProperties &operator = (vProperties &&src) noexcept
+	{
+		if (_alloc)
+			delete _alloc;
+
+		memcpy_s(this, sizeof(vProperties), &src, sizeof(vProperties));
+		src.properties = nullptr;
+		src._alloc = nullptr;
+		return *this;
+	}
+
+	template<class... Args>
+	Property *add(Args &&...args)
+	{
+		if (reserved <= (count + 1))
+		{
+			reserved += reserved / 2 + 8;
+			_resize();
+		}
+
+		auto ret = new (&properties[count]) Property(std::forward<Args>(args)...);
+		// backup property name
+		ret->name = _storeString(ret->name);
+		++count;
+		return ret;
+	}
+
+	void remove(U32 idx)
+	{
+		_alloc->deallocate(const_cast<char *>(properties[idx].name));
+
+		for (U32 i = 0; i < count; ++i)
+		{
+			if (properties[idx].parent > idx)
+				properties[idx].parent -= 1;
+
+			if (properties[i].parent == idx)
+				remove(i);
+		}
+
+		if (idx + 1 < count)
+		{
+			auto s = sizeof(Property)*(count - idx - 1);
+			memcpy_s(&properties[idx], s, &properties[idx + 1], s);
+		}
+
+		--count;
+	}
+
+	Property & operator [] (U32 i)
+	{
+		assert(i < count);
+		return properties[i];
+	}
+
+
+	void clear() { count = 0; }
+	U32 size() { return count; }
+
+	Property * begin() { return properties; }
+	Property * end() { return &properties[count]; }
+
+	const Property * begin() const { return properties; }
+	const Property * end() const { return &properties[count]; }
+
+private:
+	IMemoryAllocator *_alloc;
+	U32 reserved;
+
+	void _resize()
+	{
+		Property *old = properties;
+		properties = _getMem<Property>(reserved);
+		if (old && count)
+			memcpy_s(properties, sizeof(Property)*reserved, old, sizeof(Property)*count);
+
+		if (old)
+			_alloc->deallocate(old); // we don't release memory allocated for names
+	}
+
+	template<typename T>
+	T *_getMem(SIZE_T size)
+	{
+		if (!size)
+			return nullptr;
+
+		if (!_alloc)
+			_alloc = Allocators::GetMemoryAllocator(IMemoryAllocator::block, 4096);
+
+		return reinterpret_cast<T *>(_alloc->allocate(size * sizeof(T)));
+	}
+
+	vProperties &_cpy(const Properties &src)
+	{
+		if (src.count > reserved)
+		{
+			reserved = src.count;
+			_resize();
+		}
+		count = src.count;
+		if (count)
+		{
+			auto s = sizeof(Property)*reserved;
+			memcpy_s(properties, s, src.properties, s);
+		}
+		for (auto &p : *this)
+		{
+			p.name = _storeString(p.name);
+		}
+
+		return *this;
+	}
+
+	const char *_storeString(const char *str)
+	{
+		size_t l = strlen(str) + 1;
+		auto ret = _getMem<char>(l);
+		memcpy_s(ret, l, str, l);
+		return ret;
+	}
+};
