@@ -67,6 +67,7 @@ void Image::CreateEmpty(U32 width, U32 height, U32 format, U32 pitch)
 	if (!alloc)
 		alloc = Allocators::GetMemoryAllocator();
 
+	Release();
 	buffer = alloc->allocate(pitch * height);
 	rawImage = static_cast<U8*>(buffer);
 }
@@ -77,6 +78,8 @@ void Image::Release()
 		alloc->deallocate(buffer);
 		buffer = nullptr;
 	}
+	rawImage = nullptr;
+
 }
 
 }; // BAMS namespace

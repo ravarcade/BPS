@@ -101,6 +101,7 @@ public:
 	void AddMesh(const void *params);
 	void AddModel(const void * params);
 	void AddTexture(const void * params);
+	void UpdateTexture(const void * params);
 	void AddShader(const void *params);
 	void ReloadShader(const void * params);
 	void GetShaderParams(const void * params);

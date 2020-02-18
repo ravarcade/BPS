@@ -43,8 +43,8 @@ using namespace BAMS;
 
 #include "Utils.h"
 #include "ShadersReflections.h"
-#include "ShaderProgram.h"
 #include "Texture2d.h"
+#include "ShaderProgram.h"
 #include "camera.h"
 #include "DescriptorSetsManager.h"
 #include "iglfw.h"

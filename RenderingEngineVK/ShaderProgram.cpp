@@ -782,7 +782,7 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool force)
 	for (MiniDescriptorSet &mds : m_miniDescriptorSets)
 	{
 		mds.refCounter = 0;
-		mds.rebuildMe = force;
+		mds.rebuildMe |= force;
 	}
 	m_uniqMiniDescriptoSets.clear();
 
@@ -905,6 +905,19 @@ void CShaderProgram::RebuildAllMiniDescriptorSets(bool force)
 		if (mds.rebuildMe && mds.refCounter)
 		{
 			UpdateDescriptorSet(mds);
+		}
+	}
+}
+
+void CShaderProgram::_MarkDescriptorSetsInvalid(VkDescriptorImageInfo * pDII)
+{
+	for (MiniDescriptorSet &mds : m_miniDescriptorSets)
+	{
+		for (auto txs : mds.textures) {
+			if (txs == pDII) {
+				mds.rebuildMe |= true;
+				break;
+			}
 		}
 	}
 }

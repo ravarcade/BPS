@@ -7,24 +7,21 @@ bool DecodeTGA(Image *dst, U8 *src, SIZE_T size, TempMemory &tmp);
 bool DecodePNG(Image *dst, U8 *src, SIZE_T size, TempMemory &tmp);
 bool DecodeJPG(Image *dst, U8 *src, SIZE_T size, TempMemory &tmp);
 
-Image_Loader::Image_Loader()
+ImageDecoder::ImageDecoder()
 {
 }
 
-Image_Loader::~Image_Loader()
+ImageDecoder::~ImageDecoder()
 {
 }
 
-void Image_Loader::OnFinalize()
+void ImageDecoder::OnFinalize()
 {
 	tmp.release();
 }
 
-void Image_Loader::Load(CResImage & res)
+void ImageDecoder::Decode(CResImage & res)
 {
-	CResourceManager rm;
-	rm.LoadSync(res);
-
 	// check extensions:
 	int extIdx = Tools::FindMatchingFileExtension(res.GetPath(), L"bmp;tga;png;jpg;jpeg");
 	switch (extIdx)

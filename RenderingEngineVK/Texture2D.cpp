@@ -9,7 +9,7 @@ CTexture2d::~CTexture2d()
 {
 }
 
-void CTexture2d::LoadTexture(Image *img)
+void CTexture2d::_LoadTexture(Image *img)
 {
 	uint32_t mipmapLevels = 0;
 	VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
@@ -51,27 +51,81 @@ void CTexture2d::LoadTexture(Image *img)
 	descriptor.sampler = sampler;
 	descriptor.imageView = view;
 	descriptor.imageLayout = imageLayout;
+
+	vk->_MarkDescriptorSetsInvalid(&descriptor);
+	TRACE("Created texture: " << resImg.GetName());
 }
 
-void CTexture2d::LoadTexture(const char * textureResourceName)
+void CTexture2d::LoadResTexture(const char * textureResourceName)
 {
 	CResourceManager rm;
 	auto res = rm.FindExisting(textureResourceName, CResImage::GetType());
 	if (!res)
 	{
+
 		TRACE("ERROR: Missing \"" << textureResourceName << "\" texture.\n");
-		assert(res != nullptr);
+		// assert(res != nullptr); // we don't have to crash here... if res == nullptr we will use defaultEmptyTexture
 	}
-	LoadTexture(res);
+	LoadResTexture(res);
 }
 
-void CTexture2d::LoadTexture(IResource *textureResource)
-{
-	CResImage resImg(textureResource);
-	auto img = resImg.GetImage(true);
-	LoadTexture(img);
+void CTexture2d::LoadResTexture(IResource *textureResource)
+{	
+	if (textureResource)  // if resource exist, try to use it as texture
+	{
+		CResImage resImg(textureResource);
+		auto img = resImg.GetImage();
+		this->resImg = std::move(resImg);
+		if (img->IsLoaded())
+		{
+			_LoadTexture(img);
+			return;
+		}
+	}
+
+	auto &pdt = vk->pDefaultEmptyTexture;
+	if (!pdt) {
+		uint8_t onePixel[4] = { 0xff, 0x7f, 0x7f, 0x7f };
+		BAMS::Image defaultTextureImage(onePixel, 1, 1, PF_R8G8B8A8_UNORM);
+		pdt = new CTexture2d(vk);
+		pdt->_LoadTexture(&defaultTextureImage);
+	}
+	descriptor = pdt->descriptor;  // note: VkDescriptorImageInfo descriptor don't have any VK resources to destroy, so this plain copy is safe.
 }
+
+//void CTexture2d::UpdateTexture(Image *img)
+//{
+//	TRACE("Update Texture");
+//}
+//
+//void CTexture2d::UpdateTexture(const char *textureResourceName)
+//{
+//	CResourceManager rm;
+//	auto res = rm.FindExisting(textureResourceName, CResImage::GetType());
+//	assert(res != nullptr);
+//	if (!res)
+//	{
+//		TRACE("ERROR: Missing \"" << textureResourceName << "\" texture.\n");		
+//	}
+//	else {
+//		UpdateTexture(res);
+//	}
+//}
+//
+//void CTexture2d::UpdateTexture(IResource * textureResource)
+//{
+//	CResImage resImg(textureResource);
+//	auto img = resImg.GetImage(true);
+//	assert(img != nullptr);
+//	if (!img) {
+//		TRACE("ERROR: Missing texture.\n");
+//	}
+//	else {
+//		UpdateTexture(img);
+//	}
+//}
 
 void CTexture2d::Release()
 {
+	
 }

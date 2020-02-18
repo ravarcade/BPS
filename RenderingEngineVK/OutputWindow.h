@@ -12,7 +12,6 @@ enum EDrawOrder {
 struct ObjectInfo {
 	CShaderProgram *shader;
 	uint32_t oid;
-//	ObjectInfo(CShaderProgram *_shader, uint32_t _oid) : shader(_shader), oid(_oid) {}
 	Properties *GetProperties() { return shader->GetProperties(oid); }
 };
 
@@ -26,7 +25,6 @@ private:
 	};
 	struct UpdateFlags {
 		bool commandBuffers[MAX_DRAWORDER];
-//		std::vector<
 	};
 	UpdateFlags updateFlags;
 
@@ -76,11 +74,12 @@ private:
 			}
 			f(depth);
 		};
-		std::vector<VkDescriptorImageInfo>descriptionImageInfo;
+		std::vector<VkDescriptorImageInfo> descriptionImageInfo;
 	};
 
 	bool m_minimizeLag;
 	uint32_t windowIdx;
+	uint64_t frameCounter;
 	VkInstance instance;				// required to: (1) create and destroy VkSurfaceKHR, (2) select physical device matching surface
 	VkPhysicalDevice physicalDevice;
 	GLFWwindow* window;
@@ -172,6 +171,7 @@ private:
 
 	void _LoadShaderPrograms();
 	void _CleanupTextures();
+	void _CleanupDropedTextures(bool all = false);
 	void _CleanupShaderPrograms();
 	void _Cleanup();
 
@@ -191,6 +191,7 @@ private:
 	void _GetPipelineStatistic();
 	VkQueryPool m_pipelineStatisticsQueryPool;
 	std::vector<uint64_t>m_pipelineStats;
+
 
 public:
 	OutputWindow(uint32_t wnd);
@@ -255,7 +256,6 @@ public:
 
 	std::vector<CShaderProgram*> forwardRenderingShaders;
 	CStringHastable<CShaderProgram> shaders;
-//	CStringHastable<ObjectInfo> objects;
 	basic_array<ObjectInfo> objects;
 
 	ObjectInfo * AddObject(const char * mesh, const char * shader);
@@ -267,7 +267,10 @@ public:
 	void GetObjectParams(uint32_t idx, Properties ** props);
 	void UpdateDrawCommands();
 
+	CTexture2d * _AddOrUpdateTexture(const char * textureName, IResource * textureRes);
 	void AddTexture(void * propVal, const char * textureName, IResource * textureRes = nullptr);
+	void UpdateTexture(const char * textureName, IResource *textureRes);
+	void _MarkDescriptorSetsInvalid(VkDescriptorImageInfo *pDII);
 
 	// ------------------------ camera stuffs -------------------
 
@@ -316,12 +319,39 @@ public:
 		vkFree(tex.memory);
 	}
 	CStringHastable<CTexture2d> textures;
+	CTexture2d *pDefaultEmptyTexture;
+
+	struct DropedTexture {
+		VkSampler sampler = VK_NULL_HANDLE;
+		VkImage image = VK_NULL_HANDLE;
+		VkDeviceMemory memory = VK_NULL_HANDLE;
+		VkImageView view = VK_NULL_HANDLE;
+		uint64_t frame;
+
+		DropedTexture(IMemoryAllocator *alloc, const CTexture2d *tex, uint64_t frameCounter) :
+			sampler(tex->sampler),
+			image(tex->image),
+			memory(tex->memory),
+			view(tex->view),
+			frame(frameCounter)
+		{}
+	};
+
+	template<> void vkDestroy(DropedTexture &tex)
+	{
+		vkDestroy(tex.view);
+		vkDestroy(tex.image);
+		vkDestroy(tex.sampler);
+		vkFree(tex.memory);
+	}
+	queue<DropedTexture> dropedTextures;
+
 
 	// ------------------------- for gui ----------------
 	VkImGui *imGui;
 
 
-	VkWriteDescriptorSet _writeDescriptorSet(VkDescriptorSet dstSet, uint32_t binding, CTexture2d *tex2d)
+	/*VkWriteDescriptorSet _writeDescriptorSet(VkDescriptorSet dstSet, uint32_t binding, CTexture2d *tex2d)
 	{
 		VkWriteDescriptorSet writeDescriptorSet{};
 		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -331,7 +361,7 @@ public:
 		writeDescriptorSet.pImageInfo = &tex2d->descriptor;
 		writeDescriptorSet.descriptorCount = 1;
 		return std::move(writeDescriptorSet);
-	}
+	}*/
 	friend CDescriptorSetsMananger;
 	friend CShaderProgram;
 	friend CTexture2d;

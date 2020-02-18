@@ -21,6 +21,7 @@ using namespace std::chrono_literals; // we want to use literals, like 50ms or 1
 typedef std::chrono::steady_clock clock;
 typedef std::chrono::steady_clock::time_point time;
 
+#include "Core_Log.h"
 #include "Core_Array.h"
 #include "Core_Helpers.h"
 #include "Core_Strings.h"

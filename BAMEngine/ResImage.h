@@ -22,7 +22,6 @@ public:
 	void Release(ResBase *res);
 
 	Image *GetImage(bool loadASAP = false);
-	void Updated();
 
 	U8 *GetSrcData();
 	SIZE_T GetSrcSize();

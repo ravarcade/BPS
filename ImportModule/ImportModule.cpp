@@ -56,7 +56,7 @@ private:
 		void OnFinalize() { aiLoader.OnFinalize(); }
 	};
 
-	Image_Loader imgLoader;
+	ImageDecoder imgDecoder;
 
 	CEngine *en;
 	std::vector<ImportedModelRepo *> m_importedModelRepos;
@@ -253,17 +253,11 @@ public:
 		}
 	}
 
-	void ResLoadImage(void *params)
-	{
-		CResImage res(params);
-		imgLoader.Load(res);
-		//TRACEW(L"ResLoadImage: " << res.GetPath() << L"\n");
-	}
-
 	void ResUpdateImage(void *params)
 	{
 		CResImage res(params);
-		//TRACEW(L"ResLoadImage: " << res.GetPath() << L"\n");
+		imgDecoder.Decode(res);
+		TRACEW(L"ResUpdateImage (Image Decoded): " << res.GetPath() << L"\n");
 	}
 
 	void ResUpdate(void *params)
@@ -299,7 +293,7 @@ public:
 
 	void Finalize()
 	{
-		imgLoader.OnFinalize();
+		imgDecoder.OnFinalize();
 		m_modelRepoName2modelRepo.reset();
 		for (auto &repo : m_importedModelRepos)
 			repo->OnFinalize();
@@ -347,7 +341,7 @@ public:
 		case IDENTIFY_RESOURCE: im.ResIdentify(msg->data); break;
 		case IMPORTMODULE_UPDATE: im.ResUpdate(msg->data); break;
 		case IMPORTMODULE_LOADMESH: im.ResLoadMesh(msg->data); break;
-		case IMPORTMODULE_LOADIMAGE: im.ResLoadImage(msg->data); break;
+		//case IMPORTMODULE_LOADIMAGE: im.ResLoadImage(msg->data); break; // This is not needed.... image will be decoded right after it is loaded into memory
 		case IMPORTMODULE_UPDATEIMAGE: im.ResUpdateImage(msg->data); break;
 //		case IMPORTMODEL_RESCAN: im.Rescan(); break;
 		default:

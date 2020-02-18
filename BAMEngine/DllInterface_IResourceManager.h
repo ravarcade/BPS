@@ -67,6 +67,7 @@ enum { // msgId
 	SET_CAMERA = 0x20009,
 	ADD_TEXTURE = 0x2000a,
 	ADD_MODEL = 0x2000b,
+	UPDATE_TEXTURE = 0x2000c,
 
 	// to GUI
 	SHOW_PROPERTIES = 0x30001,
@@ -75,7 +76,7 @@ enum { // msgId
 	IDENTIFY_RESOURCE = 0x40001,
 	IMPORTMODULE_UPDATE = 0x40002,
 	IMPORTMODULE_LOADMESH = 0x40003,
-	IMPORTMODULE_LOADIMAGE = 0X40004,
+	//IMPORTMODULE_LOADIMAGE = 0X40004,
 	IMPORTMODULE_UPDATEIMAGE = 0X40005,
 };
 
@@ -146,6 +147,12 @@ struct PSET_CAMERA {
 struct PADD_TEXTURE {
 	uint32_t wnd;
 	void *propVal;
+	const char *textureResourceName;
+	IResource *textureResource;
+};
+
+struct PUPDATE_TEXTURE {
+	uint32_t wnd;
 	const char *textureResourceName;
 	IResource *textureResource;
 };
@@ -250,7 +257,7 @@ extern "C" {
 
 	// Image
 	BAMS_EXPORT Image *   IResImage_GetImage(IResImage *res, bool loadASAP = false);
-	BAMS_EXPORT void      IResImage_Updated(IResImage *res);
+//	BAMS_EXPORT void      IResImage_Updated(IResImage *res);
 	BAMS_EXPORT uint8_t * IResImage_GetSrcData(IResImage *res);
 	BAMS_EXPORT size_t    IResImage_GetSrcSize(IResImage *res);
 	BAMS_EXPORT void      IResImage_ReleaseSrc(IResImage *res);
@@ -491,7 +498,6 @@ public:
 	CRESOURCEEXT(ResImage, RESID_IMAGE);
 
 	Image *GetImage(bool loadASAP = false) { return IResImage_GetImage(Self(), loadASAP); }
-	void Updated() { IResImage_Updated(Self()); }
 	uint8_t *GetSrcData() { return IResImage_GetSrcData(Get()); }
 	size_t GetSrcSize() { return IResImage_GetSrcSize(Get()); }
 	void ReleaseSrc() { return IResImage_ReleaseSrc(Get()); }
@@ -618,7 +624,7 @@ public:
 		return pprop;
 	}
 
-	static void ShorProperties(Properties *prop, const char *name = nullptr)
+	static void ShowProperties(Properties *prop, const char *name = nullptr)
 	{
 		PSHOW_PROPERTIES params = { prop, name };
 		BAMS::CEngine::SendMsg(SHOW_PROPERTIES, RENDERING_ENGINE, 0, &params);

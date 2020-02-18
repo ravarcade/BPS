@@ -49,6 +49,7 @@ public:
 		case UPDATE_DRAW_COMMANDS: re.UpdateDrawCommands(msg->data); break;
 		case SET_CAMERA:        re.SetCamera(msg->data); break;
 		case SHOW_PROPERTIES:   re.ShowProperties(msg->data); break;
+		case UPDATE_TEXTURE:    re.UpdateTexture(msg->data); break;
 		}
 	}
 

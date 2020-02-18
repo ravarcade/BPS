@@ -38,6 +38,8 @@
 
  [5] Modified, loaded, used
 
+ [6] Recognized, no need to load, used
+
  */
 
 /*
@@ -297,7 +299,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 					res->_resSize != resSize)
 				{
 					// modified
-					res->_waitWithUpdate = waitTime;
+					res->_waitWithUpdateNotification = waitTime;
 					res->_isModified = true;
 				}
 			}
@@ -310,8 +312,12 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		if (!(filename == rm->_manifestFileName)) 
 		{
 			auto fn = filename.c_str();
-			if (rm->IsUniqFile(fn))
-				rm->AddResource(fn, RESID_UNKNOWN);
+			if (rm->IsUniqFile(fn)) {
+				auto res = rm->AddResource(fn, RESID_UNKNOWN);
+				res->_resTimestamp = timestamp;
+				res->_resSize = fileSize;
+			}
+
 		}
 	}
 
@@ -327,7 +333,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		{
 			if (!(*res)->_isDeleted)
 			{
-				(*res)->_waitWithUpdate = waitTime;
+				(*res)->_waitWithUpdateNotification = waitTime;
 				(*res)->_isModified = true;
 			}
 		}
@@ -357,10 +363,12 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 				break;
 			}
 		}
+
 		if (_rootDir.startsWith(filename) && (_rootDir.size() == fnlen || _rootDir[fnlen] == Tools::directorySeparatorChar))
 		{
 			_rootDir = nfn + _rootDir.substr(fnlen);
 		}
+
 		for (ResBase **res = nullptr; FindResourceByFilename(res, filename); )
 		{
 			(*res)->Path = nfn + (*res)->Path.substr(fnlen);
@@ -375,6 +383,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 	void AddDirToMonitor(PathSTR &&sPath, U32 type)
 	{
+		dbg::Log(L"Monitorning dir: %s\r\n", sPath.c_str());
 		_monitoredDirs.AddDir(std::move(sPath), type);
 	}
 
@@ -389,8 +398,19 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		AddDirToMonitor(path, 0);
 	}
 
+	IResourceFactory *FindResourceFactory(ResBase *res)
+	{
+		for (auto f = ResourceFactoryChain::First; f; f = f->Next)
+		{
+			if (f->TypeId == res->Type)
+				return f;
+		}
+		return nullptr;
+	}
+
 	void CreateResourceImplementation(ResBase *res)
 	{
+		isResourceProcessingRequired = true;
 		if (res->_pResImp)
 		{
 			if (res->_pResImp->GetFactory()->TypeId == res->Type)
@@ -443,27 +463,41 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		// create only if it is used
 		if (res->_refCounter)
 			CreateResourceImplementation(res);
+		else {
+			if (auto f = FindResourceFactory(res))
+			{
+				res->_isLoadable = f->IsLoadable();
+			}
+		}
 	}
 
 	void Load(ResBase *res)
 	{
-		if (res->_isDeleted || (res->_isModified && res->_waitWithUpdate > clock::now()))
+		if (res->_isDeleted || !res->Path.size())
 			return;
+		//if (res->_isDeleted ||
+		//	!res->Path.size() ||
+		//	(res->_isModified && res->_waitWithUpdateNotification > clock::now())) // if file modification is detected, wait some time before load it
+		//	return;
 
 		SIZE_T size = 0;
 		BYTE *data = nullptr;
 
-		//if (res->Type == RESID_UNKNOWN) 
-		//	res->_pResImp->Release(res);
-
 		// we are loading resource to ram, so it is in use and resource implementation must be created
 		CreateResourceImplementation(res);
 
-		if (res->_isLoadable) {
+		if (res->_isLoadFromDiskAllowed) {
+			wprintf(L"Loading: %s\n", res->Path.c_str());
 			data = Tools::LoadFile(&size, &res->_resTimestamp, res->Path, res->GetMemoryAllocator());
 		}
 		else {
-			Tools::InfoFile(&size, &res->_resTimestamp, res->Path);
+			if (res->_isModified) {
+				wprintf(L"Checking: %s\n", res->Path.c_str());
+				Tools::InfoFile(&size, &res->_resTimestamp, res->Path);
+			}
+			else {
+				size = res->_resSize;
+			}
 		}
 
 		// mark resource as deleted if file not exist and can't be loaded
@@ -472,22 +506,26 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 		if (!res->_isDeleted)
 		{
-			res->ResourceLoad(data, size);
-			if (!res->_isLoadable)
-				res->_isLoaded = true;
-
+			res->_resData = data;
+			res->_resSize = size;
+			res->_isLoaded = true;
 			res->_isModified = false;
+			res->_isLoadFromDiskAllowed = false; // don't load again
 		}
 	}
 
 	WSTR fileName, fileNameRenameTo;
+	bool isResourceProcessingRequired;
+
 	static void Worker(InternalData *rm)
 	{
+		
 		while (!rm->_killWorkerFlag)
 		{
 			// this will wait 1 second for new events to process
-			SleepEx(1000, TRUE); // we do nothing... everything is done in os
-			bool resUpdated = false;
+			SleepEx(250, TRUE); // we do nothing... everything is done in os
+			rm->_monitoredDirs.Start();
+			bool isResUpdated = false;
 			while (auto ev = rm->_monitoredDirs.GetDiskEvent()) // we read all events
 			{
 				auto &fn = rm->fileName;
@@ -503,7 +541,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 						if (rm->AddResource(rm->fileName.c_str(), RESID_UNKNOWN))
 						{
 							wprintf(L"Add: [%s] \n", fn.c_str());
-							resUpdated = true;
+							isResUpdated = true;
 						}
 					}
 					break;
@@ -511,7 +549,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 				case FILE_ACTION_REMOVED:
 					rm->RemoveResource(rm->fileName.c_str());
 					wprintf(L"Delete: [%s] \n", fn.c_str());
-					resUpdated = true;
+					isResUpdated = true;
 					break;
 
 				case FILE_ACTION_MODIFIED:
@@ -519,7 +557,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 					{
 						rm->UpdateResource(fn);
 						wprintf(L"Modify: [%s]\n", fn.c_str());
-						resUpdated = true;
+						isResUpdated = true;
 					}
 					break;
 
@@ -534,9 +572,13 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 					break;
 				}
 			}
-			rm->ProcessResources();
-			wprintf(L"Still alive... \n");
+			rm->isResourceProcessingRequired |= isResUpdated;
+			if (rm->isResourceProcessingRequired) 
+			{
+				rm->ProcessResources();
+			}
 		}
+		rm->_monitoredDirs.Stop();
 	}
 
 	void ProcessResource(ResBase *res, clock::time_point &now, bool &allLoaded)
@@ -547,18 +589,25 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		if (res->Type == RESID_UNKNOWN)
 			IdentifyResourceType(res);
 
-		if (res->_isLoaded && (res->_isDeleted || (res->_isModified && res->_waitWithUpdate > now)))
+		if (res->_isModified && res->_waitWithUpdateNotification >= now) // if we deal with modified file, we will exit here
 		{
-			res->_updateNotifier.Notify();
-			res->GetImplementation()->Release(res);
+			isResourceProcessingRequired = true; // this will inform resource monitor, that we did not finish resource processing
+			return;
 		}
 
-		if (res->_isDeleted)
+		if (res->_isLoaded && (res->_isDeleted || res->_isModified))
+		{
+			res->_updateNotifier.Notify();
+			res->GetImplementation()->Release(res);			
+			res->_isLoadFromDiskAllowed |= res->_isModified && res->_isLoadable;
+		}
+
+		if (res->_isDeleted || !res->_refCounter)
 			return;
 
-		if (!res->_isLoaded && res->_refCounter && (!res->_isModified || res->_waitWithUpdate < now))
+		//if (!res->_isLoaded && res->_refCounter && (!res->_isModified || res->_waitWithUpdateNotification < now))
+		if (!res->_isLoaded || res->_isModified)
 		{
-			wprintf(L"Loading: %s\n", res->Path.c_str());
 			Load(res);
 			if (res->_isLoaded)
 			{
@@ -566,7 +615,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			}
 		}
 
-		if (res->_refCounter && !res->_isLoaded && res->Path.size())
+		if (!res->_isLoaded && res->Path.size())
 		{
 			allLoaded = false;
 		}
@@ -581,8 +630,11 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		if (res)
 		{
 			ProcessResource(res, now, allLoaded);
-			if (!res->_isLoadable)
+			if (!res->_isLoadFromDiskAllowed) {
+				if (!res->_isLoaded)
+					TRACE("hmmm? coœ nie dzia³a dobrze.");
 				res->_isLoaded = true;
+			}
 		}
 		else
 		{
@@ -614,8 +666,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 	void StartMonitoring()
 	{
-		_monitoredDirs.Start();
-
 		if (!_worker)
 			_worker = make_new<std::thread>(Worker, this);
 	}
@@ -629,8 +679,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 			make_delete<std::thread>(_worker);
 			_worker = nullptr;
 		}
-
-		_monitoredDirs.Stop();
 	}
 
 	void IdentifyResourceType(ResBase *res)
@@ -727,7 +775,7 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		WSTR manifestFileName = rpath + MANIFESTFILENAME;
 
 		Tools::SaveFile(manifestFileName, prn.CStr(), prn.CStrSize() - 1);
-		printf("-------------- xml ------------------\n%s\n-------------------------------\n", prn.CStr());
+//		printf("-------------- xml ------------------\n%s\n-------------------------------\n", prn.CStr());
 	}
 
 	void AbsolutePath(WSTR & filename, const WSTR *root = nullptr)
@@ -848,7 +896,7 @@ ResBase * ResourceManager::FindExisting(CSTR name, U32 type)
 	ResBase *res = FindOrCreate(name);
 	if (!res || res->Type != type)
 	{
-		TRACE("ERROR: Resource \"" << name << "\" don't exist or is different type");
+		TRACE("ERROR: Resource \"" << name << "\" don't exist or is different type\n");
 		return nullptr;
 	}
 	return res;
@@ -859,7 +907,7 @@ ResBase * ResourceManager::FindExisting(CWSTR filename, U32 type)
 	ResBase *res = FindOrCreate(filename);
 	if (!res || res->Type != type)
 	{
-		TRACE("ERROR: Resource for file \"" << filename << "\" don't exist or is different type");
+		TRACE("ERROR: Resource for file \"" << filename << "\" don't exist or is different type\n");
 		return nullptr;
 	}
 	return res;
@@ -871,7 +919,7 @@ ResBase * ResourceManager::FindExisting(const UUID &resUID, U32 type)
 	ResBase *res = FindOrCreate(resUID);
 	if (!res || res->Type != type)
 	{
-		TRACE("ERROR: Resource for UID don't exist or is different type");
+		TRACE("ERROR: Resource for UID don't exist or is different type\n");
 		return nullptr;
 	}
 	return res;

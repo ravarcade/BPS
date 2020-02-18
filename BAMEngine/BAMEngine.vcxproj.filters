@@ -137,6 +137,9 @@
     <ClInclude Include="ResDrawModel.h">
       <Filter>ResMan</Filter>
     </ClInclude>
+    <ClInclude Include="Core_Log.h">
+      <Filter>Core</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

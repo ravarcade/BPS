@@ -570,7 +570,7 @@ void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t modelIdx)
 	SetModelMatrix(en, wnd, static_cast<uint32_t>(modelsOnScreen[wnd].size()), pMod);
 	if (wnd == 0 && modelsOnScreen[wnd].size() == 1)
 	{
-		SndMsg::ShorProperties(PropertiesForGui(pMod->GetProperties(0)), "tada!");
+		SndMsg::ShowProperties(PropertiesForGui(pMod->GetProperties(0)), "tada!");
 	}
 }
 
@@ -1010,7 +1010,7 @@ int main()
 	LoadModules();
 	{
 		BAMS::CEngine en;
-//		DoLocalTests();
+		//		DoLocalTests();
 
 		BAMS::DoTests();
 		BAMS::CResourceManager rm;
@@ -1025,7 +1025,7 @@ int main()
 		gs.AddProgram(L"/Shaders/imgui/imgui.frag.glsl");
 		// slug textures fix:
 		CResModel slugModel = rm.Get<CResModel>("slug2");
-		slugModel.SetMeshProperty(0, "samplerColor", Property::PT_TEXTURE, 1, rm.FindExisting("SLUG_diffuse", RESID_IMAGE));		
+		slugModel.SetMeshProperty(0, "samplerColor", Property::PT_TEXTURE, 1, rm.FindExisting("SLUG_diffuse", RESID_IMAGE));
 		slugModel.SetMeshProperty(0, "samplerNormal", Property::PT_TEXTURE, 1, rm.FindExisting("SLUG_normal", RESID_IMAGE));
 
 		ToggleWnd(en, 0); // show first window
@@ -1042,10 +1042,16 @@ int main()
 
 		auto tt = rm.FindOrCreate(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt", RESID_RAWDATA);
 
+		auto x = rm.FindExisting("deferred333", CResShader::GetType());
+		if (x) {
+			TRACE("panic");
+		}
 		// default shader program ... not needed any more
-		auto s = rm.Get<CResShader>("deferred");
-		s.AddProgram(L"/Shaders/deferred/deferred.vert.glsl");
-		s.AddProgram(L"/Shaders/deferred/deferred.frag.glsl");
+		if (!rm.FindExisting("deferred", CResShader::GetType())) {
+			auto s = rm.Get<CResShader>("deferred");
+			s.AddProgram(L"/Shaders/deferred/deferred.vert.glsl");
+			s.AddProgram(L"/Shaders/deferred/deferred.frag.glsl");
+		}
 		//			auto s = rm.GetShaderByName("default");
 //			s.AddProgram(L"/Shaders/default.vert.glsl");
 //			s.AddProgram(L"/Shaders/default.frag.glsl");

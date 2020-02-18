@@ -38,5 +38,5 @@
 
 #define IM_BUILD_DLL
 #include "AssImp_Loader.h"
-#include "Image_Loader.h"
+#include "ImageDecoder.h"
 #include "ImportModule.h"

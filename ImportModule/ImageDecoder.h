@@ -1,15 +1,14 @@
 
-class Image_Loader
+class ImageDecoder
 {
 	BAMS::TempMemory tmp;
-
+	
 public:
-	Image_Loader();
-	~Image_Loader();
+	ImageDecoder();
+	~ImageDecoder();
 
 	void OnFinalize();
-
-	void Load(BAMS::CResImage & res);
+	void Decode(BAMS::CResImage & res);
 };
 //bool REBAM_API EncodePNG(AlignedMemory *dst, CImage *src);
 //bool REBAM_API EncodeTGA(AlignedMemory *dst, CImage *src);

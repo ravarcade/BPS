@@ -177,6 +177,7 @@
     <ClInclude Include="Core_Hashtable.h" />
     <ClInclude Include="Core_Helpers.h" />
     <ClInclude Include="Core_List.h" />
+    <ClInclude Include="Core_Log.h" />
     <ClInclude Include="Core_MemoryAllocator.h" />
     <ClInclude Include="Core_Message.h" />
     <ClInclude Include="Core_Module.h" />

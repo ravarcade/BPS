@@ -6,6 +6,7 @@
 *
 */
 
+
 /// <summary>
 /// Base Resource Class.
 /// It provides common for all resources field, like pointer to memory with data, length, state if it is loaded to mem.
@@ -19,11 +20,12 @@ protected:
 	IResImp *_pResImp;
 	U32 _refCounter;
 
-	bool _isLoaded;
 	bool _isDeleted;
 	bool _isModified;
-	bool _isLoadable;
-	time _waitWithUpdate;
+	bool _isLoaded;						// Is data from disk in memory.
+	bool _isLoadable;					// Is resource loadable at all. If FALSE then it will get Update notification immediately, but no data will be loaded into memory.	
+	bool _isLoadFromDiskAllowed;		// If FALSE, when data will not be loaded from disk. This state may be changed.
+	time _waitWithUpdateNotification;
 
 	static constexpr time::duration defaultDelay = 200ms;
 	ResourceUpdateNotifier _updateNotifier;
@@ -47,6 +49,7 @@ public:
 		_isDeleted(false),
 		_isModified(false),
 		_isLoadable(true),
+		_isLoadFromDiskAllowed(true),
 		_refCounter(0),
 		_pResImp(nullptr),
 		Type(RESID_UNKNOWN),
@@ -60,25 +63,23 @@ public:
 		if (_pResImp)
 			_pResImp->GetFactory()->Destroy(_pResImp);
 	};
-
-//	void Init(CWSTR path);
-//	void Init(CSTR name);
-
-	void ResourceLoad(void *data, SIZE_T size = -1)
-	{
-		_resData = data;
-		if (size != -1)
-			_resSize = size;
-
-		_isLoaded = data != nullptr;
+	
+	void ReleaseMemory() 
+	{		
+		if (_resData) {
+			auto alloc = GetMemoryAllocator();
+			assert(alloc); // we can't have reserved memory and don't have allocaator for it!
+			if (alloc) {
+				alloc->deallocate(_resData);
+			}
+			_resData = nullptr;
+		}
 	}
 
 	inline bool isLoaded() { return _isLoaded; }
 	inline bool isDeleted() { return _isDeleted; }
 	inline bool isModified() { return _isModified; }
-	inline bool isLoadable() { return _isLoadable; }
-
-
+	inline bool isLoadable() { return _isLoadFromDiskAllowed; }
 
 	void *GetData() { return _resData; }
 	template<typename T> T *GetData() { return reinterpret_cast<T*>(_resData); }
@@ -88,8 +89,10 @@ public:
 	IResImp *GetImplementation() { return _pResImp; }
 
 	void AddRef() {
-		if (!_pResImp && !_refCounter)
+		if (!_pResImp && !_refCounter) {
+			_isLoadFromDiskAllowed = _isLoadable;
 			_CreateResourceImplementation();
+		}
 
 		++_refCounter;
 	}
@@ -107,11 +110,25 @@ public:
 		}
 	}
 
-
 	void Update() { if (_pResImp) _pResImp->Update(this); _updateNotifier.Notify(); }
+	
 	IMemoryAllocator *GetMemoryAllocator() { return !_pResImp ? nullptr : _pResImp->GetFactory()->GetMemoryAllocator(); }
 
 	void AddNotifyReciver(ResourceUpdateNotifier::IChain *nr) { _updateNotifier.Add(nr); }
 	void RemoveNotifyReciver(ResourceUpdateNotifier::IChain *nr) { _updateNotifier.Remove(nr); }
+
+	void UpdateDataMemory(const void *newData, SIZE_T newSize) 
+	{
+		assert(_pResImp);
+		if (_resSize < newSize)
+		{
+			ReleaseMemory();
+			_resSize = newSize;
+			_resData = GetMemoryAllocator()->allocate(newSize);
+		}
+		if (newData)
+			memcpy_s(_resData, _resSize, newData, newSize);
+	}
+
 	friend class ResourceManager;
 };

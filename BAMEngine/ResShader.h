@@ -6,7 +6,7 @@
 *
 */
 
-typedef TResRawData<RESID_SHADER_SRC> ResShaderSrc;
+typedef TResRawData<RESID_SHADER_SRC, false> ResShaderSrc;
 typedef TResRawData<RESID_SHADER_BIN> ResShaderBin;
 
 class ResShader : public ResImp<ResShader, RESID_SHADER>
@@ -33,8 +33,6 @@ class ResShader : public ResImp<ResShader, RESID_SHADER>
 	// ----------------------------------------------------------------------------------
 
 	ResBase *rb;
-	U8 *Data;
-	SIZE_T Size;
 
 	bool isModified;
 	bool isUpdateRecived;
@@ -95,22 +93,18 @@ class ResShader : public ResImp<ResShader, RESID_SHADER>
 	void _SaveXML();
 
 public:
-	ResShader(ResBase *res) : rb(res), Data(nullptr), Size(0), isModified(true), isUpdateRecived(false) {}
+	ResShader(ResBase *res) : rb(res), isModified(true), isUpdateRecived(false) {}
 	~ResShader() { Release(rb); }
-
-	U8 *GetData() { return Data; }
-	SIZE_T GetSize() { return Size; }
 
 	void Release(ResBase *res)
 	{
+		assert(rb = res);
 		Save(res);
-		res->ResourceLoad(nullptr);
-		if (Data)
-			deallocate(Data);
-
-		Data = nullptr;
-		Size = 0;
+		res->ReleaseMemory();
 	}
+
+	U8 *GetData() { return rb ? static_cast<U8 *>(rb->GetData()) : nullptr; }
+	SIZE_T GetSize() { return rb ? rb->GetSize() : 0; }
 
 	File * AddProgram(WSTR filename);
 	WSTR &GetSourceFilename(U32 stage);

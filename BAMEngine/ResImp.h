@@ -22,7 +22,7 @@ public:
 
 
 /// <summary>
-/// Interfec to resource factory.
+/// Interface to resource factory of resource.
 /// Every resource type has own resource factory.
 /// Every factory has:
 /// - Create - object constructor.
@@ -82,6 +82,7 @@ public:
 template <typename T, U32 ResTypeId, bool IsLoadable, MemoryAllocator Alloc>
 typename ResImp<T, ResTypeId, IsLoadable, Alloc>::ResFactory ResImp<T, ResTypeId, IsLoadable, Alloc>::_resourceFactory;
 
+/**
 // ============================================================================ ResPure ===
 
 /// <summary>
@@ -109,3 +110,4 @@ public:
 
 template <typename T, U32 ResTypeId,MemoryAllocator Alloc>
 typename ResPure<T, ResTypeId, Alloc>::ResFactory ResPure<T, ResTypeId, Alloc>::_resourceFactory;
+**/

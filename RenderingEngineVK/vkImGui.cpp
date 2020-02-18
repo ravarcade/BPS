@@ -84,7 +84,7 @@ void VkImGui::initResources()
 	io.Fonts->GetTexDataAsRGBA32(&fontData, &texWidth, &texHeight);
 
 	Image src(fontData, texWidth, texHeight, PF_R8G8B8A8_UNORM);
-	fontTexture->LoadTexture(&src);
+	fontTexture->_LoadTexture(&src);
 
 	auto sh = vk->_GetShader("__imgui__");
 	if (!sh)

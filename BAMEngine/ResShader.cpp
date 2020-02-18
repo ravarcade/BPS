@@ -42,15 +42,15 @@ void ResShader::_LoadXML()
 	using tinyxml2::XMLDocument;
 
 	// memory is allocated with ResRawData MemoryAllocator, so we don't have to copy it.
-	Data = static_cast<U8 *>(rb->GetData());
-	Size = rb->GetSize();
+	auto Data = static_cast<const char *>(rb->GetData());
+	auto Size = rb->GetSize();
 	auto &rm = globalResourceManager;
 	WSTR currPath(rm->GetDirPath(rb->Path));
 	WSTR cvt;
 	if (Data)
 	{
 		XMLDocument xml;
-		xml.Parse(reinterpret_cast<const char *>(Data), Size);
+		xml.Parse(Data, Size);
 
 		auto root = xml.FirstChildElement("Shader");
 		for (auto r = root->FirstChildElement("Program"); r; r = r->NextSiblingElement())
@@ -125,15 +125,7 @@ void ResShader::_SaveXML()
 	out.InsertFirstChild(root);
 	XMLPrinter prn;
 	out.Print(&prn);
-
-	if (Size < prn.CStrSize()-1)
-	{
-		if (Data)
-			deallocate(Data);
-		Size = prn.CStrSize()-1;
-		Data = static_cast<U8*>(allocate(Size));
-	}
-	memcpy_s(Data, Size, prn.CStr(), prn.CStrSize() - 1);
+	rb->UpdateDataMemory(prn.CStr(), prn.CStrSize() - 1);
 }
 
 ResShader::File * ResShader::AddProgram(WSTR filename)
@@ -222,7 +214,7 @@ void ResShader::Save(ResBase * res)
 		return;
 	
 	_SaveXML();
-	Tools::SaveFile(res->Path, Data, Size);
+	Tools::SaveFile(res->Path, GetData(), GetSize());
 
 	// file saved... but res may be marked as deleted (not file on disk befor save) or with old file time stamp
 	globalResourceManager->RefreshResorceFileInfo(res);

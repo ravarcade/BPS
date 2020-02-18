@@ -89,11 +89,32 @@ basic_array<IEngine::ExternalModule> externalModules;
 struct QMessage {
 	Message msg;
 	time triggerTime;
+	IMemoryAllocator *alloc;
 
-	QMessage(IMemoryAllocator *alloc, Message *m, time::duration delay) :
+	QMessage() = delete;
+	QMessage(const QMessage &) = delete;
+	QMessage(QMessage &&) = delete;
+	QMessage &operator == (const QMessage &) = delete;
+	QMessage &operator == (QMessage &&) = delete;
+
+	QMessage(IMemoryAllocator *_alloc, Message *m, time::duration delay) :
 		msg(*m), 
-		triggerTime(clock::now() + delay)
-	{}
+		triggerTime(clock::now() + delay),
+		alloc(_alloc)
+	{
+		if (msg.dataLen) {
+			auto buf = alloc->allocate(msg.dataLen);
+			memcpy_s(buf, msg.dataLen, msg.data, msg.dataLen);
+			msg.data = buf;
+		}
+	}
+	~QMessage() 
+	{
+		if (msg.dataLen) {
+			alloc->deallocate(msg.data);
+		}
+
+	}
 };
 
 queue<QMessage> messageQueue;

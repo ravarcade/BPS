@@ -26,18 +26,26 @@ void ResImage::_SaveXML()
 
 void ResImage::Update(ResBase * res) {
 
-	if (!rb->isLoaded())
+	if (rb->isLoaded())
 	{
-//		TRACE("LOADED: " << rb->Name.c_str());
-		CEngine::SendMsg(IMPORTMODULE_UPDATEIMAGE, IMPORT_MODULE, 0, rb);
+		// Image is in memory, but in file format (BMP, PNG, JPG or TGA).
+		// It must be decoded.... This is job for ImportModule
+		CEngine::SendMsg(IMPORTMODULE_UPDATEIMAGE, IMPORT_MODULE, 0, rb); 
+		_SaveXML();
+		PUPDATE_TEXTURE msg = { 0, nullptr, rb };
+		CEngine::PostMsg(UPDATE_TEXTURE, RENDERING_ENGINE, 0, &msg, sizeof(msg));
 	}
 }
 
 void ResImage::Release(ResBase * res)
 {
-//	TRACE("REL: " << rb->Name.c_str());
 	img.Release();
-	ReleaseSrc();
+
+	auto pData = GetSrcData();
+	if (pData)
+	{
+		rb->ReleaseMemory();
+	}
 }
 
 /// <summary>
@@ -47,18 +55,16 @@ void ResImage::Release(ResBase * res)
 /// <returns></returns>
 Image * ResImage::GetImage(bool loadASAP)
 {
-	if (!rb->isLoaded() && loadASAP)
-	{
-		CEngine::SendMsg(IMPORTMODULE_LOADIMAGE, IMPORT_MODULE, 0, rb);
+	if ((!rb->isLoaded() || rb->isModified()) && loadASAP)
+	{	
+		// We force resource to be loaded now.
+		// Image will be decoded right after it is loaded
+		auto &rm = globalResourceManager;
+		rm->LoadSync(rb);
 	}
 
 	return &img;
 }
-
-/// <summary>
-/// Called by ImportModule when image is loaded and properties (like size, format) are updated and image manifest should be updated.
-/// </summary>
-void ResImage::Updated() { _SaveXML(); }
 
 U8 * ResImage::GetSrcData() { return rb->GetData<U8>(); }
 
@@ -68,8 +74,7 @@ void ResImage::ReleaseSrc() {
 	auto pData = GetSrcData();
 	if (pData)
 	{
-		rb->GetMemoryAllocator()->deallocate(pData);
-		rb->ResourceLoad(nullptr, 0);
+		rb->ReleaseMemory();
 	}
 }
 

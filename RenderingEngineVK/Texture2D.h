@@ -1,30 +1,39 @@
 #pragma once
 
+class OutputWindow;
+
+
 class CTexture2d
 {
 public:
 	CTexture2d(OutputWindow *outputWindow);
 	~CTexture2d();
 
-	void LoadTexture(Image *img);
-	void LoadTexture(const char *textureResourceName);
-	void LoadTexture(IResource * textureResource);
+	void LoadResTexture(const char *textureResourceName);
+	void LoadResTexture(IResource * textureResource);
+	//void UpdateTexture(Image *img);
+	//void UpdateTexture(const char *textureResourceName);
+	//void UpdateTexture(IResource * textureResource);
 	void Release();
 
 	VkDescriptorImageInfo descriptor;
+
 protected:
 	VkSampler sampler = VK_NULL_HANDLE;
 	VkImage image = VK_NULL_HANDLE;
 	VkDeviceMemory memory = VK_NULL_HANDLE;
 	VkImageView view = VK_NULL_HANDLE;
 	VkFormat format;
-	
 	VkImageLayout imageLayout;
 	uint32_t width;
 	uint32_t height;
 	uint32_t depth;
 	uint32_t mipLevels;
 
+	BAMS::CResImage resImg;
+	void _LoadTexture(Image *img);
+
 	friend class OutputWindow;
-	OutputWindow *vk;
+	friend class VkImGui;
+	OutputWindow *vk;	
 };

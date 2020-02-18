@@ -119,7 +119,7 @@ extern "C" {
 	// =========================================================================== ResImage
 
 	BAMS_EXPORT Image *IResImage_GetImage(IResImage *res, bool loadASAP) { return Impl<ResImage>(res)->GetImage(loadASAP); }
-	BAMS_EXPORT void IResImage_Updated(IResImage *res)                   {        Impl<ResImage>(res)->Updated(); }
+//	BAMS_EXPORT void IResImage_Updated(IResImage *res)                   {        Impl<ResImage>(res)->Updated(); }
 	BAMS_EXPORT uint8_t *IResImage_GetSrcData(IResImage *res)            { return Impl<ResImage>(res)->GetSrcData(); }
 	BAMS_EXPORT size_t IResImage_GetSrcSize(IResImage *res)              { return Impl<ResImage>(res)->GetSrcSize(); }
 	BAMS_EXPORT void IResImage_ReleaseSrc(IResImage *res)                {        Impl<ResImage>(res)->ReleaseSrc(); }

@@ -91,6 +91,7 @@ protected:
 	uint32_t GetObjectCount() { return static_cast<uint32_t>(m_drawObjectData.size()); }
 
 	void RebuildAllMiniDescriptorSets(bool force = false);
+	void _MarkDescriptorSetsInvalid(VkDescriptorImageInfo * pDII);
 	
 	friend class OutputWindow;
 

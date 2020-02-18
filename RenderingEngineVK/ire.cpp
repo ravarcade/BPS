@@ -310,6 +310,12 @@ void ire::AddTexture(const void * params)
 	ow->AddTexture(p->propVal, p->textureResourceName, p->textureResource);
 }
 
+void ire::UpdateTexture(const void *params)
+{
+	CASTMSGPARAMS(PUPDATE_TEXTURE);
+	ow->UpdateTexture(p->textureResourceName, p->textureResource);
+}
+
 void ire::AddShader(const void * params)
 {
 	CASTMSGPARAMS(PADD_SHADER);

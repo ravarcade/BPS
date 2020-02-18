@@ -224,7 +224,7 @@ struct MonitoredDir
 			bufferSize = 0;
 			pollingOverlap.hEvent = this;
 			isStopped = false;
-			BOOL success = ::ReadDirectoryChangesW(
+			BOOL ret = ::ReadDirectoryChangesW(
 				hDir,
 				&buffer,
 				sizeof(buffer),
@@ -237,6 +237,12 @@ struct MonitoredDir
 				&bufferSize,
 				&pollingOverlap,
 				&NotificationCompletion);
+
+			if (!ret) {
+				dbg::Log("Error: MonitoredDir don't work. GetLastError() = %x\r\n", GetLastError());
+			}
+
+			
 		}
 
 	}
@@ -373,7 +379,9 @@ public:
 		std::lock_guard<std::mutex> lck(_monitoredDirsAccessMutex);
 		_monitoredDirs.push_back(newMonitoredDir);
 
-		newMonitoredDir->Start();
+		// we don't want to star monitoring in main threat
+		// if it is starten in main thread then main thread will have to call SleepEx to recive events
+		// newMonitoredDir->Start();
 	}
 
 	void StartWorker()

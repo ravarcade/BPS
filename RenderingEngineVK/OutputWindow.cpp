@@ -16,7 +16,9 @@ OutputWindow::OutputWindow(uint32_t _wnd) :
 	device(VK_NULL_HANDLE),
 	windowIdx(_wnd),
 	imGui(nullptr),
-	m_pipelineStatisticsQueryPool(VK_NULL_HANDLE)
+	m_pipelineStatisticsQueryPool(VK_NULL_HANDLE),
+	frameCounter(0),
+	pDefaultEmptyTexture(nullptr)
 {
 }
 
@@ -734,6 +736,7 @@ void OutputWindow::_Cleanup()
 			vkDestroy(m_pipelineStatisticsQueryPool);
 
 		_CleanupTextures();
+		_CleanupDropedTextures(true);
 		_CleanupShaderPrograms();
 		// do nothing for: graphicsQueue, presentQueue, transferQueue;
 		_CleanupSharedUniform();
@@ -1215,6 +1218,40 @@ void OutputWindow::_CleanupTextures()
 		vkDestroy(*t);
 	});
 	textures.clear();
+	if (pDefaultEmptyTexture) {
+		pDefaultEmptyTexture->Release();
+		vkDestroy(*pDefaultEmptyTexture);
+		pDefaultEmptyTexture = nullptr;
+	}
+}
+
+void OutputWindow::_CleanupDropedTextures(bool all)
+{
+	int sum = 0;
+	if (all)
+	{
+		dropedTextures.filter([](DropedTexture *dt) {
+			return true;
+		}, [&](DropedTexture *dt) {
+			vkDestroy(*dt);
+			++sum;
+		});	
+	}
+	else {
+		if (this->frameCounter < 10)
+			return;
+
+		uint64_t frameCounter = all ? -1 : this->frameCounter - 10;
+
+		dropedTextures.filter([frameCounter](DropedTexture *dt) {
+			return dt->frame < frameCounter;
+		}, [&](DropedTexture *dt) {
+			vkDestroy(*dt);
+			++sum;
+		});
+	}
+	if (sum)
+		TRACE("Destoyed: " << sum << "\n");
 }
 
 void OutputWindow::_CleanupShaderPrograms()
@@ -1361,6 +1398,7 @@ bool OutputWindow::_UpdateBeforeDraw(float dt)
 
 void OutputWindow::Update(float dt)
 {
+	++frameCounter;
 	uint32_t imageIndex;
 
 	if (imGui)
@@ -1372,6 +1410,7 @@ void OutputWindow::Update(float dt)
 	if (!_SimpleAcquireNextImage(imageIndex))
 		return;
 
+	_CleanupDropedTextures();
 	_SimpleQueueSubmit(imageAvailableSemaphore, deferredFrameBuf.deferredSemaphore, *commandBuffers.rbegin());
 	_GetPipelineStatistic();
 	_SimpleQueueSubmit(deferredFrameBuf.deferredSemaphore, renderFinishedSemaphore, commandBuffers[imageIndex]);
@@ -1467,22 +1506,53 @@ void OutputWindow::UpdateDrawCommands()
 	BufferRecreationNeeded();
 }
 
-void OutputWindow::AddTexture(void *propVal, const char * textureName, IResource *textureRes)
+
+CTexture2d *OutputWindow::_AddOrUpdateTexture(const char * textureName, IResource *textureRes)
 {
 	if (!textureName && textureRes)
-	{
 		textureName = IResource_GetName(textureRes);
-	}
+
 	auto pTex = textures.find(textureName);
-	if (!pTex)
+	if (!pTex) // if texture NOT exist, load it
 	{
-		pTex = textures.add(textureName, this);
-		if (textureRes)
-			pTex->LoadTexture(textureRes);
-		else
-			pTex->LoadTexture(textureName);
+		TRACE("AddTexture: " << textureName << "\n");
+		pTex = textures.add(textureName, this); // <- this will create new CTexture2d object
+
 	}
-	*reinterpret_cast<VkDescriptorImageInfo **>(propVal) = &pTex->descriptor;
+	else {
+		// update texture in 2 steps:
+		// (1) add old texture to "destroy it later" list (dropedTextures), 
+		dropedTextures.push_back(pTex, frameCounter);
+		TRACE("UpdatedTexture: " << textureName << "\n");
+		// (2) load new texture in that place
+	}
+
+	if (textureRes)
+		pTex->LoadResTexture(textureRes);
+	else
+		pTex->LoadResTexture(textureName);
+
+	return pTex;
+}
+
+void OutputWindow::AddTexture(void *propVal, const char * textureName, IResource *textureRes)
+{
+	auto pTex = _AddOrUpdateTexture(textureName, textureRes);
+	if (pTex && propVal)
+		*reinterpret_cast<VkDescriptorImageInfo **>(propVal) = &pTex->descriptor;
+}
+
+void OutputWindow::UpdateTexture(const char * textureName, IResource *textureRes)
+{
+	auto pTex = _AddOrUpdateTexture(textureName, textureRes);
+}
+
+void OutputWindow::_MarkDescriptorSetsInvalid(VkDescriptorImageInfo * pDII)
+{
+	shaders.foreach([pDII](CShaderProgram *sh)
+	{
+		sh->_MarkDescriptorSetsInvalid(pDII);
+	});
 }
 
 void OutputWindow::SetCamera(const BAMS::PSET_CAMERA *cam)

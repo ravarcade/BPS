@@ -47,8 +47,7 @@ class ResImportModel : public ResImp<ResImportModel, RESID_IMPORTMODEL, false>
 	time_t resourceTimestamp;
 
 public:
-	ResImportModel(ResBase *res) : rb(res), resourceSize(res->GetSize()), resourceTimestamp(res->GetTimestamp()) {
-	}
+	ResImportModel(ResBase *res) : rb(res), resourceSize(res->GetSize()), resourceTimestamp(res->GetTimestamp()) {}
 	~ResImportModel() {}
 
 	void Update(ResBase *res) {
