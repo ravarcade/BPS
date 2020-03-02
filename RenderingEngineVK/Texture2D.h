@@ -6,15 +6,13 @@ class OutputWindow;
 class CTexture2d
 {
 public:
-	CTexture2d(OutputWindow *outputWindow);
-	~CTexture2d();
+	CTexture2d(OutputWindow *outputWindow) : vk(outputWindow) {};
+	~CTexture2d() {};
+	void Release() {};
+
 
 	void LoadResTexture(const char *textureResourceName);
 	void LoadResTexture(IResource * textureResource);
-	//void UpdateTexture(Image *img);
-	//void UpdateTexture(const char *textureResourceName);
-	//void UpdateTexture(IResource * textureResource);
-	void Release();
 
 	VkDescriptorImageInfo descriptor;
 

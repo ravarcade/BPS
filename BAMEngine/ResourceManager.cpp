@@ -93,10 +93,6 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 	{
 		StopMonitoring();
 		SaveManifest();
-		//for (auto *pRes : _resources)
-		//{
-		//	make_delete<ResBase>(pRes);
-		//}
 		_resources.clear();
 	}
 
@@ -592,20 +588,21 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 		if (res->_isModified && res->_waitWithUpdateNotification >= now) // if we deal with modified file, we will exit here
 		{
 			isResourceProcessingRequired = true; // this will inform resource monitor, that we did not finish resource processing
+			allLoaded = false;
 			return;
 		}
 
 		if (res->_isLoaded && (res->_isDeleted || res->_isModified))
 		{
-			res->_updateNotifier.Notify();
-			res->GetImplementation()->Release(res);			
+			res->_updateNotifier.Notify(res->_isDeleted ? ResourceNotifyType::ERASE : ResourceNotifyType::MODIFY);
+			res->GetImplementation()->Release(res);	
+			res->_isLoaded = false;
 			res->_isLoadFromDiskAllowed |= res->_isModified && res->_isLoadable;
 		}
 
 		if (res->_isDeleted || !res->_refCounter)
 			return;
 
-		//if (!res->_isLoaded && res->_refCounter && (!res->_isModified || res->_waitWithUpdateNotification < now))
 		if (!res->_isLoaded || res->_isModified)
 		{
 			Load(res);
@@ -649,8 +646,8 @@ struct ResourceManager::InternalData : public Allocators::Ext<>
 
 	void LoadEverything(ResBase *res)
 	{
-		if (res)
-			res->_isDeleted = false;
+//		if (res)
+//			res->_isDeleted = false;
 		bool allLoaded = ProcessResources(res);
 		while (!_killWorkerFlag && !allLoaded)
 		{

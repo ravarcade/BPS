@@ -194,6 +194,7 @@
     <ClInclude Include="Texture2d.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="vkImGui.h" />
+    <ClInclude Include="VkTools.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\3rdParty\ImGui\imgui.cpp">

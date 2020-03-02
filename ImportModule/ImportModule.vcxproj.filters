@@ -8,6 +8,9 @@
     <Filter Include="Src">
       <UniqueIdentifier>{5b30dcaf-8337-4d4d-844f-007e2f5d68d9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ktx">
+      <UniqueIdentifier>{492cbee7-ca9f-4b26-b5e9-ae0c0d73d2e6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -52,6 +55,27 @@
       <Filter>Src</Filter>
     </ClCompile>
     <ClCompile Include="ImageDecoder.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rdParty\ktx\lib\checkheader.c">
+      <Filter>ktx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rdParty\ktx\lib\filestream.c">
+      <Filter>ktx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rdParty\ktx\lib\hashlist.c">
+      <Filter>ktx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rdParty\ktx\lib\memstream.c">
+      <Filter>ktx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rdParty\ktx\lib\swap.c">
+      <Filter>ktx</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rdParty\ktx\lib\texture.c">
+      <Filter>ktx</Filter>
+    </ClCompile>
+    <ClCompile Include="ktx.cpp">
       <Filter>Src</Filter>
     </ClCompile>
   </ItemGroup>

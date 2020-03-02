@@ -628,6 +628,12 @@ public:
 	{
 		PSHOW_PROPERTIES params = { prop, name };
 		BAMS::CEngine::SendMsg(SHOW_PROPERTIES, RENDERING_ENGINE, 0, &params);
+	}	
+
+	static void SetTexture(uint32_t wnd, Property *p, const char *name, IResource *res = nullptr)
+	{
+		PADD_TEXTURE params = { wnd, p->val, name, res };
+		BAMS::CEngine::SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &params);
 	}
 };
 

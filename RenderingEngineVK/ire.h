@@ -114,6 +114,7 @@ public:
 	VkImGui * GetImGui() { return outputWindows[MAINWND] ? outputWindows[MAINWND]->imGui : nullptr; }
 
 	friend OutputWindow;
+	friend VkTools;
 };
 
 extern ire re;

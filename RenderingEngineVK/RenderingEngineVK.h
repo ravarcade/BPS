@@ -49,6 +49,7 @@ using namespace BAMS;
 #include "DescriptorSetsManager.h"
 #include "iglfw.h"
 #include "OutputWindow.h"
+#include "VkTools.h"
 #include "ire.h"
 #include "vkImGui.h"
 

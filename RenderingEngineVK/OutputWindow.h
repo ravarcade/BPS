@@ -1,6 +1,7 @@
 
 class OutputWindow;
 class VkImGui;
+class VkTools;
 
 enum EDrawOrder {
 	DEFERRED = 0,
@@ -88,6 +89,8 @@ private:
 	// ---- 
 	VkSurfaceKHR surface;
 	VkDevice device; // logical device
+	VkPhysicalDeviceProperties devProperties;
+	VkPhysicalDeviceFeatures devFeatures;
 	VkQueue graphicsQueue;
 	VkQueue presentQueue;
 	VkQueue transferQueue;
@@ -129,8 +132,8 @@ private:
 	VkFormat _FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
 	// image functions
-	void _CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage & image, VkDeviceMemory & imageMemory);
-	VkImageView _CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+	void _CreateImage(VkImage & outImage, VkDeviceMemory & outImageMemory, uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t layers, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageCreateFlags flags = 0);
+	VkImageView _CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D);
 	void _CreateAttachment(VkExtent2D extent, FrameBufferAttachment & attachment);
 	void _CreateAttachment(VkFormat format, VkImageUsageFlags usage, VkExtent2D extent, FrameBufferAttachment &attachment);
 
@@ -192,6 +195,7 @@ private:
 	VkQueryPool m_pipelineStatisticsQueryPool;
 	std::vector<uint64_t>m_pipelineStats;
 
+	uint32_t _mipLevels(uint32_t x, uint32_t y) { return static_cast<uint32_t>(floor(log2(std::max(x, y))) + 1); }
 
 public:
 	OutputWindow(uint32_t wnd);
@@ -350,20 +354,9 @@ public:
 	// ------------------------- for gui ----------------
 	VkImGui *imGui;
 
-
-	/*VkWriteDescriptorSet _writeDescriptorSet(VkDescriptorSet dstSet, uint32_t binding, CTexture2d *tex2d)
-	{
-		VkWriteDescriptorSet writeDescriptorSet{};
-		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		writeDescriptorSet.dstSet = dstSet;
-		writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		writeDescriptorSet.dstBinding = binding;
-		writeDescriptorSet.pImageInfo = &tex2d->descriptor;
-		writeDescriptorSet.descriptorCount = 1;
-		return std::move(writeDescriptorSet);
-	}*/
 	friend CDescriptorSetsMananger;
 	friend CShaderProgram;
 	friend CTexture2d;
 	friend VkImGui;
+	friend VkTools;
 };

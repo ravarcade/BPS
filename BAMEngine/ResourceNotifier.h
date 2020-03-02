@@ -6,14 +6,21 @@
 *
 */
 
+enum ResourceNotifyType {
+	UPDATE = 1,
+	ERASE = 2,
+	MODIFY = 3,
+	DESTROY = 4,
+};
+
 class ResourceUpdateNotifier
 {
 public:
 	struct IChain {
 		IChain *next;
 		IChain *prev;
-		bool isValide;
-		virtual void Notify() = 0;
+		bool isValid;
+		virtual void Notify(U32 type) = 0;
 	} *first;
 
 
@@ -21,13 +28,13 @@ public:
 	~ResourceUpdateNotifier()
 	{
 		for (IChain *f = first; f; f = f->next)
-			f->isValide = false;
+			f->isValid = false;
 	}
 
-	void Notify()
+	void Notify(U32 type )
 	{
 		for (IChain *f = first; f; f = f->next)
-			f->Notify();
+			f->Notify(type);
 	}
 
 	void Add(IChain *n)
@@ -37,7 +44,7 @@ public:
 		if (first)
 			first->prev = n;
 		first = n;
-		n->isValide = true;
+		n->isValid = true;
 	}
 
 	void Remove(IChain *n)
@@ -57,17 +64,18 @@ class ResourceUpdateNotifyReciver : public ResourceUpdateNotifier::IChain
 {
 private:
 	ResBase *_res;
-	U64 _param;
 	T *_owner;
 public:
-	ResourceUpdateNotifyReciver() : _res(nullptr), _param(0) {}
-	~ResourceUpdateNotifyReciver() { StopNotifyReciver(); }
-	void SetResource(ResBase *res, T *owner, U64 param = 0)
+	ResourceUpdateNotifyReciver() : _res(nullptr), _owner(nullptr) {}
+	~ResourceUpdateNotifyReciver() { 
+//		TRACE("~ResourceUpdateNotifyReciver: " << this << ", res: " << _res << " (" << (_res ? _res->Name.c_str() : "empty") << "), owner: " << (_owner ? _owner->rb->Name.c_str() : "missing") <<"\n");
+		StopNotifyReciver(); 
+	}
+	void SetResource(ResBase *res, T *owner)
 	{
 		StopNotifyReciver();
 		_res = res;
 		_owner = owner;
-		_param = param;
 		_res->AddNotifyReciver(this);
 		res->AddRef();
 	}
@@ -75,12 +83,12 @@ public:
 	void StopNotifyReciver()
 	{
 		if (_res) {
-			if (isValide)
+			if (isValid)
 				_res->RemoveNotifyReciver(this);
 			_res->Release();
 		}
 	}
 
-	void Notify() { if (_owner) _owner->Notify(_res, _param); }
+	void Notify(U32 type) { if (_owner) _owner->Notify(_res, type); }
 	ResBase *GetResource() { return _res; }
 };

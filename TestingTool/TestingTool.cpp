@@ -314,8 +314,10 @@ void SetLightRadius(Property &p, uint32_t i, uint32_t stride)
 
 const float deg2rad = 0.01745329251994329576923690768489f;
 
-void SetDeferredParams(Properties *pprop)
+void SetDeferredParams(int wnd)
 {
+	auto pprop = &deferredProp[wnd];
+
 	uint32_t stride = 0;
 	uint32_t count = 0;
 	float n = defaultCam.zNear;
@@ -348,6 +350,18 @@ void SetDeferredParams(Properties *pprop)
 			{
 				SetLightRadius(p, i, stride);
 			}
+		}
+		else if (strcmp(p.name, "samplerReflection") == 0 && p.type == Property::PT_TEXTURE)
+		{
+			
+			BAMS::CEngine::SetTexture(wnd, &p, "cubemap_yokohama_bc3_unorm");
+			//			BAMS::CResourceManager rm;
+//			rm.
+//			p.Set(rm.FindExisting("cubemap_space", RESID_IMAGE));
+//			p.val = rm.FindExisting("cubemap_space", RESID_IMAGE);
+//			slugModel.SetMeshProperty(0, "samplerColor", Property::PT_TEXTURE, 1, rm.FindExisting("SLUG_diffuse", RESID_IMAGE));
+			TRACE("samplerReflection");
+
 		}
 	}
 }
@@ -602,8 +616,8 @@ void ToggleWnd(BAMS::CEngine &en, int wnd)
 	else
 	{
 		en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, wn[wnd]);
-		deferredProp[wnd] = *en.AddMesh(wnd, "", "deferred");
-		SetDeferredParams(&deferredProp[wnd]);
+		deferredProp[wnd] = *en.AddMesh(wnd, "", "deferred2");
+		SetDeferredParams(wnd);
 		defaultCam.wnd = wnd;
 		en.SendMsg(SET_CAMERA, RENDERING_ENGINE, 0, &defaultCam);
 	}
@@ -1042,9 +1056,9 @@ int main()
 
 		auto tt = rm.FindOrCreate(L"C:\\Work\\BPS\\BAMEngine\\ReadMe.txt", RESID_RAWDATA);
 
-		auto x = rm.FindExisting("deferred333", CResShader::GetType());
+		auto x = rm.FindExisting("deferred2", CResShader::GetType());
 		if (x) {
-			TRACE("panic");
+			TRACE("--- panic ---");
 		}
 		// default shader program ... not needed any more
 		if (!rm.FindExisting("deferred", CResShader::GetType())) {

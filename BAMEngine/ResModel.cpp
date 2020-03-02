@@ -131,6 +131,7 @@ void ResModel::MeshEntry::FindTexturesInProperties(ResBase *meshSrc)
 	static const char *map[] = {
 		"samplerColor", "albedo", "file", nullptr,
 		"samplerNormal", "normal", nullptr,
+		"samplerReflection", nullptr,
 		nullptr
 	};
 

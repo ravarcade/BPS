@@ -66,7 +66,6 @@ void ResMesh::_LoadXML()
 
 void ResMesh::_SaveXML() 
 { 
-
 	auto &rm = globalResourceManager;
 	auto out = rb->XML ? rb->XML : rm->NewXMLElement();
 	out->DeleteChildren();

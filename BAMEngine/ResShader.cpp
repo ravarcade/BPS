@@ -190,19 +190,16 @@ void ResShader::Update(ResBase * res)
 			Compile(&src);
 		}
 
-		if (!src.IsEmpty() && !src.IsEmpty())
+		if (!src.IsEmpty() && !bin.IsEmpty() && src.IsModified())
 		{
-			if (src.IsModified())
+			isModified = true;
+			if (src.Timestamp == 0 && src.Size == 0)
 			{
-				isModified = true;
-				if (src.Timestamp == 0 && src.Size == 0)
-				{
-					Delete(&src);
-				}
-				else
-				{
-					Compile(&src);
-				}
+				Delete(&src);
+			}
+			else
+			{
+				Compile(&src);
 			}
 		}
 	}
@@ -257,37 +254,42 @@ ResBase * ResShader::GetBinary(U32 idx)
 	return nullptr;
 }
 
-void ResShader::Compile(File * p)
+void ResShader::Compile(File * pSrcFile)
 {
 	// find matching stage;
 	U32 stage = 0;
-	File *o = nullptr;
+	File *pBinFile = nullptr;
 	for (auto &src : Source)
 	{
-		if (&src == p)
+		if (&src == pSrcFile)
 		{
-			o = &Binary[stage];
+			pBinFile = &Binary[stage];
 			break;
 		}
 		++stage;
 	}
 
-	assert(o);
+	assert(pBinFile);
 
-
-	if (o)
+	if (pBinFile)
 	{
-		TRACEW(L"compile: " << p->Filename.c_str() << L"\n");
-		WSTR binFilename = o->Filename;
+		TRACEW(L"compile: " << pSrcFile->Filename.c_str() << L"\n");
+		WSTR binFilename = pBinFile->Filename;
 		if (binFilename.size() == 0)
 		{
-			binFilename = p->Filename;
+			binFilename = pSrcFile->Filename;
 			binFilename.resize(binFilename.size() - 4);
 			binFilename += L"spv";
 		}
 
+		auto pBinRes = pBinFile->GetResource();
+		if (pBinRes) {
+			pBinRes->ModificationBegin();
+		}
+
+
 		WSTR cmd = L"glslangValidator.exe -V ";
-		cmd += p->Filename + L" -o " + binFilename;
+		cmd += pSrcFile->Filename + L" -o " + binFilename;
 		if (Tools::WinExec(cmd) == 0)
 		{
 			AddProgram(binFilename);
@@ -296,6 +298,8 @@ void ResShader::Compile(File * p)
 		{
 			TRACEW(L"compile error\n");
 		}
+		if (pBinRes)
+			pBinRes->ModificationEnd();
 	}
 }
 
@@ -319,7 +323,7 @@ void ResShader::Delete(File * p)
 /// </summary>
 /// <param name="res">The resource (with shader program).</param>
 /// <param name="type">The type.</param>
-void ResShader::Notify(ResBase * res, U64 type)
+void ResShader::Notify(ResBase * res, U32 type)
 {
 	bool isResModified = false;
 	auto getFile = [&](auto &files) {
@@ -333,6 +337,7 @@ void ResShader::Notify(ResBase * res, U64 type)
 		}
 		return (File *)nullptr;
 	};
+
 	auto src = getFile(Source);
 	auto bin = getFile(Binary);
 

@@ -22,6 +22,8 @@ public:
 	void Update(ResBase *res)
 	{
 		// check if we still are with same resource
+		if (_res == nullptr)
+			_res = res;
 		assert(res == _res);
 	}
 
@@ -29,8 +31,11 @@ public:
 	{
 		// just check if we still are with same resource
 		assert(res == _res);
-		_res->ReleaseMemory();
-		_res = nullptr;
+		if (_res) 
+		{
+			_res->ReleaseMemory();
+			_res = nullptr;
+		}
 	}
 
 	U8 *GetData() { return _res ? static_cast<U8 *>(_res->GetData()) : nullptr; }

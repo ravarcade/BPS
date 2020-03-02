@@ -17,7 +17,7 @@ struct UniformBuffer
 struct MiniDescriptorSet
 {
 	VkDescriptorSet descriptorSet;
-	VkDescriptorImageInfo *textures[4];
+	VkDescriptorImageInfo *textures[5];
 	uint32_t uniformBufferSet;
 	uint32_t hash;
 	uint32_t nextEmpty;
@@ -43,6 +43,7 @@ struct cmp<const MiniDescriptorSet *> {
 			a->textures[1] == b->textures[1] &&
 			a->textures[2] == b->textures[2] &&
 			a->textures[3] == b->textures[3] &&
+			a->textures[4] == b->textures[4] &&
 			a->uniformBufferSet == b->uniformBufferSet;
 	};
 };

@@ -60,8 +60,12 @@ public:
 
 	~ResBase()
 	{
-		if (_pResImp)
+		//TRACE("~ResBase: " << Name.c_str() << " : " << _pResImp << "\n");
+
+		if (_pResImp) {
 			_pResImp->GetFactory()->Destroy(_pResImp);
+			_pResImp = nullptr;
+		}
 	};
 	
 	void ReleaseMemory() 
@@ -110,7 +114,7 @@ public:
 		}
 	}
 
-	void Update() { if (_pResImp) _pResImp->Update(this); _updateNotifier.Notify(); }
+	void Update() { if (_pResImp) _pResImp->Update(this); _updateNotifier.Notify(ResourceNotifyType::UPDATE); }
 	
 	IMemoryAllocator *GetMemoryAllocator() { return !_pResImp ? nullptr : _pResImp->GetFactory()->GetMemoryAllocator(); }
 
@@ -130,5 +134,7 @@ public:
 			memcpy_s(_resData, _resSize, newData, newSize);
 	}
 
+	void ModificationBegin(time::duration delay = 10s) { _isModified = true; _waitWithUpdateNotification = clock::now() + defaultDelay; }
+	void ModificationEnd(time::duration delay = 10ms) { _isModified = true; _waitWithUpdateNotification = clock::now() + defaultDelay; }
 	friend class ResourceManager;
 };

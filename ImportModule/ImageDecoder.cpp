@@ -6,6 +6,7 @@ bool DecodeBMP(Image *dst, U8 *src, SIZE_T size, TempMemory &tmp);
 bool DecodeTGA(Image *dst, U8 *src, SIZE_T size, TempMemory &tmp);
 bool DecodePNG(Image *dst, U8 *src, SIZE_T size, TempMemory &tmp);
 bool DecodeJPG(Image *dst, U8 *src, SIZE_T size, TempMemory &tmp);
+bool DecodeKTX(Image *dst, U8 *src, SIZE_T size, TempMemory &tmp);
 
 ImageDecoder::ImageDecoder()
 {
@@ -23,7 +24,7 @@ void ImageDecoder::OnFinalize()
 void ImageDecoder::Decode(CResImage & res)
 {
 	// check extensions:
-	int extIdx = Tools::FindMatchingFileExtension(res.GetPath(), L"bmp;tga;png;jpg;jpeg");
+	int extIdx = Tools::FindMatchingFileExtension(res.GetPath(), L"bmp;tga;png;jpg;jpeg;ktx");
 	switch (extIdx)
 	{
 	case 0: // bmp
@@ -47,6 +48,9 @@ void ImageDecoder::Decode(CResImage & res)
 		DecodeJPG(res.GetImage(), res.GetSrcData(), res.GetSrcSize(), tmp);
 		break;
 
+	case 5: // ktx
+		TRACE("LOADE KTX\n");
+		DecodeKTX(res.GetImage(), res.GetSrcData(), res.GetSrcSize(), tmp);
 	default:
 		break;
 	}

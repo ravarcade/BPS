@@ -237,7 +237,7 @@ void CShadersReflections::LoadProgram(const char *shaderName)
 		prg.entryPointName = "main";
 		prg.resource = m_shaderResource.GetBinary(i);
 		if (!prg.resource.IsLoaded())
-			rm.LoadSync(prg.resource);
+			rm.LoadSync(prg.resource);		
 	}
 
 	_ParsePrograms();
@@ -356,23 +356,41 @@ void CShadersReflections::_ParsePrograms()
 			vd.stage = prg.stage;
 			vd.isSharedUBO = vd.entry.rootTypeName == SHAREDUBOTYPENAME;
 			vd.isHostVisibleUBO = ForceHostVisibleUBOS || vd.isSharedUBO;
-			m_params_in_ubos.push_back(vd);
-
-			if (vd.isSharedUBO)
+			
+			bool isUniq = true;
+			for (auto &vdPrev : m_params_in_ubos) 
 			{
-				m_shared_ubos_size += vd.entry.size;
-			}
-			else {
-				m_total_ubos_size += vd.entry.size;
-
-				if (m_ubo_sizes.size() <= vd.binding)
+				if (vdPrev.binding == vd.binding &&
+					vdPrev.set == vd.set &&
+					vdPrev.stage != vd.stage) 
 				{
-					size_t i = m_ubo_sizes.size();
-					m_ubo_sizes.resize(vd.binding + 1);
-					for (; i < vd.binding; ++i)
-						m_ubo_sizes[i] = 0;
+					// same set binding
+					vdPrev.stage |= vd.stage;
+					isUniq = false;
+					break;
 				}
-				m_ubo_sizes[vd.binding] = vd.entry.size;
+			}
+
+			if (isUniq) 
+			{
+				m_params_in_ubos.push_back(vd);
+
+				if (vd.isSharedUBO)
+				{
+					m_shared_ubos_size += vd.entry.size;
+				}
+				else {
+					m_total_ubos_size += vd.entry.size;
+
+					if (m_ubo_sizes.size() <= vd.binding)
+					{
+						size_t i = m_ubo_sizes.size();
+						m_ubo_sizes.resize(vd.binding + 1);
+						for (; i < vd.binding; ++i)
+							m_ubo_sizes[i] = 0;
+					}
+					m_ubo_sizes[vd.binding] = vd.entry.size;
+				}
 			}
 
 			auto name = compiler.get_name(buffer.id);

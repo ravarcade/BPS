@@ -57,7 +57,7 @@ public:
 	void Set(I32 v) { Set(PT_I32, &v, sizeof(v)); }
 	void Set(F32 v) { Set(PT_F32, &v, sizeof(v)); }
 	void Set(F32 *v, U32 cnt = 1) { Set(PT_F32, v, sizeof(F32)*cnt); }
-	void Set(CSTR v) { val = const_cast<char *>(v); }
+	void Set(CSTR v) { val = const_cast<char *>(v); }	
 
 	void SetMem(void *v) { SIZE_T l = MemoryRequired(); if (!l) val = v; else memcpy_s(val, l, v, l); }
 	SIZE_T MemoryRequired() const { return MemoryRequired(type, count); }

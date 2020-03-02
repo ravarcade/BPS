@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 
+
 using namespace BAMS;
 using namespace ::Assimp;
 
@@ -202,7 +203,7 @@ private:
 		if (*(p->pType) != RESID_UNKNOWN)
 			return;
 		
-		if (Tools::FindMatchingFileExtension(p->filename, L"png;bmp;jpg;jpeg;tga") >= 0)
+		if (Tools::FindMatchingFileExtension(p->filename, L"png;bmp;jpg;jpeg;tga;ktx") >= 0)
 		{
 			*(p->pType) = RESID_IMAGE;
 			// load texture 2d?

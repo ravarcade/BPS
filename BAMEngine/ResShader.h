@@ -7,7 +7,8 @@
 */
 
 typedef TResRawData<RESID_SHADER_SRC, false> ResShaderSrc;
-typedef TResRawData<RESID_SHADER_BIN> ResShaderBin;
+typedef TResRawData<RESID_SHADER_BIN, true> ResShaderBin;
+
 
 class ResShader : public ResImp<ResShader, RESID_SHADER>
 {
@@ -31,8 +32,6 @@ class ResShader : public ResImp<ResShader, RESID_SHADER>
 	};
 
 	// ----------------------------------------------------------------------------------
-
-	ResBase *rb;
 
 	bool isModified;
 	bool isUpdateRecived;
@@ -93,8 +92,12 @@ class ResShader : public ResImp<ResShader, RESID_SHADER>
 	void _SaveXML();
 
 public:
+	ResBase *rb;
 	ResShader(ResBase *res) : rb(res), isModified(true), isUpdateRecived(false) {}
-	~ResShader() { Release(rb); }
+	~ResShader() { 
+//		TRACE("~ResShader: " << rb->Name.c_str() << "\n");
+		Release(rb); 
+	}
 
 	void Release(ResBase *res)
 	{
@@ -116,13 +119,12 @@ public:
 	U32 GetSourceCount();
 	ResBase *GetBinary(U32 idx);
 
-
 	void Compile(File *p);
 
 	PRELOAD_SHADER reloadShaderMessageData;
 	void Link(File *p);
 	void Delete(File *p);
-	void Notify(ResBase *res, U64 type);
+	void Notify(ResBase *res, U32 type);
 
 	static void IdentifyResourceType(ResBase *res);
 };

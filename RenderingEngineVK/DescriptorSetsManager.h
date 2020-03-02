@@ -21,7 +21,7 @@ private:
 	OutputWindow *vk;
 
 	void _CreateNewDescriptorPool();
-	void _AddOldLimits(CShaderProgram **shaders, uint32_t count);
+	//void _AddOldLimits(CShaderProgram **shaders, uint32_t count);
 
 	// params:
 	static uint32_t default_AvailableDesciprotrSets;

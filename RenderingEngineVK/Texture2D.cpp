@@ -1,59 +1,68 @@
 #include "stdafx.h"
 
-CTexture2d::CTexture2d(OutputWindow *outputWindow) 
-	: vk(outputWindow)
+
+void CTexture2d::_LoadTexture(Image *pImg)
 {
-}
+	VkTools vkt(vk);
 
-CTexture2d::~CTexture2d()
-{
-}
+	vkt.CreateImage(pImg, image, memory, view, format, mipLevels);
 
-void CTexture2d::_LoadTexture(Image *img)
-{
-	uint32_t mipmapLevels = 0;
-	VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+	vkt.CopyToStagingBuffer(pImg);
 
-	// create texture
-	vk->_CreateImage(img->width, img->height, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
-	vk->_TransitionImageLayout(image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	vkt.TransitionImageLayout(image, 0, pImg->mipmaps, 0, pImg->faces*pImg->layers,
+		0, VK_ACCESS_TRANSFER_WRITE_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-	// copy texture from ram to gpu
-	vk->CopyImage(image, img);
-	vk->_TransitionImageLayout(image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	vkt.CopyBufferToImage(image, pImg);
+	vkt.Execute();
 
-	// create sampler
-	VkSamplerCreateInfo samplerInfo = {};
-	samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-	samplerInfo.magFilter = VK_FILTER_LINEAR;
-	samplerInfo.minFilter = VK_FILTER_LINEAR;
-	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.mipLodBias = 0.0f;
-	samplerInfo.compareOp = VK_COMPARE_OP_NEVER;
-	samplerInfo.minLod = 0.0f;
+	if (mipLevels != pImg->mipmaps)
+	{
+		vkt.TransitionImageLayout(image, 0, pImg->mipmaps, 0, pImg->faces*pImg->layers,
+			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-	// Set max level-of-detail to mip level count of the texture
-	samplerInfo.maxLod = static_cast<float>(mipmapLevels);
+		for (uint32_t mip = pImg->mipmaps; mip < mipLevels; mip++)
+		{
+			vkt.TransitionImageLayout(image, mip, 1, 0, pImg->faces*pImg->layers,
+				0, VK_ACCESS_TRANSFER_WRITE_BIT,
+				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-	// TODO: set anisotropy
-	samplerInfo.maxAnisotropy = 1.0;
-	samplerInfo.anisotropyEnable = VK_FALSE;
-	samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-	vkCreateSampler(vk->device, &samplerInfo, vk->allocator, &sampler);
+			vkt.BlitImage(image, mip - 1, mip, pImg);
 
-	// view
-	view = vk->_CreateImageView(image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+			vkt.TransitionImageLayout(image, mip, 1, 0, pImg->faces*pImg->layers,
+				VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
+		}
+		vkt.TransitionImageLayout(image, 0, mipLevels, 0, pImg->faces*pImg->layers,
+			VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_READ_BIT,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 
-	imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	}
+	else {
+		vkt.TransitionImageLayout(image, 0, mipLevels, 0, pImg->faces*pImg->layers,
+			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+
+	}
+	vkt.Execute();
+
+	// === create sampler ============================================================================================================
+
+	sampler = vkt.CreateSampler(mipLevels, true);
+
 	descriptor.sampler = sampler;
 	descriptor.imageView = view;
-	descriptor.imageLayout = imageLayout;
+	descriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 	vk->_MarkDescriptorSetsInvalid(&descriptor);
-	TRACE("Created texture: " << resImg.GetName());
+	TRACE("Created texture: " << resImg.GetName() << "\n");
 }
 
 void CTexture2d::LoadResTexture(const char * textureResourceName)
@@ -70,7 +79,7 @@ void CTexture2d::LoadResTexture(const char * textureResourceName)
 }
 
 void CTexture2d::LoadResTexture(IResource *textureResource)
-{	
+{
 	if (textureResource)  // if resource exist, try to use it as texture
 	{
 		CResImage resImg(textureResource);
@@ -93,39 +102,3 @@ void CTexture2d::LoadResTexture(IResource *textureResource)
 	descriptor = pdt->descriptor;  // note: VkDescriptorImageInfo descriptor don't have any VK resources to destroy, so this plain copy is safe.
 }
 
-//void CTexture2d::UpdateTexture(Image *img)
-//{
-//	TRACE("Update Texture");
-//}
-//
-//void CTexture2d::UpdateTexture(const char *textureResourceName)
-//{
-//	CResourceManager rm;
-//	auto res = rm.FindExisting(textureResourceName, CResImage::GetType());
-//	assert(res != nullptr);
-//	if (!res)
-//	{
-//		TRACE("ERROR: Missing \"" << textureResourceName << "\" texture.\n");		
-//	}
-//	else {
-//		UpdateTexture(res);
-//	}
-//}
-//
-//void CTexture2d::UpdateTexture(IResource * textureResource)
-//{
-//	CResImage resImg(textureResource);
-//	auto img = resImg.GetImage(true);
-//	assert(img != nullptr);
-//	if (!img) {
-//		TRACE("ERROR: Missing texture.\n");
-//	}
-//	else {
-//		UpdateTexture(img);
-//	}
-//}
-
-void CTexture2d::Release()
-{
-	
-}

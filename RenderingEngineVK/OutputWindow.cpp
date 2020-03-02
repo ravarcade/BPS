@@ -76,6 +76,9 @@ void OutputWindow::Prepare(VkInstance _instance, GLFWwindow* _window, const VkAl
 	if (physicalDevice == VK_NULL_HANDLE)
 		throw std::runtime_error("failed to find a suitable GPU!");
 
+	vkGetPhysicalDeviceProperties(physicalDevice, &devProperties);
+	vkGetPhysicalDeviceFeatures(physicalDevice, &devFeatures);
+
 	// ------------------------------------------------------------------------ create logical device
 	// queues: one from graphics family one from present family (it may be same)
 	QueueFamilyIndices indices(physicalDevice, surface);
@@ -405,7 +408,16 @@ VkFormat OutputWindow::_FindSupportedFormat(const std::vector<VkFormat>& candida
 /// <param name="properties">The properties.</param>
 /// <param name="image">The image.</param>
 /// <param name="imageMemory">The image memory.</param>
-void OutputWindow::_CreateImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory)
+void OutputWindow::_CreateImage(
+	VkImage& outImage, VkDeviceMemory& outImageMemory,
+	uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t layers,
+	VkSampleCountFlagBits numSamples,
+	VkFormat format,
+	VkImageTiling tiling,
+	VkImageUsageFlags usage,
+	VkMemoryPropertyFlags properties,
+	VkImageCreateFlags flags)
+	
 {
 	VkImageCreateInfo imageInfo = {};
 	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -414,39 +426,40 @@ void OutputWindow::_CreateImage(uint32_t width, uint32_t height, uint32_t mipLev
 	imageInfo.extent.height = height;
 	imageInfo.extent.depth = 1;
 	imageInfo.mipLevels = mipLevels;
-	imageInfo.arrayLayers = 1;
+	imageInfo.arrayLayers = layers;
 	imageInfo.format = format;
 	imageInfo.tiling = tiling;
 	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 	imageInfo.usage = usage;
 	imageInfo.samples = numSamples;
 	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.flags = flags;
 
-	if (vkCreateImage(device, &imageInfo, allocator, &image) != VK_SUCCESS) {
+	if (vkCreateImage(device, &imageInfo, allocator, &outImage) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create image!");
 	}
 
 	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(device, image, &memRequirements);
+	vkGetImageMemoryRequirements(device, outImage, &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo = {};
 	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	allocInfo.allocationSize = memRequirements.size;
 	allocInfo.memoryTypeIndex = _FindMemoryType(memRequirements.memoryTypeBits, properties);
 
-	if (vkAllocateMemory(device, &allocInfo, allocator, &imageMemory) != VK_SUCCESS) {
+	if (vkAllocateMemory(device, &allocInfo, allocator, &outImageMemory) != VK_SUCCESS) {
 		throw std::runtime_error("failed to allocate image memory!");
 	}
 
-	vkBindImageMemory(device, image, imageMemory, 0);
+	vkBindImageMemory(device, outImage, outImageMemory, 0);
 }
 
-VkImageView OutputWindow::_CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags)
+VkImageView OutputWindow::_CreateImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, VkImageViewType viewType)
 {
 	VkImageViewCreateInfo viewInfo = {};
 	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 	viewInfo.image = image;
-	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.viewType = viewType;
 	viewInfo.format = format;
 	viewInfo.components = {
 		VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -488,7 +501,7 @@ void OutputWindow::_CreateAttachment(VkExtent2D extent, FrameBufferAttachment &a
 		imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 	}
 
-	_CreateImage(extent.width, extent.height, mipLevels, numSamples, attachment.format, tiling, attachment.usage, properties, attachment.image, attachment.memory);
+	_CreateImage(attachment.image, attachment.memory, extent.width, extent.height, mipLevels, 1, numSamples, attachment.format, tiling, attachment.usage, properties);
 	attachment.view = _CreateImageView(attachment.image, attachment.format, aspectFlags);
 	_TransitionImageLayout(attachment.image, attachment.format, VK_IMAGE_LAYOUT_UNDEFINED, imageLayout);
 }
