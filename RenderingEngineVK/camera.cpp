@@ -123,7 +123,8 @@ void CCamera::update(float dt)
 			R = glm::rotate(R, -float(my)*mouseScale, right);
 
 			dir = R * glm::vec4(dir,0);
-			*reinterpret_cast<vec3 *>(&current.lookAt) = *reinterpret_cast<vec3 *>(&current.eye) + dir;
+			asVec3(current.lookAt) = asVec3(current.eye) + dir;
+			asVec3(current.up) = glm::normalize(glm::cross(right, dir));
 			SetCursorPos(mouseCursorPosition.x, mouseCursorPosition.y);
 		}
 	}

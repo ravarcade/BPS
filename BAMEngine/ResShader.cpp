@@ -307,7 +307,7 @@ void ResShader::Link(File * p)
 {
 	TRACEW(L"link: " << p->Filename.c_str() << L"\n");
 	reloadShaderMessageData.wnd = -1;
-	reloadShaderMessageData.shader = rb->Name.c_str();
+	reloadShaderMessageData.resShader = rb;
 	Message msg = { RELOAD_SHADER, RENDERING_ENGINE, 0, &reloadShaderMessageData };
 	IEngine::PostMsg(&msg, 100ms);
 }

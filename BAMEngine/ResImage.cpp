@@ -32,7 +32,7 @@ void ResImage::Update(ResBase * res) {
 		// It must be decoded.... This is job for ImportModule
 		CEngine::SendMsg(IMPORTMODULE_UPDATEIMAGE, IMPORT_MODULE, 0, rb); 
 		_SaveXML();
-		PUPDATE_TEXTURE msg = { 0, nullptr, rb };
+		PUPDATE_TEXTURE msg = { static_cast<uint32_t>(-1), rb };
 		CEngine::PostMsg(UPDATE_TEXTURE, RENDERING_ENGINE, 0, &msg, sizeof(msg));
 	}
 }

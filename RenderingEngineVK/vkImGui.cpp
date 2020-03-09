@@ -309,7 +309,7 @@ void VkImGui::_iglfw_character(unsigned int c)
 inline void VkImGui::initGui()
 {
 	m_showImGuiDemoWindow = false;
-	m_prop = nullptr;
+	m_hMesh = -1;
 	m_propName = "";
 }
 
@@ -353,10 +353,10 @@ void VkImGui::drawGui()
 			}
 		}
 	}
-	if (m_prop)
+	if (m_hMesh != -1)
 	{
 		if (ImGui::CollapsingHeader("Properties"))
-			inputProperties(m_prop);
+			inputProperties(m_hMesh);
 	}
 
 	if (ImGui::CollapsingHeader("Tests"))
@@ -368,9 +368,10 @@ void VkImGui::drawGui()
 
 }
 
-void VkImGui::ShowProperties(Properties * prop, const char * name)
+void VkImGui::ShowProperties(HandleMesh hMesh, const char * name)
 { 
-	m_prop = prop; 
+	//vk->AddModel
+	m_hMesh = hMesh; 
 	m_propName = name ? name : ""; 
 }
 
@@ -403,6 +404,53 @@ void VkImGui::_updateTextureData()
 			m_textureDescriptors.emplace_back(pIdx ? &vk->textures[*pIdx].descriptor : nullptr);
 		}
 	}
+}
+
+Properties * VkImGui::_propertiesForGui(Properties *prop)
+{
+	auto strcmpext = [] (const char *val, const char **patt, size_t count, bool caseInsesitive = true)
+	{
+		decltype(_stricmp) *cmp = caseInsesitive ? _stricmp : strcmp;
+		for (size_t i = 0; i < count; ++i)
+		{
+			if (cmp(val, patt[i]) == 0)
+				return true;
+		}
+		return false;
+	}; 
+
+	static const char *colors[] = {
+		"baseColor", "color"
+	};
+	static const char *drag01[] = {
+		"normalMapScale", "metalness", "roughtness"
+	};
+
+	for (auto &p : *prop)
+	{
+		switch (p.type)
+		{
+		case Property::PT_F32:
+			if ((p.count == 3 || p.count == 4) && strcmpext(p.name, colors, COUNT_OF(colors)))
+			{
+				p.guiType = PTGUI_COLOR;
+			}
+			if (p.count <= 4 && strcmpext(p.name, drag01, COUNT_OF(drag01)))
+			{
+				p.guiType = PTGUI_DRAG;
+				p.guiMin = 0.0f;
+				p.guiMax = 1.0f;
+				p.guiStep = 0.005f;
+			}
+			break;
+		}
+	}
+	return prop;
+}
+
+bool VkImGui::inputProperties(HandleMesh hMesh)
+{
+	return inputProperties(_propertiesForGui(vk->GetMeshParams(hMesh)));
 }
 
 bool VkImGui::inputProperties(Properties *prop)
@@ -458,7 +506,9 @@ bool VkImGui::inputProperties(Properties *prop)
 
 					if (Mchange)
 					{
-						Utils::composeM(reinterpret_cast<float *>(p.val), r, s, t);
+						float T[16];
+						Utils::composeM(T, r, s, t);
+						vk->SetModelMatrix(m_hMesh, T);
 					}
 				}
 				break;
@@ -475,7 +525,7 @@ bool VkImGui::inputProperties(Properties *prop)
 				change = selectTexture(p.name, pPropVal, &res);
 				if (change && res && !*pPropVal)
 				{
-					re.GetImGui()->vk->AddTexture(p.val, nullptr, res);
+					re.GetImGui()->vk->AddTexture(p.val, res);
 				}
 			}
 			break;

@@ -100,12 +100,13 @@ public:
 	void CloseWnd(const void *params);
 	void AddMesh(const void *params);
 	void AddModel(const void * params);
+	void SetModelMatrix(const void * params);
 	void AddTexture(const void * params);
 	void UpdateTexture(const void * params);
 	void AddShader(const void *params);
 	void ReloadShader(const void * params);
 	void GetShaderParams(const void * params);
-	void GetObjectParams(const void * params);
+	void GetMeshParams(const void * params);
 	void UpdateDrawCommands(const void *params);
 	void SetCamera(const void * params);
 	void ShowProperties(const void * params);

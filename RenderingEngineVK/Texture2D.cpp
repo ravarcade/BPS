@@ -65,19 +65,6 @@ void CTexture2d::_LoadTexture(Image *pImg)
 	TRACE("Created texture: " << resImg.GetName() << "\n");
 }
 
-void CTexture2d::LoadResTexture(const char * textureResourceName)
-{
-	CResourceManager rm;
-	auto res = rm.FindExisting(textureResourceName, CResImage::GetType());
-	if (!res)
-	{
-
-		TRACE("ERROR: Missing \"" << textureResourceName << "\" texture.\n");
-		// assert(res != nullptr); // we don't have to crash here... if res == nullptr we will use defaultEmptyTexture
-	}
-	LoadResTexture(res);
-}
-
 void CTexture2d::LoadResTexture(IResource *textureResource)
 {
 	if (textureResource)  // if resource exist, try to use it as texture

@@ -1465,20 +1465,22 @@ void OutputWindow::PrepareShader(CShaderProgram *sh)
 	}
 }
 
-CShaderProgram * OutputWindow::AddShader(const char * shader)
+CShaderProgram * OutputWindow::AddShader(IResource * resShader)
 {
-	auto sh = shaders.find(shader);
+	auto shaderName = IResource_GetName(resShader);
+	auto sh = shaders.find(shaderName);
 	if (sh)
 		return sh; // can't add second shader program with same name....
 
-	sh = shaders.add(shader, this);
-	sh->LoadProgram(shader); 
+	sh = shaders.add(shaderName, this);
+	sh->LoadProgram(shaderName);
 	PrepareShader(sh);
 	return sh;
 }
 
-CShaderProgram * OutputWindow::ReloadShader(const char * shader)
+CShaderProgram * OutputWindow::ReloadShader(IResource *resShader)
 {
+	auto shader = IResource_GetName(resShader);
 	auto sh = shaders.find(shader);
 	if (!sh)
 		return nullptr;
@@ -1493,25 +1495,30 @@ CShaderProgram * OutputWindow::ReloadShader(const char * shader)
 	return sh;
 }
 
-void OutputWindow::GetShaderParams(const char *shader, Properties **props)
+Properties *OutputWindow::GetShaderParams(IResource *shader)
 {
-	auto sh = shaders.find(shader);
-	if (!sh) return;
-	*props = sh->GetProperties();
+	auto sh = shaders.find(IResource_GetName(shader));
+	return sh ? sh->GetProperties() : nullptr;
 }
 
 
-void OutputWindow::GetObjectParams(uint32_t idx, Properties **props)
+Properties * OutputWindow::GetMeshParams(HandleMesh hMesh)
 {
-	ObjectInfo *oi;
-	if (idx >= static_cast<uint32_t>(objects.size()))
-		return;
+	if (hMesh >= objects.size())
+	{
+		return nullptr;
+	}
+	auto &meshInfo = objects[hMesh];
+	return meshInfo.shader->GetProperties(meshInfo.oid);
+	//ObjectInfo *oi;
+	//if (idx >= static_cast<uint32_t>(objects.size()))
+	//	return;
 
-	oi = &objects[idx];
-	if (!oi) 
-		return;
+	//oi = &objects[idx];
+	//if (!oi) 
+	//	return;
 
-	*props = oi->GetProperties();
+	//*props = oi->GetProperties();
 }
 
 void OutputWindow::UpdateDrawCommands()
@@ -1520,10 +1527,9 @@ void OutputWindow::UpdateDrawCommands()
 }
 
 
-CTexture2d *OutputWindow::_AddOrUpdateTexture(const char * textureName, IResource *textureRes)
-{
-	if (!textureName && textureRes)
-		textureName = IResource_GetName(textureRes);
+CTexture2d *OutputWindow::_AddOrUpdateTexture(IResource *resTexture)
+{	
+	auto textureName = resTexture ? IResource_GetName(resTexture) : "";
 
 	auto pTex = textures.find(textureName);
 	if (!pTex) // if texture NOT exist, load it
@@ -1540,24 +1546,21 @@ CTexture2d *OutputWindow::_AddOrUpdateTexture(const char * textureName, IResourc
 		// (2) load new texture in that place
 	}
 
-	if (textureRes)
-		pTex->LoadResTexture(textureRes);
-	else
-		pTex->LoadResTexture(textureName);
+	pTex->LoadResTexture(resTexture);
 
 	return pTex;
 }
 
-void OutputWindow::AddTexture(void *propVal, const char * textureName, IResource *textureRes)
+void OutputWindow::AddTexture(void *propVal, IResource *resTexture)
 {
-	auto pTex = _AddOrUpdateTexture(textureName, textureRes);
+	auto pTex = _AddOrUpdateTexture(resTexture);
 	if (pTex && propVal)
 		*reinterpret_cast<VkDescriptorImageInfo **>(propVal) = &pTex->descriptor;
 }
 
-void OutputWindow::UpdateTexture(const char * textureName, IResource *textureRes)
+void OutputWindow::UpdateTexture(IResource *resTexture)
 {
-	auto pTex = _AddOrUpdateTexture(textureName, textureRes);
+	_AddOrUpdateTexture(resTexture);
 }
 
 void OutputWindow::_MarkDescriptorSetsInvalid(VkDescriptorImageInfo * pDII)
@@ -1715,55 +1718,127 @@ VkDescriptorImageInfo *OutputWindow::GetDescriptionImageInfo(const char * attach
 	return nullptr;
 }
 
-CShaderProgram * OutputWindow::_GetShader(const char *shader)
+
+CShaderProgram * OutputWindow::_GetShader(const char *resShaderName)
 {
-	return AddShader(shader);
+	CResourceManager rm;
+	return _GetShader(rm.FindExisting(resShaderName, CResShader::GetType()));
 }
 
-ObjectInfo * OutputWindow::AddObject(const char * mesh, const char * shader)
+CShaderProgram * OutputWindow::_GetShader(IResource *resShader)
 {
-	auto sh = _GetShader(shader);
+	return AddShader(resShader);
+}
+
+HandleMesh OutputWindow::AddMesh(IResource *resMesh, IResource *resShader)
+{
+	auto sh = _GetShader(resShader);
 	if (!sh)
-		return nullptr;
+		return -1;
 
-	auto oid = sh->AddObject(mesh);
+	auto oid = sh->AddMesh(resMesh);
 	if (oid == -1)
-		return nullptr;
+		return -1;
 
-	auto ret = objects.add_empty();
-	ret->shader = sh;
-	ret->oid = oid;
+	HandleMesh hMesh = static_cast<HandleMesh>(objects.size());
+	ObjectInfo oi = { sh, oid, 0 };
+	objects.push_back(oi);
 
 	BufferRecreationNeeded();
+
+	return hMesh;
+}
+
+HandleModel OutputWindow::AddModel(IResource *resModel)
+{
+	CResModel model(resModel);
+	uint32_t count = model.GetMeshCount();
+	IResource *resMesh;
+	IResource *resShader;
+	const float *M;
+	HandleModel ret = -1;
+	ObjectInfo *prevMeshInfo = nullptr;
+	for (uint32_t i = 0; i < count; ++i)
+	{
+		const Properties *srcProp;
+		model.GetMesh(i, (IResource **)&resMesh, &resShader, &M, &srcProp);
+		if (resMesh && resShader)
+		{
+			HandleMesh hMesh = AddMesh(resMesh, resShader);
+			auto &meshInfo = objects[hMesh];
+			if (ret == -1)
+			{
+				ret = hMesh;
+			} else{
+				prevMeshInfo->nextMesh = hMesh;
+			}
+			memcpy_s(&meshInfo.M, sizeof(meshInfo.M), M, sizeof(meshInfo.M));
+			meshInfo.pModelMatrix = nullptr;
+			prevMeshInfo = &meshInfo;
+
+			Properties *prop = meshInfo.GetProperties();
+			for (uint32_t j = 0; j < prop->count; ++j)
+			{
+				auto &p = prop->properties[j];
+				if (p.type == Property::PT_TEXTURE)
+				{
+					auto src = srcProp->ConstFind(p.name);
+					if (src && src->val)
+						AddTexture(p.val, reinterpret_cast<IResource *>(src->val));
+					else {
+						CResourceManager rm;
+						AddTexture(p.val, rm.FindExisting(p.name, CResImage::GetType()));
+					}
+				}
+
+				if (p.type == Property::PT_F32 && p.count == 16)
+				{
+					meshInfo.pModelMatrix = reinterpret_cast<float *>(p.val);
+				}
+			}
+		}
+	}
 
 	return ret;
 }
 
-void OutputWindow::AddModel(const char * name)
+glm::mat4 &asMat4(float *v) { return *reinterpret_cast<glm::mat4*>(v); }
+const glm::mat4 &asMat4(const float *v) { return *reinterpret_cast<const glm::mat4*>(v); }
+
+
+void OutputWindow::SetModelMatrix(HandleModel hModel, const float *T, const char *propName)
 {
-	CResourceManager rm;
-	auto res = rm.FindExisting(name, RESID_MODEL);
-	assert(!res);
-	if (res) 
+	auto ResetModelMatrix = [](ObjectInfo *mi, const char *propName)
 	{
-		CResModel model(res);
-		uint32_t count = model.GetMeshCount();
-		const char *mesh;
-		const char *shader;
-		const float *m;
-		const Properties *prop;
-
-		for (uint32_t i = 0; i < count; ++i)
+		auto props = mi->GetProperties();
+		for (auto &p : *props) 
 		{
-			model.GetMesh(i, &mesh, &shader, &m, &prop);
-			if (mesh && shader)
+			if (p.name == propName && p.type == Property::PT_F32 && p.count == 16) 
 			{
-				auto oid = AddObject(mesh, shader);
-				auto oProp = oid->GetProperties();
-
-				// oProp->Set(porp);
-			
+				mi->pModelMatrix = reinterpret_cast<float *>(p.val);
+				break;
 			}
+		}
+	};
+
+	if (hModel >= objects.size())
+		return;
+	auto *mi = &objects[hModel];
+	if (propName)
+		ResetModelMatrix(mi, propName);
+
+	if (!mi->nextMesh) {
+		memcpy_s(mi->pModelMatrix, 16 * sizeof(float), T, 16 * sizeof(float));
+	}
+	else {
+		// loop for all meshes
+		asMat4(mi->pModelMatrix) = asMat4(mi->M) * asMat4(T);
+		while (mi->nextMesh) 
+		{
+			mi = &objects[mi->nextMesh];
+			if (propName)
+				ResetModelMatrix(mi, propName);
+			asMat4(mi->pModelMatrix) = asMat4(mi->M) * asMat4(T);
 		}
 	}
 }

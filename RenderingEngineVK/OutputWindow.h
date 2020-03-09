@@ -13,6 +13,9 @@ enum EDrawOrder {
 struct ObjectInfo {
 	CShaderProgram *shader;
 	uint32_t oid;
+	uint32_t nextMesh;
+	float M[16]; // realative to root matrix
+	float *pModelMatrix;
 	Properties *GetProperties() { return shader->GetProperties(oid); }
 };
 
@@ -178,7 +181,8 @@ private:
 	void _CleanupShaderPrograms();
 	void _Cleanup();
 
-	CShaderProgram *_GetShader(const char *shader);
+	CShaderProgram *_GetShader(const char *resShaderName);
+	CShaderProgram *_GetShader(IResource *resShader);
 
 	bool _SimpleAcquireNextImage(uint32_t & imageIndex);
 	void _SimpleQueueSubmit(VkSemaphore & waitSemaphore, VkSemaphore & signalSemaphore, VkCommandBuffer & commandBuffer);
@@ -262,18 +266,20 @@ public:
 	CStringHastable<CShaderProgram> shaders;
 	basic_array<ObjectInfo> objects;
 
-	ObjectInfo * AddObject(const char * mesh, const char * shader);
-	void AddModel(const char * name);
+	HandleMesh AddMesh(IResource * resMesh, IResource * resShader);
+	HandleModel AddModel(IResource *resModel);
 
-	CShaderProgram *AddShader(const char * shader);
-	CShaderProgram *ReloadShader(const char *shader);
-	void GetShaderParams(const char * shader, Properties **params);
-	void GetObjectParams(uint32_t idx, Properties ** props);
+	void SetModelMatrix(HandleModel hModel, const float * T, const char * propName = nullptr);
+
+	CShaderProgram *AddShader(IResource *resShader);
+	CShaderProgram *ReloadShader(IResource *resShader);
+	Properties * GetShaderParams(IResource * resShader);
+	Properties *GetMeshParams(HandleMesh hMesh);
 	void UpdateDrawCommands();
 
-	CTexture2d * _AddOrUpdateTexture(const char * textureName, IResource * textureRes);
-	void AddTexture(void * propVal, const char * textureName, IResource * textureRes = nullptr);
-	void UpdateTexture(const char * textureName, IResource *textureRes);
+	CTexture2d * _AddOrUpdateTexture(IResource * resTexture);
+	void AddTexture(void * propVal, IResource * resTexture);
+	void UpdateTexture(IResource *resTexture);
 	void _MarkDescriptorSetsInvalid(VkDescriptorImageInfo *pDII);
 
 	// ------------------------ camera stuffs -------------------

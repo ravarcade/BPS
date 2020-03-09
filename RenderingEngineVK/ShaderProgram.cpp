@@ -53,13 +53,13 @@ void CShaderProgram::Release()
 
 
 /// <summary>
-/// Adds the object.
+/// Adds the mesh.
 /// </summary>
-/// <param name="meshIdx">Index of the mesh.</param>
+/// <param name="resMesh">Mesh resource.</param>
 /// <returns></returns>
-uint32_t CShaderProgram::AddObject(const char *meshName)
+uint32_t CShaderProgram::AddMesh(IResource *resMesh)
 {
-	uint32_t meshIdx = _AddMesh(meshName);
+	uint32_t meshIdx = _AddMesh(resMesh);
 	if (meshIdx == -1)
 		return -1;
 
@@ -148,8 +148,9 @@ void CShaderProgram::CreateGraphicsPipeline()
 
 // ============================================================================ CShaderProgram private methods ===
 
-uint32_t CShaderProgram::_AddMesh(const char *name)
+uint32_t CShaderProgram::_AddMesh(IResource *resMesh)
 {
+	auto name = IResource_GetName(resMesh);
 	if (auto pMeshId = m_meshNames.find(name))
 		return *pMeshId;
 
@@ -183,7 +184,9 @@ uint32_t CShaderProgram::_AddMesh(const char *name)
 		return meshId;
 	}
 
-	const VertexDescription *vd = _GetMeshVertexDescription(name);
+	CResMesh mesh(resMesh);
+	const VertexDescription *vd = mesh.GetVertexDescription(true);
+//	const VertexDescription *vd = IResource_GetMeshVertexDescription(resMesh);
 	if (!vd)
 		return -1;
 
@@ -542,23 +545,17 @@ void CShaderProgram::_CreateNewBufferSet(uint32_t numVertices, uint32_t numIndec
 	m_meshBufferSets.emplace_back(set);
 }
 
-VertexDescription *CShaderProgram::_GetMeshVertexDescription(const char *name)
-{
-	// TODO: Load mesh from resources
-	static VertexDescription vd;
-	BAMS::CResourceManager rm;
-	if (auto res = rm.FindExisting(name, RESID_MESH))
-	{
-		CResMesh m(res);
-		auto pvd = m.GetVertexDescription(true); // we need loaded mesh now.
-		if (pvd)
-		{
-			vd = *pvd;
-			return &vd;
-		}
-	}
-	return nullptr;
-}
+//VertexDescription *CShaderProgram::_GetMeshVertexDescription(IResource *resMesh)
+//{
+//	static VertexDescription vd;
+//	CResMesh m(resMesh);
+//	auto pvd = m.GetVertexDescription(true); // we need loaded mesh now.
+//	if (pvd)
+//	{
+//		vd = *pvd;
+//		return &vd;
+//	}
+//}
 
 void CShaderProgram::_CreateUniformBuffers()
 {

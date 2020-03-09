@@ -36,7 +36,6 @@ void decomposeM(const float *m, float *r, float *s, float *t)
 		}
 	}
 
-
 	glm::mat4 tm(
 		m[0] / s[0], m[1] / s[0], m[2] / s[0], 0,
 		m[4] / s[1], m[5] / s[1], m[6] / s[1], 0,
@@ -82,9 +81,9 @@ void decomposeM(const float *m, float *r, float *s, float *t)
 void composeM(float *m, float *r, float *s, float *t)
 {
 	float nr[3] = {
-	r[0] * deg2rad,
-	r[2] * deg2rad,
-	r[1] * deg2rad
+		r[0] * deg2rad,
+		r[2] * deg2rad,
+		r[1] * deg2rad
 	};
 	static glm::mat4 I(1);
 	auto S = glm::scale(I, *reinterpret_cast<glm::vec3 *>(s));
@@ -92,7 +91,7 @@ void composeM(float *m, float *r, float *s, float *t)
 	auto T = glm::translate(I, *reinterpret_cast<glm::vec3 *>(t));
 
 	auto &M = *reinterpret_cast<glm::mat4 *>(m);
-	M = T * R*S;
+	M = T * R * S;
 }
 
 }; // Utils namespace

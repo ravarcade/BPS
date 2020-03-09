@@ -58,7 +58,7 @@ public:
 
 	void LoadProgram(const char *program);
 	void Release();
-	uint32_t AddObject(const char *meshName);
+	uint32_t AddMesh(IResource *resMesh);
 	Properties *GetProperties(uint32_t drawObjectId = -1);
 
 	Properties *SetDrawCallback(DrawCallback f, void *data)
@@ -97,7 +97,7 @@ protected:
 	friend class OutputWindow;
 
 private:
-	uint32_t _AddMesh(const char *name);
+	uint32_t _AddMesh(IResource *resMesh);
 	std::vector<VkPipelineShaderStageCreateInfo> _Compile();
 	VkPipelineVertexInputStateCreateInfo _GetVertexInputInfo();
 	VkPipelineInputAssemblyStateCreateInfo _GetInputAssembly();
@@ -115,7 +115,7 @@ private:
 
 	void _CreateNewBufferSet(uint32_t numVertices, uint32_t numIndeces);
 
-	VertexDescription * _GetMeshVertexDescription(const char * name);
+//	VertexDescription * _GetMeshVertexDescription(IResource *resMesh);
 	void _ImportMeshData(const VertexDescription *vd, void *dst);
 	const VertexAttribs &_GetVertexAttribs() { return m_reflection.GetVertexAttribs(); }
 

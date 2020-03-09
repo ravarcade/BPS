@@ -163,30 +163,30 @@ void wait_for_esc()
 
 // ================================================================= 
 
-void AddModel(BAMS::CEngine &en, uint32_t wnd, const char *repoResourceName)
-{
-	PADD_MODEL p = { wnd, repoResourceName };
-	en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &p);
-	return;
-}
+//void AddModel(BAMS::CEngine &en, uint32_t wnd, const char *repoResourceName)
+//{
+//	PADD_MODEL p = { wnd, repoResourceName };
+//	en.SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &p);
+//	return;
+//}
 
-Properties *GetShaderParams(BAMS::CEngine &en, uint32_t wnd, const char *shaderName)
-{
-	Properties *prop;
-	PGET_SHADER_PARAMS p = { wnd, shaderName, &prop };
-	en.SendMsg(GET_SHADER_PARAMS, RENDERING_ENGINE, 0, &p);
+//Properties *GetShaderParams(BAMS::CEngine &en, uint32_t wnd, const char *shaderName)
+//{
+//	Properties *prop;
+//	PGET_SHADER_PARAMS p = { wnd, shaderName, &prop };
+//	en.SendMsg(GET_SHADER_PARAMS, RENDERING_ENGINE, 0, &p);
+//
+//	return prop;
+//}
 
-	return prop;
-}
-
-Properties * GetObjectParams(BAMS::CEngine &en, uint32_t wnd, const char *objectName, uint32_t objectIdx = 0)
-{
-	Properties *prop = nullptr;
-	PGET_OBJECT_PARAMS p = { wnd, objectName, objectIdx, &prop };
-	en.SendMsg(GET_OBJECT_PARAMS, RENDERING_ENGINE, 0, &p);
-
-	return prop;
-}
+//Properties * GetObjectParams(BAMS::CEngine &en, uint32_t wnd, const char *objectName, uint32_t objectIdx = 0)
+//{
+//	Properties *prop = nullptr;
+//	PGET_OBJECT_PARAMS p = { wnd, objectName, objectIdx, &prop };
+//	en.SendMsg(GET_OBJECT_PARAMS, RENDERING_ENGINE, 0, &p);
+//
+//	return prop;
+//}
 
 
 Property *FindProp(MProperties &prop, const char *name)
@@ -516,47 +516,47 @@ void DeleteModels(uint32_t wnd)
 	modelsOnScreen[wnd].clear();
 }
 
-bool strcmpext(const char *val, const char **patt, size_t count, bool caseInsesitive = true)
-{
-	decltype(_stricmp) *cmp = caseInsesitive ? _stricmp : strcmp;
-	for (size_t i = 0; i < count; ++i)
-	{
-		if (cmp(val, patt[i]) == 0)
-			return true;
-	}
-	return false;
-}
-
-Properties * PropertiesForGui(Properties *prop)
-{
-	static const char *colors[] = {
-		"baseColor", "color"
-	};
-	static const char *drag01[] = {
-		"normalMapScale"
-	};
-
-	for (auto &p : *prop)
-	{
-		switch (p.type)
-		{
-		case Property::PT_F32:
-			if ((p.count == 3 || p.count == 4) && strcmpext(p.name, colors, COUNT_OF(colors)))
-			{
-				p.guiType = PTGUI_COLOR;
-			}
-			if (p.count <= 4 && strcmpext(p.name, drag01, COUNT_OF(drag01)))
-			{
-				p.guiType = PTGUI_DRAG;
-				p.guiMin = 0.0f;
-				p.guiMax = 1.0f;
-				p.guiStep = 0.005f;
-			}
-			break;
-		}
-	}
-	return prop;
-}
+//bool strcmpext(const char *val, const char **patt, size_t count, bool caseInsesitive = true)
+//{
+//	decltype(_stricmp) *cmp = caseInsesitive ? _stricmp : strcmp;
+//	for (size_t i = 0; i < count; ++i)
+//	{
+//		if (cmp(val, patt[i]) == 0)
+//			return true;
+//	}
+//	return false;
+//}
+//
+//Properties * PropertiesForGui(Properties *prop)
+//{
+//	static const char *colors[] = {
+//		"baseColor", "color"
+//	};
+//	static const char *drag01[] = {
+//		"normalMapScale"
+//	};
+//
+//	for (auto &p : *prop)
+//	{
+//		switch (p.type)
+//		{
+//		case Property::PT_F32:
+//			if ((p.count == 3 || p.count == 4) && strcmpext(p.name, colors, COUNT_OF(colors)))
+//			{
+//				p.guiType = PTGUI_COLOR;
+//			}
+//			if (p.count <= 4 && strcmpext(p.name, drag01, COUNT_OF(drag01)))
+//			{
+//				p.guiType = PTGUI_DRAG;
+//				p.guiMin = 0.0f;
+//				p.guiMax = 1.0f;
+//				p.guiStep = 0.005f;
+//			}
+//			break;
+//		}
+//	}
+//	return prop;
+//}
 
 void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t modelIdx)
 {
@@ -584,7 +584,10 @@ void AddModelToWnd(BAMS::CEngine &en, uint32_t wnd, uint32_t modelIdx)
 	SetModelMatrix(en, wnd, static_cast<uint32_t>(modelsOnScreen[wnd].size()), pMod);
 	if (wnd == 0 && modelsOnScreen[wnd].size() == 1)
 	{
-		SndMsg::ShowProperties(PropertiesForGui(pMod->GetProperties(0)), "tada!");
+//		SndMsg::ShowProperties(PropertiesForGui(pMod->GetProperties(0)), "tada!");
+//		PropertiesForGui(pMod->GetProperties(0));
+		pMod->ShowProperties("tada!");
+//		SndMsg::ShowProperties(pMod, "tada!");
 	}
 }
 
@@ -606,6 +609,7 @@ void ToggleWnd(BAMS::CEngine &en, int wnd)
 {
 	static PCLOSE_WINDOW cw = { 0 };
 	static PCREATE_WINDOW *wn[3] = { &w0, &w1, &w2 };
+	CResourceManager rm;
 
 	cw.wnd = wnd;
 	if (wndState[wnd])
@@ -616,7 +620,9 @@ void ToggleWnd(BAMS::CEngine &en, int wnd)
 	else
 	{
 		en.SendMsg(CREATE_WINDOW, RENDERING_ENGINE, 0, wn[wnd]);
-		deferredProp[wnd] = *en.AddMesh(wnd, "", "deferred2");
+//		deferredProp[wnd] = *en.AddMesh(wnd, nullptr, "deferred2");
+		auto hMesh = en.AddMesh(wnd, nullptr, rm.FindExisting("deferred2", CResShader::GetType()));
+		deferredProp[wnd] = *en.GetMeshParams(wnd, hMesh);
 		SetDeferredParams(wnd);
 		defaultCam.wnd = wnd;
 		en.SendMsg(SET_CAMERA, RENDERING_ENGINE, 0, &defaultCam);

@@ -70,19 +70,25 @@ public:
 	void initGui();
 	void drawGui();
 
-	void ShowProperties(Properties *prop, const char *name);
+	void ShowProperties(HandleMesh hMesh, const char *name);
 
 	bool m_showImGuiDemoWindow;
 	std::string m_propName;
-	Properties *m_prop;
+
+	HandleMesh m_hMesh;
 	std::vector<IResource *> m_textureResources;
 	std::vector<VkDescriptorImageInfo *> m_textureDescriptors;
 
+	bool inputProperties(HandleMesh hMesh); 
 	bool inputProperties(Properties *prop);
 	bool selectTexture(const char *label, VkDescriptorImageInfo **pPropVal, IResource **outRes);
 		// ==================================================================== Helpers ===
 private:
 	void _updateTextureData();
+
+	Properties * _propertiesForGui(Properties * prop);
+	
+
 	int _getTexture(VkDescriptorImageInfo *val);
 
 	// matrix decomposition

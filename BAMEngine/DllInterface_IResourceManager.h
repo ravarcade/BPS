@@ -62,12 +62,13 @@ enum { // msgId
 	ADD_SHADER = 0x20004,
 	RELOAD_SHADER = 0x20005,
 	GET_SHADER_PARAMS = 0x20006,
-	GET_OBJECT_PARAMS = 0x20007,
+	GET_MESH_PARAMS = 0x20007,
 	UPDATE_DRAW_COMMANDS = 0x20008,
 	SET_CAMERA = 0x20009,
 	ADD_TEXTURE = 0x2000a,
 	ADD_MODEL = 0x2000b,
 	UPDATE_TEXTURE = 0x2000c,
+	SET_MODEL_MATRIX = 0x2000d,
 
 	// to GUI
 	SHOW_PROPERTIES = 0x30001,
@@ -76,7 +77,6 @@ enum { // msgId
 	IDENTIFY_RESOURCE = 0x40001,
 	IMPORTMODULE_UPDATE = 0x40002,
 	IMPORTMODULE_LOADMESH = 0x40003,
-	//IMPORTMODULE_LOADIMAGE = 0X40004,
 	IMPORTMODULE_UPDATEIMAGE = 0X40005,
 };
 
@@ -90,37 +90,38 @@ struct PCLOSE_WINDOW {
 	uint32_t wnd;
 };
 
+typedef uint32_t HandleMesh;
+typedef uint32_t HandleModel;
+
 struct PADD_MESH {
 	uint32_t wnd;
-	const char *mesh;	 // resource name
-	const char *shader;  // resource name
-	Properties **pProperties;
-	uint32_t *pId;
+	IResource *resMesh;
+	IResource *resShader;
+	HandleMesh *pHandleMesh;
 };
 
 struct PADD_SHADER {
 	uint32_t wnd;
-	const char *shader;
+	IResource *resShader;
 };
-
-struct SHADER_PARAM_ENTRY {
-	uint32_t parent;
-	uint32_t type;
-	uint32_t count;
-	const char *name;
-};
+//
+//struct SHADER_PARAM_ENTRY {
+//	uint32_t parent;
+//	uint32_t type;
+//	uint32_t count;
+//	const char *name;
+//};
 
 struct PGET_SHADER_PARAMS {
 	uint32_t wnd;
-	const char *name;
+	IResource *resShader;
 	Properties **pProperties;
 };
 
 typedef struct PADD_SHADER PRELOAD_SHADER;
-struct PGET_OBJECT_PARAMS {
+struct PGET_MESH_PARAMS {
 	uint32_t wnd;
-	const char *name;
-	uint32_t objectIdx;
+	HandleMesh hMesh;
 	Properties **pProperties;
 };
 
@@ -147,24 +148,33 @@ struct PSET_CAMERA {
 struct PADD_TEXTURE {
 	uint32_t wnd;
 	void *propVal;
-	const char *textureResourceName;
-	IResource *textureResource;
+	IResource *resTexture;
 };
 
 struct PUPDATE_TEXTURE {
 	uint32_t wnd;
-	const char *textureResourceName;
-	IResource *textureResource;
+	IResource *resTexture;
 };
 
 struct PADD_MODEL {
 	uint32_t wnd;
-	const char * modelName;
+	IResource * resModel;
+	HandleModel *pHandleModel;
 };
 
-struct PSHOW_PROPERTIES {
-	Properties *prop;
-	const char *name;
+struct PSHOW_PROPERTIES 
+{
+	uint32_t wnd;
+	HandleMesh hMesh;
+	const char *propertiesName;
+};
+
+struct PSET_MODEL_MATRIX
+{
+	uint32_t wnd;
+	HandleMesh hModel;
+	const float *T;
+	const char *propName;
 };
 
 extern "C" {
@@ -565,7 +575,7 @@ public:
 };
 
 // ================================================================================== CEngine ===
-
+class CResModelDraw;
 class CEngine
 {
 public:
@@ -615,25 +625,52 @@ public:
 	}
 
 	// =========================== messages ============
-	static Properties *AddMesh(uint32_t wnd, const char *mesh, const char *shader, uint32_t *pId = nullptr)
+	static HandleModel AddModel(uint32_t wnd, IResource *resModel)
 	{
-		Properties *pprop = nullptr;
-		PADD_MESH params = { wnd, mesh, shader, &pprop, pId };
-		BAMS::CEngine::SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &params);
-
-		return pprop;
+		HandleModel hModel = 0;
+		PADD_MODEL params = { wnd, resModel, &hModel };
+		BAMS::CEngine::SendMsg(ADD_MODEL, RENDERING_ENGINE, 0, &params);
+		return hModel;
 	}
 
-	static void ShowProperties(Properties *prop, const char *name = nullptr)
+	static HandleMesh AddMesh(uint32_t wnd, IResource *resMesh, IResource *resShader)
 	{
-		PSHOW_PROPERTIES params = { prop, name };
+		HandleMesh hMesh;
+		PADD_MESH params = { wnd, resMesh, resShader, &hMesh };
+		BAMS::CEngine::SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &params);
+		return hMesh;
+	}
+
+	static Properties *GetMeshParams(uint32_t wnd, HandleMesh hMesh)
+	{
+		Properties *prop = nullptr;
+		PGET_MESH_PARAMS params = { wnd, hMesh, &prop };
+		BAMS::CEngine::SendMsg(GET_MESH_PARAMS, RENDERING_ENGINE, 0, &params);
+		return prop;
+	}
+
+	static void ShowProperties(uint32_t wnd, HandleMesh hMesh, const char *name = nullptr)
+	{
+		PSHOW_PROPERTIES params = { wnd, hMesh, name };
 		BAMS::CEngine::SendMsg(SHOW_PROPERTIES, RENDERING_ENGINE, 0, &params);
 	}	
 
-	static void SetTexture(uint32_t wnd, Property *p, const char *name, IResource *res = nullptr)
+	static void SetTexture(uint32_t wnd, Property *p, const char *resTextureName) 
 	{
-		PADD_TEXTURE params = { wnd, p->val, name, res };
+		CResourceManager rm;
+		SetTexture(wnd, p, rm.FindExisting(resTextureName, CResImage::GetType()));
+	}
+
+	static void SetTexture(uint32_t wnd, Property *p, IResource *resTexture)
+	{
+		PADD_TEXTURE params = { wnd, p->val, resTexture };
 		BAMS::CEngine::SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &params);
+	}
+
+	static void SetModelMatrix(uint32_t wnd, HandleMesh hMesh, const float *T, const char *propName = nullptr)
+	{
+		PSET_MODEL_MATRIX params = { wnd, hMesh, T, propName };
+		BAMS::CEngine::SendMsg(SET_MODEL_MATRIX, RENDERING_ENGINE, 0, &params);
 	}
 };
 
@@ -677,55 +714,75 @@ public:
 	void AddToWindow(uint32_t _wnd, const char *modelMatrixName)
 	{
 		wnd = _wnd;
-		CEngine en;
-		uint32_t count = GetMeshCount();
-		meshes.resize(count);
-		const float *M;
-		const Properties *srcProp;
-		Properties *prop = nullptr;
-		PADD_MESH p = { wnd, nullptr, nullptr, &prop, nullptr };
+		hModel = CEngine::AddModel(wnd, Get());
 
-		for (uint32_t i = 0; i < count; ++i)
-		{
-			GetMesh(i, &p.mesh, &p.shader, &M, &srcProp);
+		//PADD_MESH p = { wnd, nullptr, nullptr, &hModel };
 
-			en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &p);
-			MeshData &m = meshes[i];
-			memcpy_s(m.M, sizeof(m.M), M, sizeof(m.M));
-			m.prop = *prop;
 
-			// set mesh "model" matrix (M)
-			auto pModelProp = m.prop.Find(modelMatrixName);
-			m.outputM = pModelProp ? reinterpret_cast<float *>(pModelProp->val) : nullptr;
+		//CEngine en;
+		//uint32_t count = GetMeshCount();
+		//meshes.resize(count);
+		//Properties *pMeshProp;
+		//
+		//PADD_MESH p = { wnd, nullptr, nullptr, &hModel };
 
-			// set textures
-			for (auto &p : m.prop)
-			{
-				if (p.type != Property::PT_TEXTURE)
-					continue;
+		//for (uint32_t i = 0; i < count; ++i)
+		//{
+		//	const float *M;
+		//	const Properties *srcProp;
+		//	GetMesh(i, &p.mesh, &p.shader, &M, &srcProp);
 
-				auto src = srcProp->ConstFind(p.name);
-				void *val = src ? src->val : nullptr;
-				if (!val)
-				{
-					CResourceManager rm;
-					val = rm.FindExisting(p.name, RESID_IMAGE);
-				}
-				if (val)
-				{
-					PADD_TEXTURE addTexParams = { wnd, p.val, nullptr, reinterpret_cast<IResource *>(val) };
-					en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
-				}
-			}
+		//	MeshData &m = meshes[i];
+		//	p.pId = &m.meshId;
+		//	en.SendMsg(ADD_MESH, RENDERING_ENGINE, 0, &p);
+		//	memcpy_s(m.M, sizeof(m.M), M, sizeof(m.M));
+		//	m.prop = *pMeshProp;
 
-		}
+
+		//	// set mesh "model" matrix (M)
+		//	auto pModelProp = m.prop.Find(modelMatrixName);
+		//	m.outputM = pModelProp ? reinterpret_cast<float *>(pModelProp->val) : nullptr;
+
+		//	// set textures
+		//	for (auto &p : m.prop)
+		//	{
+		//		if (p.type != Property::PT_TEXTURE)
+		//			continue;
+
+		//		auto src = srcProp->ConstFind(p.name);
+		//		void *val = src ? src->val : nullptr;
+		//		if (!val)
+		//		{
+		//			CResourceManager rm;
+		//			val = rm.FindExisting(p.name, RESID_IMAGE);
+		//		}
+		//		if (val)
+		//		{
+		//			PADD_TEXTURE addTexParams = { wnd, p.val, nullptr, reinterpret_cast<IResource *>(val) };
+		//			en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
+		//		}
+		//	}
+
+		//}
 	}
 
+	Properties *GetProperties(uint32_t idx)
+	{
+		return CEngine::GetMeshParams(wnd, hModel + idx);
+	}
+
+	Property *GetProperty(const char *name, uint32_t idx)
+	{
+		auto prop = GetProperties(idx);
+
+		if (!prop)
+			return nullptr;
+		return prop->Find(name);
+
+	}
 	void *GetParam(const char *name, uint32_t idx)
 	{
-		if (idx >= meshes.size())
-			return nullptr;
-		auto p = meshes[idx].prop.Find(name);
+		auto p = GetProperty(name, idx);
 		return p ? p->val : nullptr;
 	}
 
@@ -737,39 +794,40 @@ public:
 			for (uint32_t max = GetMeshCount(); idx < max; ++idx)
 				SetParam(name, value, idx);
 		}
-		if (idx < meshes.size())
+		auto p = GetProperty(name, idx);
+		if (p) 
 		{
-			MeshData &mesh = meshes[idx];
-			auto p = mesh.prop.Find(name);
-			if (p) 
+			if (p->type == Property::PT_TEXTURE) 
 			{
-				if (p->type == Property::PT_TEXTURE)
-				{
-					CEngine en;
-					PADD_TEXTURE addTexParams = { wnd, p->val, nullptr, reinterpret_cast<IResource *>(value) };
-					en.SendMsg(ADD_TEXTURE, RENDERING_ENGINE, 0, &addTexParams);
-				}
-				else
-				{
-					p->SetMem(value);
-				}
+				CEngine::SetTexture(wnd, p, reinterpret_cast<IResource *>(value));
+			}
+			else {
+				p->SetMem(value);
 			}
 		}
 	}
 
 	void SetMatrix(const float *T) 
 	{
-		for (auto &m : meshes)
-			Tools::Mat4mul(m.outputM, T, m.M);
+		CEngine::SetModelMatrix(wnd, hModel, T);
+		//for (auto &m : meshes)
+			//Tools::Mat4mul(m.outputM, T, m.M);
 	};
-	MProperties *GetProperties(uint32_t idx) { return idx < meshes.size() ? &meshes[idx].prop : nullptr; }
+
+	void ShowProperties(const char *name, uint32_t idx = 0)
+	{
+		CEngine::ShowProperties(wnd, hModel + idx, name);
+	}
+
 private:
 	uint32_t wnd;
-	struct MeshData
-	{		
-		float M[16];
-		float *outputM;
-		MProperties prop;
-	};
-	array<MeshData> meshes;
+	HandleModel hModel;
+	//struct MeshData
+	//{		
+	//	uint32_t meshId;
+	//	float M[16];
+	//	float *outputM;
+	//	MProperties prop;
+	//};
+	//array<MeshData> meshes;
 };

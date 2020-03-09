@@ -11,7 +11,6 @@ public:
 	void Release() {};
 
 
-	void LoadResTexture(const char *textureResourceName);
 	void LoadResTexture(IResource * textureResource);
 
 	VkDescriptorImageInfo descriptor;

@@ -45,11 +45,12 @@ public:
 		case ADD_TEXTURE:       re.AddTexture(msg->data); break;
 		case RELOAD_SHADER:     re.ReloadShader(msg->data); break;
 		case GET_SHADER_PARAMS: re.GetShaderParams(msg->data); break;
-		case GET_OBJECT_PARAMS: re.GetObjectParams(msg->data); break;
+		case GET_MESH_PARAMS:   re.GetMeshParams(msg->data); break;
 		case UPDATE_DRAW_COMMANDS: re.UpdateDrawCommands(msg->data); break;
 		case SET_CAMERA:        re.SetCamera(msg->data); break;
 		case SHOW_PROPERTIES:   re.ShowProperties(msg->data); break;
 		case UPDATE_TEXTURE:    re.UpdateTexture(msg->data); break;
+		case SET_MODEL_MATRIX:  re.SetModelMatrix(msg->data); break;
 		}
 	}
 

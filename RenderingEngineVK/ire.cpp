@@ -272,54 +272,58 @@ if (!p || p->wnd >= COUNT_OF(outputWindows)) return; \
 auto ow = outputWindows[p->wnd]; \
 if (!ow || !ow->Exist())  return;
 
+#define CASTMSGPARAMSTOALL(x,y) \
+auto p = static_cast<const x *>(params);\
+if (!p) return;\
+if (p->wnd == -1) \
+{\
+	for (auto ow : outputWindows) { \
+		if (!ow || !ow->Exist())  continue; \
+		y; \
+	} \
+	return;\
+}\
+if (p->wnd >= COUNT_OF(outputWindows)) return; \
+auto ow = outputWindows[p->wnd]; \
+if (!ow || !ow->Exist())  return;
 
 /// <summary>
 /// Adds the mesh.
 /// </summary>
 /// <param name="params">The parameters.</param>
-void  ire::AddMesh(const void * params)
+void ire::AddMesh(const void * params)
 {
 	CASTMSGPARAMS(PADD_MESH);
-	auto oi = ow->AddObject(p->mesh, p->shader);
-	if (oi)
-	{
-		if (p->pProperties)
-			*p->pProperties = oi->GetProperties();
-		if (p->pId)
-			*p->pId = oi->oid;
-	}
+	*p->pHandleMesh = ow->AddMesh(p->resMesh, p->resShader);
 }
 
-void  ire::AddModel(const void * params)
+void ire::AddModel(const void * params)
 {
 	CASTMSGPARAMS(PADD_MODEL);
-	ow->AddModel(p->modelName);
-	//auto oi = ow->AddObject(p->name, p->mesh, p->shader);
-	//if (oi)
-	//{
-	//	if (p->pProperties)
-	//		*p->pProperties = oi->GetProperties();
-	//	if (p->pId)
-	//		*p->pId = oi->oid;
-	//}
+	*p->pHandleModel = ow->AddModel(p->resModel);
+}
+
+void ire::SetModelMatrix(const void * params)
+{
+	CASTMSGPARAMS(PSET_MODEL_MATRIX);
+	ow->SetModelMatrix(p->hModel, p->T, p->propName);
 }
 
 void ire::AddTexture(const void * params)
 {
 	CASTMSGPARAMS(PADD_TEXTURE);
-	ow->AddTexture(p->propVal, p->textureResourceName, p->textureResource);
+	ow->AddTexture(p->propVal, p->resTexture);
 }
 
 void ire::UpdateTexture(const void *params)
 {
-	CASTMSGPARAMS(PUPDATE_TEXTURE);
-	ow->UpdateTexture(p->textureResourceName, p->textureResource);
+	CASTMSGPARAMSTOALL(PUPDATE_TEXTURE, ow->UpdateTexture(p->resTexture));
 }
 
 void ire::AddShader(const void * params)
 {
 	CASTMSGPARAMS(PADD_SHADER);
-	ow->AddShader(p->shader);
+	ow->AddShader(p->resShader);
 }
 
 void ire::ReloadShader(const void *params)
@@ -332,8 +336,8 @@ void ire::ReloadShader(const void *params)
 		{
 			if (ow && ow->Exist())
 			{
-				TRACE("ReloadShader: " << p->shader << ", wnd=" << p->wnd << "\n");
-				ow->ReloadShader(p->shader);
+				TRACE("ReloadShader: " << IResource_GetName(p->resShader) << ", wnd=" << p->wnd << "\n");
+				ow->ReloadShader(p->resShader);
 			}
 		}
 	}
@@ -343,22 +347,21 @@ void ire::ReloadShader(const void *params)
 		if (!ow || !ow->Exist())  
 			return;
 
-		TRACE("ReloadShader: " << p->shader << ", wnd=" << p->wnd << "\n");
-		ow->ReloadShader(p->shader);
-
+		TRACE("ReloadShader: " << IResource_GetName(p->resShader) << ", wnd=" << p->wnd << "\n");
+		ow->ReloadShader(p->resShader);
 	}
 }
 
 void ire::GetShaderParams(const void * params)
 {
 	CASTMSGPARAMS(PGET_SHADER_PARAMS);
-	ow->GetShaderParams(p->name, p->pProperties);
+	*p->pProperties = ow->GetShaderParams(p->resShader);
 }
 
-void ire::GetObjectParams(const void * params)
+void ire::GetMeshParams(const void * params)
 {
-	CASTMSGPARAMS(PGET_OBJECT_PARAMS);
-	ow->GetObjectParams(p->objectIdx, p->pProperties);
+	CASTMSGPARAMS(PGET_MESH_PARAMS);
+	*p->pProperties = ow->GetMeshParams(p->hMesh);
 }
 
 void ire::UpdateDrawCommands(const void *params)
@@ -379,7 +382,7 @@ void ire::ShowProperties(const void *params)
 	auto p = static_cast<const PSHOW_PROPERTIES *>(params);
 	if (!p || !ow || !ow->Exist() || !ow->imGui) 
 		return;
-	ow->imGui->ShowProperties(p->prop, p->name);
+	ow->imGui->ShowProperties(p->hMesh, p->propertiesName);
 }
 
 // ============================================================================ ire : Rendering Engine - protected methods ===
