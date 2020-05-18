@@ -37,7 +37,7 @@ private:
 		MeshEntry(ResBase *_mesh, ResBase *_shader, const float *_M) : mesh(_mesh), shader(_shader) 
 		{ 
 			memcpy_s(M, sizeof(M), _M, sizeof(M));
-			CResMesh me(mesh); 
+			ResMesh me(mesh); 
 			prop = *me.GetMeshProperties(true); 
 			FindTexturesInProperties(reinterpret_cast<ResBase *>(me.GetMeshSrc())); 
 		}

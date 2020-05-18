@@ -166,7 +166,7 @@ void ResImportModel::IdentifyResourceType(ResBase * res)
 	PIDETIFY_RESOURCE ir = {
 		res->Path.c_str(),
 		&res->Type,
-		res};
+		reinterpret_cast<IResource*>(res) };
 	IEngine::SendMsg(IDENTIFY_RESOURCE, IMPORT_MODULE, 0, &ir);
 }
 

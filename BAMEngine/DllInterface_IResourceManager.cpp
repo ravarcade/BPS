@@ -5,7 +5,7 @@ namespace BAMS {
 using namespace CORE;
 
 template<typename T>
-T *Impl(void *res)
+T *Impl(IResource *res)
 {
 	assert(res);
 	auto ret = reinterpret_cast<T *>(reinterpret_cast<ResBase *>(res)->GetImplementation());
@@ -33,7 +33,7 @@ extern "C" {
 
 	BAMS_EXPORT BAMS::IModule *GetModule(uint32_t moduleId)
 	{
-		return IEngine::GetModule(moduleId);
+		return reinterpret_cast<BAMS::IModule*>(IEngine::GetModule(moduleId));
 	}
 
 	// =========================================================================== Resource
@@ -86,7 +86,7 @@ extern "C" {
 	BAMS_EXPORT const wchar_t * IResShader_GetBinaryFilename(IResShader *res, int type) { return Impl<ResShader>(res)->GetBinaryFilename(type).c_str(); }
 	BAMS_EXPORT void IResShader_Save(IResShader *res)                                   {        Impl<ResShader>(res)->Save(reinterpret_cast<ResBase *>(res));}
 	BAMS_EXPORT uint32_t IResShader_GetBinaryCount(IResShader *res)                     { return Impl<ResShader>(res)->GetBinaryCount(); }
-	BAMS_EXPORT IResRawData *IResShader_GetBinary(IResShader *res, uint32_t idx)        { return Impl<ResShader>(res)->GetBinary(idx); }
+	BAMS_EXPORT IResRawData *IResShader_GetBinary(IResShader *res, uint32_t idx)        { return reinterpret_cast<IResRawData *>(Impl<ResShader>(res)->GetBinary(idx)); }
 
 	// =========================================================================== ResMesh
 
@@ -102,7 +102,7 @@ extern "C" {
 
 	BAMS_EXPORT const VertexDescription * IResMesh_GetVertexDescription(IResMesh * res, bool loadASAP) { return Impl<ResMesh>(res)->GetVertexDescription(loadASAP); }
 	BAMS_EXPORT const Properties * IResMesh_GetMeshProperties(IResMesh * res, bool loadASAP)           { return Impl<ResMesh>(res)->GetMeshProperties(loadASAP); }
-	BAMS_EXPORT IResource * IResMesh_GetMeshSrc(IResMesh * res)                                        { return Impl<ResMesh>(res)->GetMeshSrc(); }
+	BAMS_EXPORT IResource * IResMesh_GetMeshSrc(IResMesh * res)                                        { return reinterpret_cast<IResource *>(Impl<ResMesh>(res)->GetMeshSrc()); }
 	BAMS_EXPORT uint32_t IResMesh_GetMeshIdx(IResMesh * res)                                           { return Impl<ResMesh>(res)->GetMeshIdx(); }
 	BAMS_EXPORT void IResMesh_SetMeshIdx(IResMesh * res, uint32_t idx)                                 { return Impl<ResMesh>(res)->SetMeshIdx(idx); }
 	BAMS_EXPORT uint32_t IResMesh_GetMeshHash(IResMesh * res)                                          { return Impl<ResMesh>(res)->GetMeshHash(); }
@@ -128,8 +128,8 @@ extern "C" {
 
 	BAMS_EXPORT IResourceManager *IResourceManager_Create()
 	{
-		auto rm = reinterpret_cast<ResourceManagerModule*>(GetModule(IModule::ResourceManagerModule));
-		return rm->GetResourceManager();
+		auto rm = reinterpret_cast<ResourceManagerModule*>(GetModule(BAMS::CORE::IModule::ResourceManagerModule));
+		return reinterpret_cast<IResourceManager*>(rm->GetResourceManager());
 	}
 
 	BAMS_EXPORT void IResourceManager_Destroy(IResourceManager *rm)
@@ -141,43 +141,43 @@ extern "C" {
 	BAMS_EXPORT IResource * IResourceManager_CreateResource(IResourceManager *rm, const char *resName, uint32_t type)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->Create(resName, type);
+		return reinterpret_cast<IResource *>(resm->Create(resName, type));
 	}
 
 	BAMS_EXPORT IResource * IResourceManager_FindOrCreate(IResourceManager *rm, const char *resName, uint32_t type)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->FindOrCreate(resName, type);
+		return reinterpret_cast<IResource *>(resm->FindOrCreate(resName, type));
 	}
 
 	BAMS_EXPORT IResource * IResourceManager_FindOrCreateByFilename(IResourceManager *rm, const wchar_t *path, uint32_t type)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->FindOrCreate(path, type);
+		return reinterpret_cast<IResource *>(resm->FindOrCreate(path, type));
 	}
 
 	BAMS_EXPORT IResource * IResourceManager_FindOrCreateByUID(IResourceManager *rm, const UUID &uid, uint32_t type)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->FindOrCreate(uid, type);
+		return reinterpret_cast<IResource *>(resm->FindOrCreate(uid, type));
 	}
 
 	BAMS_EXPORT IResource * IResourceManager_FindExisting(IResourceManager *rm, const char *resName, uint32_t type)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->FindExisting(resName, type);
+		return reinterpret_cast<IResource *>(resm->FindExisting(resName, type));
 	}
 
 	BAMS_EXPORT IResource * IResourceManager_FindExistingByFilename(IResourceManager *rm, const wchar_t *path, uint32_t type)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->FindExisting(path, type);
+		return reinterpret_cast<IResource *>(resm->FindExisting(path, type));
 	}
 
 	BAMS_EXPORT IResource * IResourceManager_FindExistingByUID(IResourceManager *rm, const UUID &uid, uint32_t type)
 	{
 		auto *resm = reinterpret_cast<ResourceManager *>(rm);
-		return resm->FindExisting(uid, type);
+		return reinterpret_cast<IResource *>(resm->FindExisting(uid, type));
 	}
 
 	BAMS_EXPORT void IResourceManager_AddDir(IResourceManager *rm, const wchar_t *path)

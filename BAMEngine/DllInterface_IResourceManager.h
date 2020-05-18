@@ -35,15 +35,26 @@ enum {
 
 // ============================================================================
 
-typedef void IResource;
-typedef void IResRawData;
-typedef void IResShader;
-typedef void IResMesh;
-typedef void IResModel;
-typedef void IResImage;
-typedef void IResourceManager;
+//typedef void IResource;
+//typedef void IResRawData;
+//typedef void IResShader;
+//typedef void IResMesh;
+//typedef void IResModel;
+//typedef void IResImage;
+//typedef void IResourceManager;
 
-typedef void IModule;
+//typedef void IModule;
+
+struct IResource { /* empty */ };
+struct IResRawData : public IResource { /* empty */ };
+struct IResShader : public IResource { /* empty */ };
+struct IResMesh : public IResource { /* empty */ };
+struct IResModel : public IResource { /* empty */ };
+struct IResImage : public IResource { /* empty */ };
+struct IResourceManager { /* empty */ };
+
+struct IModule { /* empty */ };
+
 
 enum { // msgDst
 	RENDERING_ENGINE = 0x201, // VK
@@ -128,7 +139,7 @@ struct PGET_MESH_PARAMS {
 struct PIDETIFY_RESOURCE {
 	const wchar_t *filename;
 	uint32_t *pType;
-	void *res;
+	IResource *res;
 };
 
 struct PUPDATE_DRAW_COMMANDS {
@@ -375,14 +386,15 @@ public:
 	uint32_t GetRefCounter() { return IResource_GetRefCounter(Get()); }
 	inline IResource *Get() { return _res.Get(); }
 	template<typename T>
-	T *Get() { return static_cast<T*>(_res.Get()); }
+	T *Get() { return reinterpret_cast<T*>(_res.Get()); }
 };
 
 // ================================================================================== Help macro ===
 
 #define CRESOURCEEXT2(x, y, resTypeId) \
 		C##x() {} \
-		C##x(I##y *r) : CResource(static_cast<IResource *>(r)) {} \
+		C##x(IResource *r): CResource(r) {} \
+		C##x(I##y *r) : CResource(reinterpret_cast<IResource *>(r)) {} \
 		C##x(const C##x &src) : CResource(src) {} \
 		C##x(C##x &&src) : CResource(std::move(src)) {} \
 		virtual ~C##x() {} \
@@ -508,9 +520,9 @@ public:
 	CRESOURCEEXT(ResImage, RESID_IMAGE);
 
 	Image *GetImage(bool loadASAP = false) { return IResImage_GetImage(Self(), loadASAP); }
-	uint8_t *GetSrcData() { return IResImage_GetSrcData(Get()); }
-	size_t GetSrcSize() { return IResImage_GetSrcSize(Get()); }
-	void ReleaseSrc() { return IResImage_ReleaseSrc(Get()); }
+	uint8_t *GetSrcData() { return IResImage_GetSrcData(Get<IResImage>()); }
+	size_t GetSrcSize() { return IResImage_GetSrcSize(Get<IResImage>()); }
+	void ReleaseSrc() { return IResImage_ReleaseSrc(Get<IResImage>()); }
 };
 
 // ================================================================================== CResourceManager ===

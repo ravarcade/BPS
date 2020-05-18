@@ -236,7 +236,7 @@ public:
 
 	void ResLoadMesh(void *params)
 	{
-		CResMesh m(params);
+		CResMesh m(reinterpret_cast<IResource*>(params));
 		auto res = m.GetMeshSrc();
 		if (res) {
 			auto *pModelRepo = _GetImportedModelRepo(res);
@@ -256,14 +256,14 @@ public:
 
 	void ResUpdateImage(void *params)
 	{
-		CResImage res(params);
+		CResImage res(reinterpret_cast<IResource*>(params));
 		imgDecoder.Decode(res);
 		TRACEW(L"ResUpdateImage (Image Decoded): " << res.GetPath() << L"\n");
 	}
 
 	void ResUpdate(void *params)
 	{
-		CResource res(params);
+		CResource res(reinterpret_cast<IResource*>(params));
 		TRACEW(L"ResUp: " << res.GetPath() << L"\n");
 	}
 

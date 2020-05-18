@@ -20,7 +20,7 @@
 // MACRO-s:
 #ifdef NDEBUG
 #define assert(condition) ((void)0)
-#define TRACE(x)
+#define TRACE(x) {}
 #define TRACEW(x)
 #else
 #include <cassert>
